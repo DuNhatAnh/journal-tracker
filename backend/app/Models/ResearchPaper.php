@@ -35,12 +35,12 @@ class ResearchPaper extends Model
 
     public function authors()
     {
-        return $this->belongsToMany(Author::class, 'paper_author');
+        return $this->belongsToMany(Author::class, 'paper_author', 'paper_id', 'author_id');
     }
 
     public function keywords()
     {
-        return $this->belongsToMany(Keyword::class, 'keyword_paper');
+        return $this->belongsToMany(Keyword::class, 'keyword_paper', 'paper_id', 'keyword_id');
     }
 
     public function bookmarks()

@@ -13,7 +13,7 @@ class Keyword extends Model
 
     public function papers()
     {
-        return $this->belongsToMany(ResearchPaper::class, 'keyword_paper');
+        return $this->belongsToMany(ResearchPaper::class, 'keyword_paper', 'keyword_id', 'paper_id');
     }
 
     public function trends()

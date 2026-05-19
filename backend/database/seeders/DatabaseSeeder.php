@@ -20,28 +20,28 @@ class DatabaseSeeder extends Seeder
         $admin = User::create([
             'name'     => 'System Admin',
             'email'    => 'admin@journaltracker.app',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('12345678'),
             'role'     => 'admin',
         ]);
 
         User::create([
             'name'     => 'Dr. Researcher',
             'email'    => 'researcher@journaltracker.app',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('12345678'),
             'role'     => 'researcher',
         ]);
 
         User::create([
             'name'     => 'Prof. Lecturer',
             'email'    => 'lecturer@journaltracker.app',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('12345678'),
             'role'     => 'lecturer',
         ]);
 
         User::create([
             'name'     => 'Student Demo',
             'email'    => 'student@journaltracker.app',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('12345678'),
             'role'     => 'student',
         ]);
 
@@ -59,62 +59,14 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        // ─── Demo Journals ───────────────────────────────────────────────────────
-        $journals = [
-            ['name' => 'Nature', 'issn' => '0028-0836', 'publisher' => 'Springer Nature', 'field' => 'Multidisciplinary'],
-            ['name' => 'IEEE Transactions on Neural Networks', 'issn' => '2162-237X', 'publisher' => 'IEEE', 'field' => 'Computer Science'],
-            ['name' => 'arXiv (cs.AI)', 'issn' => null, 'publisher' => 'Cornell University', 'field' => 'Artificial Intelligence'],
-        ];
-
-        foreach ($journals as $j) {
-            Journal::create($j);
-        }
-
-        // ─── Demo Keywords ───────────────────────────────────────────────────────
-        $keywordNames = [
-            'Machine Learning', 'Deep Learning', 'Natural Language Processing',
-            'Computer Vision', 'Reinforcement Learning', 'Transformer', 'Large Language Models',
-        ];
-
-        $keywords = [];
-        foreach ($keywordNames as $kw) {
-            $keywords[] = Keyword::create([
-                'name' => $kw,
-                'slug' => \Illuminate\Support\Str::slug($kw),
-            ]);
-        }
-
-        // ─── Demo Publication Trends ─────────────────────────────────────────────
-        $trendData = [
-            'Machine Learning'   => [2020 => 1200, 2021 => 1450, 2022 => 1890, 2023 => 2200, 2024 => 2750],
-            'Deep Learning'      => [2020 => 980,  2021 => 1300, 2022 => 1700, 2023 => 2100, 2024 => 2600],
-            'Large Language Models' => [2020 => 50, 2021 => 200, 2022 => 800, 2023 => 2500, 2024 => 5100],
-        ];
-
-        foreach ($trendData as $kwName => $years) {
-            $kw = Keyword::where('name', $kwName)->first();
-            $prev = null;
-            foreach ($years as $year => $count) {
-                $growth = $prev ? round(($count - $prev) / $prev * 100, 2) : 0;
-                PublicationTrend::create([
-                    'keyword_id'   => $kw->id,
-                    'year'         => $year,
-                    'paper_count'  => $count,
-                    'citation_count' => $count * rand(3, 8),
-                    'growth_rate'  => $growth,
-                ]);
-                $prev = $count;
-            }
-        }
-
-        $this->command->info('✅ Seeding complete! Demo accounts created.');
+        $this->command->info('✅ Seeding complete! User accounts and API sources created.');
         $this->command->table(
             ['Role', 'Email', 'Password'],
             [
-                ['Admin',      'admin@journaltracker.app',      'password'],
-                ['Researcher', 'researcher@journaltracker.app', 'password'],
-                ['Lecturer',   'lecturer@journaltracker.app',   'password'],
-                ['Student',    'student@journaltracker.app',    'password'],
+                ['Admin',      'admin@journaltracker.app',      '12345678'],
+                ['Researcher', 'researcher@journaltracker.app', '12345678'],
+                ['Lecturer',   'lecturer@journaltracker.app',   '12345678'],
+                ['Student',    'student@journaltracker.app',    '12345678'],
             ]
         );
     }

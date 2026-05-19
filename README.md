@@ -93,14 +93,14 @@ php artisan serve
 php artisan queue:work
 ```
 
-**Demo accounts sau khi seed:**
+**Các tài khoản mặc định sau khi seed:**
 
-| Role | Email | Password |
+| Vai trò | Email | Mật khẩu |
 |------|-------|---------|
-| Admin | admin@journaltracker.app | password |
-| Researcher | researcher@journaltracker.app | password |
-| Lecturer | lecturer@journaltracker.app | password |
-| Student | student@journaltracker.app | password |
+| Admin | admin@journaltracker.app | `12345678` |
+| Researcher | researcher@journaltracker.app | `12345678` |
+| Lecturer | lecturer@journaltracker.app | `12345678` |
+| Student | student@journaltracker.app | `12345678` |
 
 ---
 

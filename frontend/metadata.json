@@ -1,0 +1,6 @@
+{
+  "name": "SciTrend",
+  "description": "Hệ thống Theo dõi Xu hướng Xuất bản Tạp chí Khoa học (Scientific Journal Publication Trend Tracking System). An advanced academic insight engine for tracking research trends and managing academic citations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
