@@ -62,4 +62,10 @@ class User extends Authenticatable
                     ->withPivot('note')
                     ->withTimestamps();
     }
+
+    public function followedKeywords()
+    {
+        return $this->belongsToMany(Keyword::class, 'user_keyword')
+                    ->withTimestamps();
+    }
 }

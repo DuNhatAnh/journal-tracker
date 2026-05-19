@@ -14,6 +14,8 @@ use App\Models\ResearchPaper;
 use App\Models\Journal;
 use App\Models\Author;
 use App\Models\Keyword;
+use App\Models\SyncLog;
+use App\Models\ApiSource;
 
 class SyncPapersFromApi implements ShouldQueue
 {
@@ -21,6 +23,8 @@ class SyncPapersFromApi implements ShouldQueue
 
     public int $tries   = 3;
     public int $timeout = 120;
+
+    protected int $syncedCount = 0;
 
     public function __construct(
         protected string $query,
@@ -32,22 +36,53 @@ class SyncPapersFromApi implements ShouldQueue
     {
         Log::info("SyncPapersFromApi started", ['query' => $this->query, 'source' => $this->source]);
 
-        for ($page = 1; $page <= $this->maxPages; $page++) {
-            $data = $openAlex->searchWorks($this->query, $page, 50);
+        $apiSource = ApiSource::whereRaw('LOWER(name) = ?', [strtolower($this->source)])->first();
+        $log = SyncLog::create([
+            'api_source_id' => $apiSource?->id,
+            'status'        => 'running',
+            'papers_synced' => 0,
+        ]);
 
-            if (empty($data['results'])) {
-                break;
+        $this->syncedCount = 0;
+
+        try {
+            for ($page = 1; $page <= $this->maxPages; $page++) {
+                $data = $openAlex->searchWorks($this->query, $page, 50);
+
+                if (empty($data['results'])) {
+                    break;
+                }
+
+                foreach ($data['results'] as $item) {
+                    $this->processWork($item);
+                }
+
+                // Respect rate limits — polite crawling
+                sleep(1);
             }
 
-            foreach ($data['results'] as $item) {
-                $this->processWork($item);
+            $log->update([
+                'status'        => 'success',
+                'papers_synced' => $this->syncedCount,
+            ]);
+
+            if ($apiSource) {
+                $apiSource->update(['last_synced_at' => now()]);
             }
 
-            // Respect rate limits — polite crawling
-            sleep(1);
+            Log::info("SyncPapersFromApi completed", ['query' => $this->query, 'synced_count' => $this->syncedCount]);
+
+        } catch (\Throwable $e) {
+            Log::error("SyncPapersFromApi failed", ['error' => $e->getMessage()]);
+
+            $log->update([
+                'status'        => 'failed',
+                'papers_synced' => $this->syncedCount,
+                'error_message' => $e->getMessage(),
+            ]);
+
+            throw $e;
         }
-
-        Log::info("SyncPapersFromApi completed", ['query' => $this->query]);
     }
 
     protected function processWork(array $item): void
@@ -105,6 +140,13 @@ class SyncPapersFromApi implements ShouldQueue
                 }
             }
             $paper->keywords()->sync($keywordIds);
+
+            // Notify users if this is a newly imported research paper
+            if ($paper->wasRecentlyCreated) {
+                app(\App\Services\NotificationService::class)->notifyUsersForPaper($paper);
+            }
+
+            $this->syncedCount++;
 
         } catch (\Throwable $e) {
             Log::warning('Failed to process work', [
