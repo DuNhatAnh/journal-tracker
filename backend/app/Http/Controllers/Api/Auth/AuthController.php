@@ -56,10 +56,10 @@ class AuthController extends Controller
 
         $user  = Auth::user();
         
-        if ($user->role !== 'lecturer' && $user->role !== 'student') {
+        if (!in_array($user->role, ['admin', 'researcher', 'lecturer', 'student'])) {
             Auth::logout();
             throw ValidationException::withMessages([
-                'email' => 'Tài khoản không có quyền truy cập ứng dụng. Chỉ cho phép tài khoản Lecturer và Student.',
+                'email' => 'Tài khoản không có quyền truy cập ứng dụng.',
             ]);
         }
 

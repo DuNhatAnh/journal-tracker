@@ -21,6 +21,12 @@ class Keyword extends Model
         return $this->hasMany(PublicationTrend::class);
     }
 
+    public function followers()
+    {
+        return $this->belongsToMany(User::class, 'user_keyword')
+                    ->withTimestamps();
+    }
+
     /**
      * Total number of papers using this keyword.
      */

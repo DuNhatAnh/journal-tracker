@@ -83,6 +83,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         Route::apiResource('users',       AdminUserController::class);
         Route::apiResource('api-sources', ApiSourceController::class);
-        Route::post('api-sources/{source}/sync', [ApiSourceController::class, 'sync']);
+        Route::post('api-sources/{api_source}/sync', [ApiSourceController::class, 'sync']);
+        Route::get('sync-logs', [ApiSourceController::class, 'syncLogs']);
     });
 });

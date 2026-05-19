@@ -52,9 +52,22 @@ class ApiSourceController extends Controller
 
     public function sync(Request $request, ApiSource $apiSource)
     {
-        // Placeholder for sync action
+        $field = $request->input('field', 'deep learning');
+        $pages = (int) $request->input('pages', 1);
+
+        \App\Jobs\SyncPapersFromApi::dispatch($field, strtolower($apiSource->name), $pages);
+
         return response()->json([
-            'message' => "Synchronization started for source: {$apiSource->name}",
+            'message' => "Bắt đầu đồng bộ nguồn {$apiSource->name} với từ khóa '{$field}' (Số trang: {$pages}) ngầm...",
         ]);
+    }
+
+    public function syncLogs()
+    {
+        $logs = \App\Models\SyncLog::with('apiSource')
+            ->orderByDesc('created_at')
+            ->paginate(20);
+
+        return response()->json($logs);
     }
 }

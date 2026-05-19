@@ -17,6 +17,10 @@ async function startServer() {
 
     const headers: Record<string, string> = {};
     for (const [key, value] of Object.entries(req.headers)) {
+      const lowerKey = key.toLowerCase();
+      if (lowerKey === "expect" || lowerKey === "connection") {
+        continue;
+      }
       if (value && typeof value === "string") {
         headers[key] = value;
       }
