@@ -22,8 +22,48 @@ journal-tracker/
 | Charts     | ApexCharts                              |
 | Routing    | React Router v6                         |
 | API Client | Axios (with Bearer token interceptor)   |
+---
+
+## 🐳 Docker Setup (Khuyên dùng - Đã tối ưu siêu nhẹ)
+
+Nếu bạn không muốn cài đặt thủ công PHP, Composer, Node.js và Redis trên máy local, bạn có thể chạy toàn bộ dự án chỉ bằng 1 câu lệnh Docker. 
+
+### Các tối ưu hóa giúp hệ thống chạy nhẹ nhất:
+- **Alpine Linux base images**: Sử dụng các phiên bản Alpine siêu nhỏ cho cả PHP, Node và Redis để giảm dung lượng đĩa và RAM tối đa.
+- **Single Process Webserver**: Sử dụng máy chủ Web tích hợp của PHP qua `php artisan serve` bên trong container giúp loại bỏ sự cần thiết của container Nginx riêng biệt, tiết kiệm thêm dung lượng và CPU.
+- **Predis Library**: Dùng Predis viết bằng PHP thay vì cài đặt và biên dịch thư viện C `php-redis`, giúp build container cực nhanh và gọn nhẹ.
+- **Volume caching**: Tách rời `node_modules` và `vendor` bằng anonymous volumes để tránh xung đột hiệu năng ghi đĩa trên máy host (đặc biệt hữu ích trên Windows).
+
+### Hướng dẫn chạy:
+
+1. **Điền thông tin kết nối Supabase:**
+   Sao chép file `backend/.env.example` thành `backend/.env` và cập nhật thông tin database kết nối tới Supabase của bạn (`DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`).
+
+2. **Khởi động Docker Compose:**
+   Tại thư mục gốc của dự án (`journal-tracker/`), chạy lệnh sau:
+   ```powershell
+   docker compose up --build
+   ```
+   *Hệ thống sẽ tự động sao chép .env, cài đặt toàn bộ PHP/Node dependencies và sinh `APP_KEY`.*
+
+3. **Truy cập ứng dụng:**
+   - **Frontend:** [http://localhost:5173](http://localhost:5173)
+   - **Backend API:** [http://localhost:8000](http://localhost:8000)
+
+4. **Các lệnh tiện ích:**
+   ```powershell
+   # Dừng dự án
+   docker compose down
+   
+   # Chạy migrations trong container backend
+   docker compose exec backend php artisan migrate
+   
+   # Seed dữ liệu mẫu vào database
+   docker compose exec backend php artisan db:seed
+   ```
 
 ---
+
 
 ## 🚀 Backend Setup (`backend/`)
 

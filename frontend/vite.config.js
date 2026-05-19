@@ -11,10 +11,11 @@ export default defineConfig({
     },
     server: {
         port: 5173,
+        host: true, // Listen on all interfaces (crucial for Docker)
         proxy: {
             // Dev proxy: forward /api calls to Laravel backend
             '/api': {
-                target: 'http://localhost:8000',
+                target: process.env.VITE_API_URL || 'http://localhost:8000',
                 changeOrigin: true,
             },
         },
