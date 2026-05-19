@@ -26,8 +26,8 @@ export default function Login() {
       });
       
       const role = response.user?.role;
-      if (role !== "lecturer" && role !== "student") {
-        setError("Tài khoản không có quyền truy cập ứng dụng. Chỉ cho phép tài khoản Lecturer và Student.");
+      if (role !== "lecturer" && role !== "student" && role !== "researcher" && role !== "admin") {
+        setError("Tài khoản không có quyền truy cập ứng dụng.");
         return;
       }
       

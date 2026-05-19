@@ -12,7 +12,7 @@ export function Layout() {
   }
 
   const role = user.role;
-  if (role !== "lecturer" && role !== "student") {
+  if (role !== "lecturer" && role !== "student" && role !== "researcher" && role !== "admin") {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     return <Navigate to="/login" replace />;

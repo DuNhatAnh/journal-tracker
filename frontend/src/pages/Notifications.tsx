@@ -5,7 +5,9 @@ import { api } from "@/src/lib/api";
 type NotificationItem = {
   id: string;
   type?: string;
-  data: Record<string, any>;
+  title?: string;
+  content?: string;
+  data?: Record<string, any>;
   created_at: string;
   is_read?: boolean;
   read_at?: string | null;
@@ -20,7 +22,7 @@ const iconMap: Record<string, typeof BellRing> = {
 };
 
 function getNotificationType(notification: NotificationItem) {
-  const type = notification.data?.type || notification.type || "";
+  const type = notification.type || notification.data?.type || "";
 
   if (typeof type === "string") {
     if (type.toLowerCase().includes("trend") || type.toLowerCase().includes("xu hướng")) return "trend";
@@ -34,6 +36,7 @@ function getNotificationType(notification: NotificationItem) {
 
 function getNotificationTitle(notification: NotificationItem) {
   return (
+    notification.title ||
     notification.data?.title ||
     notification.data?.subject ||
     notification.data?.heading ||
@@ -44,6 +47,7 @@ function getNotificationTitle(notification: NotificationItem) {
 
 function getNotificationDescription(notification: NotificationItem) {
   return (
+    notification.content ||
     notification.data?.description ||
     notification.data?.body ||
     notification.data?.message ||
@@ -156,15 +160,17 @@ export default function Notifications() {
           <p className="mt-2 text-sm">Hệ thống sẽ hiển thị khi có cảnh báo hoặc cập nhật từ dữ liệu của bạn.</p>
         </div>
       ) : (
-        (Object.entries(groupedNotifications) as [string, NotificationItem[]][]).map(([label, items]) => (
-          <section key={label} className="space-y-4">
-            <div className="flex items-center gap-4">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">{label}</span>
-              <div className="flex-1 h-px bg-white/5" />
-            </div>
+        Object.entries(groupedNotifications).map(([label, items]) => {
+          const notificationItems = items as NotificationItem[];
+          return (
+            <section key={label} className="space-y-4">
+              <div className="flex items-center gap-4">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">{label}</span>
+                <div className="flex-1 h-px bg-white/5" />
+              </div>
 
-            <div className="space-y-4">
-              {items.map((notification) => {
+              <div className="space-y-4">
+                {notificationItems.map((notification) => {
                 const SectionIcon = iconMap[getNotificationType(notification)] || BellRing;
                 const title = getNotificationTitle(notification);
                 const description = getNotificationDescription(notification);
@@ -196,7 +202,7 @@ export default function Notifications() {
               })}
             </div>
           </section>
-        ))
+        );})
       )}
     </div>
   );
