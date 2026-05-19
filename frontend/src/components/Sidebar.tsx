@@ -5,12 +5,12 @@ import { Logo } from "@/src/components/Logo";
 import { ThemeToggle } from "@/src/components/ThemeToggle";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Bảng điều khiển", path: "/dashboard" },
-  { icon: Search, label: "Khám phá bài báo", path: "/search" },
-  { icon: TrendingUp, label: "Xu hướng nghiên cứu", path: "/trending" },
-  { icon: Bookmark, label: "Dấu trang", path: "/bookmarks" },
-  { icon: Users, label: "Đang theo dõi", path: "/following" },
-  { icon: Bell, label: "Thông báo", path: "/notifications" },
+  { icon: LayoutDashboard, label: "Bảng điều khiển", path: "/dashboard", badge: undefined as string | undefined },
+  { icon: Search, label: "Khám phá bài báo", path: "/search", badge: undefined as string | undefined },
+  { icon: TrendingUp, label: "Xu hướng nghiên cứu", path: "/trending", badge: undefined as string | undefined },
+  { icon: Bookmark, label: "Dấu trang", path: "/bookmarks", badge: undefined as string | undefined },
+  { icon: Users, label: "Đang theo dõi", path: "/following", badge: undefined as string | undefined },
+  { icon: Bell, label: "Thông báo", path: "/notifications", badge: "2" as string | undefined },
 ];
 
 export function Sidebar() {

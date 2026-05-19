@@ -120,7 +120,7 @@ export default function Notifications() {
     groups[label] = groups[label] || [];
     groups[label].push(notification);
     return groups;
-  }, {});
+  }, {} as Record<string, NotificationItem[]>);
 
   return (
     <div className="max-w-4xl mx-auto space-y-12 pb-20">
@@ -156,7 +156,7 @@ export default function Notifications() {
           <p className="mt-2 text-sm">Hệ thống sẽ hiển thị khi có cảnh báo hoặc cập nhật từ dữ liệu của bạn.</p>
         </div>
       ) : (
-        Object.entries(groupedNotifications).map(([label, items]) => (
+        (Object.entries(groupedNotifications) as [string, NotificationItem[]][]).map(([label, items]) => (
           <section key={label} className="space-y-4">
             <div className="flex items-center gap-4">
               <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">{label}</span>

@@ -1,17 +1,4 @@
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: journal-tracker-db
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_DB=journal_tracker
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-
   redis:
     image: redis:alpine
     container_name: journal-tracker-redis
@@ -30,10 +17,8 @@ services:
     environment:
       - APP_ENV=local
       - REDIS_HOST=redis
-      - DB_HOST=db
     depends_on:
       - redis
-      - db
     restart: unless-stopped
 
   queue:
@@ -48,10 +33,8 @@ services:
     environment:
       - APP_ENV=local
       - REDIS_HOST=redis
-      - DB_HOST=db
     depends_on:
       - redis
-      - db
       - backend
     restart: unless-stopped
 
@@ -70,6 +53,3 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
-
-volumes:
-  postgres_data:
