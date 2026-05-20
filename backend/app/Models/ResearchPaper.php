@@ -62,9 +62,57 @@ class ResearchPaper extends Model
 
     public function scopeSearch($query, string $term)
     {
-        return $query->where(function ($q) use ($term) {
-            $q->where('title', 'ilike', "%{$term}%")
-              ->orWhere('abstract', 'ilike', "%{$term}%");
+        $term = trim(preg_replace('/\s+/', ' ', $term));
+        if (empty($term)) return $query;
+
+        // Split by OR (OR has the lowest precedence)
+        $orGroups = explode(' OR ', $term);
+
+        return $query->where(function ($q) use ($orGroups) {
+            foreach ($orGroups as $orGroup) {
+                $q->orWhere(function ($subQ) use ($orGroup) {
+                    // Extract phrases in quotes or individual words
+                    preg_match_all('/"([^"]+)"|(\S+)/', $orGroup, $matches);
+                    
+                    $tokens = [];
+                    foreach ($matches[0] as $index => $match) {
+                        if (!empty($matches[1][$index])) {
+                            $tokens[] = $matches[1][$index]; // Quoted phrase
+                        } else {
+                            $tokens[] = $matches[2][$index]; // Normal word
+                        }
+                    }
+                    
+                    $expectingNot = false;
+                    foreach ($tokens as $token) {
+                        // Skip 'AND' as it is the default implicit behavior
+                        if ($token === 'AND') {
+                            continue;
+                        }
+                        if ($token === 'NOT') {
+                            $expectingNot = true;
+                            continue;
+                        }
+                        
+                        $isNot = $expectingNot;
+                        $expectingNot = false;
+                        
+                        $condition = function ($q2) use ($token) {
+                            $q2->where('title', 'ilike', "%{$token}%")
+                               ->orWhere('abstract', 'ilike', "%{$token}%")
+                               ->orWhereHas('keywords', fn($k) => $k->where('name', 'ilike', "%{$token}%"))
+                               ->orWhereHas('authors', fn($a) => $a->where('name', 'ilike', "%{$token}%"))
+                               ->orWhereHas('journal', fn($j) => $j->where('name', 'ilike', "%{$token}%"));
+                        };
+
+                        if ($isNot) {
+                            $subQ->whereNot($condition);
+                        } else {
+                            $subQ->where($condition);
+                        }
+                    }
+                });
+            }
         });
     }
 }

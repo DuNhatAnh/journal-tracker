@@ -38,6 +38,22 @@ class BookmarkController extends Controller
     }
 
     /**
+     * PUT /api/bookmarks/{bookmark}
+     */
+    public function update(Request $request, Bookmark $bookmark)
+    {
+        if ($bookmark->user_id !== auth()->id()) {
+            return response()->json(['message' => 'Không có quyền.'], 403);
+        }
+
+        $request->validate(['note' => 'nullable|string|max:1000']);
+
+        $bookmark->update(['note' => $request->note]);
+
+        return response()->json($bookmark->load('paper'));
+    }
+
+    /**
      * DELETE /api/bookmarks/{bookmark}
      */
     public function destroy(Bookmark $bookmark)
