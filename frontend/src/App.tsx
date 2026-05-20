@@ -12,8 +12,6 @@ import Following from "./pages/Following";
 import Notifications from "./pages/Notifications";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
-import AdminUsers from "./pages/Admin/Users";
-import AdminSync from "./pages/Admin/Sync";
 
 export default function App() {
   return (
@@ -32,8 +30,6 @@ export default function App() {
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/admin/users" element={<AdminUsers />} />
-            <Route path="/admin/sync" element={<AdminSync />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

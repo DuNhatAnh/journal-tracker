@@ -119,7 +119,7 @@ export default function Notifications() {
     loadNotifications();
   }, []);
 
-  const groupedNotifications = notifications.reduce((groups: Record<string, NotificationItem[]>, notification) => {
+  const groupedNotifications = notifications.reduce((groups: Record<string, NotificationItem[]>, notification: NotificationItem) => {
     const label = getDayLabel(notification.created_at);
     groups[label] = groups[label] || [];
     groups[label].push(notification);
@@ -170,7 +170,7 @@ export default function Notifications() {
               </div>
 
               <div className="space-y-4">
-                {notificationItems.map((notification) => {
+                {notificationItems.map((notification: NotificationItem) => {
                 const SectionIcon = iconMap[getNotificationType(notification)] || BellRing;
                 const title = getNotificationTitle(notification);
                 const description = getNotificationDescription(notification);
