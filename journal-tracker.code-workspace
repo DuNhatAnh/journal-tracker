@@ -1,0 +1,19 @@
+{
+  "folders": [
+    {
+      "name": "Root Project",
+      "path": "."
+    },
+    {
+      "name": "Frontend (React)",
+      "path": "frontend"
+    },
+    {
+      "name": "Backend (Laravel)",
+      "path": "backend"
+    }
+  ],
+  "settings": {
+    "typescript.tsdk": "frontend/node_modules/typescript/lib"
+  }
+}

@@ -9,19 +9,22 @@ interface DashboardData {
   stats: { label: string; value: string; trend: string }[];
   trendingTopics: { id: number; name: string; papers: string; change: string; data: number[] }[];
   recentPapers: { id: number; title: string; journal: string; authors: string; time: string; impact: number; citations: number }[];
+  recommendedPapers: { id: number; title: string; author: string; match: string }[];
+  topJournals: { id: number; name: string; field: string; initial: string; color: string }[];
+  fieldsDistribution: { name: string; value: number }[];
 }
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
 
   useEffect(() => {
-    api.get<any>("/dashboard")
+    api.get<any>(`/dashboard?t=${Date.now()}`)
       .then(res => {
         const mappedStats = [
           { label: "Tổng số bài báo", value: String(res.stats?.total_papers ?? 0), trend: "Kho lưu trữ" },
           { label: "Số lượng từ khóa", value: String(res.stats?.total_keywords ?? 0), trend: "Theo dõi" },
           { label: "Ấn phẩm năm nay", value: String(res.stats?.papers_this_year ?? 0), trend: "Mới nhận" },
-          { label: "Nguồn API kết nối", value: "2", trend: "Hoạt động" },
+          { label: "Bài báo đã lưu", value: String(res.stats?.total_bookmarks ?? 0), trend: "Bộ sưu tập" },
         ];
 
         const mappedTrending = (res.trending_topics || []).map((t: any) => ({
@@ -29,7 +32,7 @@ export default function Dashboard() {
           name: t.keyword?.name || "Chủ đề",
           papers: `${t.paper_count ?? 0}`,
           change: `+${t.growth_rate ?? 0}%`,
-          data: [10, 15, 12, 18, 25, 28, 35],
+          data: t.chart_data || [0, 0, 0, 0, 0, 0, 0],
         }));
 
         const mappedRecent = (res.recent_papers || []).map((p: any) => ({
@@ -46,6 +49,9 @@ export default function Dashboard() {
           stats: mappedStats,
           trendingTopics: mappedTrending,
           recentPapers: mappedRecent,
+          recommendedPapers: res.recommended_papers || [],
+          topJournals: res.top_journals || [],
+          fieldsDistribution: res.fields_distribution || [],
         });
       })
       .catch(err => {
@@ -181,21 +187,21 @@ export default function Dashboard() {
                <h3 className="font-display text-xl font-bold">Động cơ Thông tin chuyên sâu</h3>
              </div>
              <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
-               Dựa trên sự quan tâm của bạn về <strong>Vật lý lượng tử</strong>, chúng tôi đề xuất những văn bản nền tảng này cho bài đánh giá hiện tại của bạn.
+               Dựa trên mối quan tâm nghiên cứu của bạn, chúng tôi đề xuất những bài báo học thuật nổi bật sau cho quá trình đánh giá và nghiên cứu của bạn.
              </p>
              <div className="space-y-4">
-               {[
-                 { title: "Sự mất kết hợp và sự xuất hiện của một thế giới cổ điển", author: "E. Joos et al.", match: "98%" },
-                 { title: "Tính toán lượng tử và Thông tin lượng tử", author: "M. Nielsen", match: "94%" },
-               ].map((rec, i) => (
-                 <div key={i} className="p-4 rounded-xl bg-surface-container/30 border-2 border-outline-variant/30 hover:border-primary/30 transition-all cursor-pointer group">
+               {data.recommendedPapers.map((rec) => (
+                 <div key={rec.id} className="p-4 rounded-xl bg-surface-container/30 border-2 border-outline-variant/30 hover:border-primary/30 transition-all cursor-pointer group">
                    <h5 className="text-sm font-bold leading-tight mb-2 group-hover:text-primary transition-colors">{rec.title}</h5>
                    <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-widest text-on-surface-variant">
-                     <span>{rec.author}</span>
+                     <span className="truncate max-w-[200px]">{rec.author}</span>
                      <span className="text-primary">{rec.match} Phù hợp</span>
                    </div>
                  </div>
                ))}
+               {data.recommendedPapers.length === 0 && (
+                 <p className="text-xs text-on-surface-variant text-center py-4">Chưa có bài viết gợi ý nào mới.</p>
+               )}
              </div>
              <button className="w-full mt-8 gradient-btn py-3 rounded-xl font-display text-xs font-bold uppercase tracking-widest text-white flex items-center justify-center gap-2">
                Tạo đánh giá <BookOpen className="w-4 h-4" />
@@ -205,12 +211,8 @@ export default function Dashboard() {
            <section className="space-y-4">
              <h3 className="font-display text-xl font-bold px-2">Tạp chí hàng đầu</h3>
              <div className="space-y-3">
-               {[
-                 { name: "Nature", field: "Đa ngành", initial: "N", color: "bg-white text-black" },
-                 { name: "Science", field: "Đa ngành", initial: "S", color: "bg-secondary-container text-on-secondary-container" },
-                 { name: "Cell", field: "Khoa học đời sống", initial: "C", color: "bg-tertiary-container text-on-tertiary-container" },
-               ].map((j, i) => (
-                 <div key={i} className="glass-panel p-4 rounded-xl border-2 flex items-center gap-4 hover:bg-white/5 cursor-pointer group">
+               {data.topJournals.map((j) => (
+                 <div key={j.id} className="glass-panel p-4 rounded-xl border-2 flex items-center gap-4 hover:bg-white/5 cursor-pointer group">
                     <div className={cn("w-12 h-12 rounded-lg flex items-center justify-center font-display font-black text-xl shadow-md", j.color)}>
                       {j.initial}
                     </div>
@@ -221,7 +223,62 @@ export default function Dashboard() {
                     <ChevronRight className="w-4 h-4 text-outline group-hover:text-primary transition-all" />
                  </div>
                ))}
+               {data.topJournals.length === 0 && (
+                 <p className="text-xs text-on-surface-variant text-center py-4">Không có tạp chí nào.</p>
+               )}
              </div>
+           </section>
+
+           <section className="space-y-4">
+             <h3 className="font-display text-xl font-bold px-2">Phân bổ Lĩnh vực</h3>
+             {data.fieldsDistribution.length > 0 ? (
+               <div className="glass-panel p-6 rounded-xl border-2 h-72 flex items-center justify-center">
+                 <Chart
+                   options={{
+                     chart: {
+                       id: "fields-distribution-donut",
+                       type: "donut",
+                       background: "transparent",
+                       foreColor: "var(--on-surface)",
+                       toolbar: { show: false }
+                     },
+                     labels: data.fieldsDistribution.map(f => f.name),
+                     colors: ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
+                     stroke: { show: false },
+                     legend: {
+                       position: "bottom",
+                       labels: { colors: "var(--on-surface-variant)" },
+                       markers: { radius: 12 } as any
+                     },
+                     dataLabels: { enabled: false },
+                     plotOptions: {
+                       pie: {
+                         donut: {
+                           size: "70%",
+                           labels: {
+                             show: true,
+                             name: { show: true, fontSize: "12px", fontFamily: "inherit", color: "var(--on-surface-variant)" },
+                             value: { show: true, fontSize: "20px", fontFamily: "inherit", fontWeight: "bold", color: "var(--on-surface)" },
+                             total: {
+                               show: true,
+                               label: "Tổng cộng",
+                               color: "var(--on-surface-variant)",
+                               formatter: () => String(data.fieldsDistribution.reduce((acc, curr) => acc + curr.value, 0)),
+                             },
+                           },
+                         },
+                       },
+                     },
+                   }}
+                   series={data.fieldsDistribution.map(f => f.value)}
+                   type="donut"
+                   width="100%"
+                   height="100%"
+                 />
+               </div>
+             ) : (
+               <p className="text-xs text-on-surface-variant text-center py-4">Chưa có dữ liệu phân bổ.</p>
+             )}
            </section>
         </div>
       </div>
