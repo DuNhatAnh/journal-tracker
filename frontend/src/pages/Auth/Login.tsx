@@ -1,8 +1,8 @@
 import React from "react";
 import { Mail, Lock, ArrowRight, Github } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
-import { Logo } from "@/src/components/Logo";
-import { ThemeToggle } from "@/src/components/ThemeToggle";
+import { Logo } from "@/src/components/shared/Logo";
+import { ThemeToggle } from "@/src/components/shared/ThemeToggle";
 
 import { useState } from "react";
 import { api } from "@/src/lib/api";

@@ -6,8 +6,8 @@ import {
   BookOpenText, LineChart, BellRing, Bookmark,
   GraduationCap, Settings
 } from "lucide-react";
-import { Logo } from "@/src/components/Logo";
-import { ThemeToggle } from "@/src/components/ThemeToggle";
+import { Logo } from "@/src/components/shared/Logo";
+import { ThemeToggle } from "@/src/components/shared/ThemeToggle";
 
 export default function Landing() {
   const token = localStorage.getItem("token");

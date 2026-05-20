@@ -1,8 +1,8 @@
 import { LayoutDashboard, Search, TrendingUp, Bookmark, Users, Bell, Settings, ChevronRight, LogOut } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/src/lib/utils";
-import { Logo } from "@/src/components/Logo";
-import { ThemeToggle } from "@/src/components/ThemeToggle";
+import { Logo } from "@/src/components/shared/Logo";
+import { ThemeToggle } from "@/src/components/shared/ThemeToggle";
 
 
 export function Sidebar() {

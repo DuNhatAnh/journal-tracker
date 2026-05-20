@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Mail, Lock, User, ChevronLeft } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
-import { Logo } from "@/src/components/Logo";
-import { ThemeToggle } from "@/src/components/ThemeToggle";
+import { Logo } from "@/src/components/shared/Logo";
+import { ThemeToggle } from "@/src/components/shared/ThemeToggle";
 import { api } from "@/src/lib/api";
 
 export default function Register() {

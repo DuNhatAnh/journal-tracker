@@ -114,7 +114,7 @@ export default function Trending() {
                 chart: { 
                   id: "publication-velocity-chart",
                   toolbar: { show: false },
-                  animations: { enabled: true, easing: 'easeinout', speed: 800 },
+                  animations: { enabled: true, speed: 800 },
                   background: 'transparent',
                 },
                 stroke: { curve: 'smooth', width: 4, colors: ['#3B82F6'] },
