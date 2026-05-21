@@ -97,17 +97,18 @@ class DashboardController extends Controller
                 });
         });
 
-        // 5. Research Fields Distribution (Cached for 30 minutes)
+        // 5. Research Topics Distribution (Cached for 30 minutes)
         $fieldsDistribution = Cache::remember('dashboard.fields_distribution', now()->addMinutes(30), function () {
-            return ResearchPaper::join('journals', 'research_papers.journal_id', '=', 'journals.id')
-                ->selectRaw('journals.field, COUNT(*) as count')
-                ->groupBy('journals.field')
+            return \Illuminate\Support\Facades\DB::table('keyword_paper')
+                ->join('keywords', 'keyword_paper.keyword_id', '=', 'keywords.id')
+                ->selectRaw('keywords.name, COUNT(*) as count')
+                ->groupBy('keywords.id', 'keywords.name')
                 ->orderByDesc('count')
                 ->limit(5)
                 ->get()
                 ->map(function ($item) {
                     return [
-                        'name' => $item->field ? ucwords($item->field) : 'Lĩnh vực khác',
+                        'name' => ucwords($item->name),
                         'value' => (int) $item->count,
                     ];
                 });

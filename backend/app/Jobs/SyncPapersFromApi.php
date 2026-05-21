@@ -22,14 +22,16 @@ class SyncPapersFromApi implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries   = 3;
-    public int $timeout = 120;
+    public int $timeout = 3600;
 
     protected int $syncedCount = 0;
 
     public function __construct(
-        protected string $query,
+        protected string $query = '',
         protected string $source = 'openalex',
-        protected int    $maxPages = 5,
+        protected int    $maxPages = 50,
+        protected string $topicId = '',
+        protected string $years = ''
     ) {}
 
     public function handle(OpenAlexService $openAlex): void
@@ -47,7 +49,7 @@ class SyncPapersFromApi implements ShouldQueue
 
         try {
             for ($page = 1; $page <= $this->maxPages; $page++) {
-                $data = $openAlex->searchWorks($this->query, $page, 50);
+                $data = $openAlex->searchWorks($this->query, $page, 100, $this->topicId, $this->years);
 
                 if (empty($data['results'])) {
                     break;
@@ -94,7 +96,7 @@ class SyncPapersFromApi implements ShouldQueue
                 $issn = data_get($item, 'primary_location.source.issn_l');
                 $journal = Journal::firstOrCreate(
                     ['name' => $sourceName],
-                    ['issn' => $issn]
+                    ['issn' => $issn, 'field' => 'Computer Science']
                 );
             }
 
