@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Users, UserPlus, Search, Edit2, Trash2, X, ShieldAlert, Mail, User as UserIcon, Lock } from "lucide-react";
+import { Users, UserPlus, Search, Edit2, Trash2, X, ShieldAlert, Mail, User as UserIcon, Lock, Shield, TrendingUp, BookOpen, GraduationCap, ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/src/lib/api";
 
 type UserItem = {
@@ -9,6 +9,13 @@ type UserItem = {
   email: string;
   role: string;
   created_at: string;
+};
+
+const ROLE_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string; bg: string; border: string }> = {
+  admin:      { label: "Admin",       icon: Shield,       color: "text-error",     bg: "bg-error/10",     border: "border-error/20" },
+  researcher: { label: "Researcher",  icon: TrendingUp,   color: "text-primary",   bg: "bg-primary/10",   border: "border-primary/20" },
+  lecturer:   { label: "Giảng viên",  icon: BookOpen,     color: "text-secondary", bg: "bg-secondary/10", border: "border-secondary/20" },
+  student:    { label: "Sinh viên",   icon: GraduationCap,color: "text-tertiary",  bg: "bg-tertiary/10",  border: "border-tertiary/20" },
 };
 
 export default function AdminUsers() {
@@ -146,6 +153,24 @@ export default function AdminUsers() {
         </button>
       </header>
 
+      {/* Stats Summary Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {Object.entries(ROLE_CONFIG).map(([role, cfg]) => {
+          const count = users.filter(u => u.role === role).length;
+          return (
+            <div key={role} className={`glass-panel rounded-2xl p-4 border ${cfg.border} bg-surface flex items-center gap-3`}>
+              <div className={`p-2.5 rounded-xl ${cfg.bg}`}>
+                <cfg.icon className={`w-4 h-4 ${cfg.color}`} />
+              </div>
+              <div>
+                <p className={`text-xl font-black font-display ${cfg.color}`}>{loading ? "—" : count}</p>
+                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">{cfg.label}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {error && (
         <div className="p-4 rounded-xl bg-error-container/20 border border-error/40 text-error text-sm font-medium">
           {error}
@@ -194,6 +219,20 @@ export default function AdminUsers() {
         </div>
       ) : (
         <div className="glass-panel rounded-2xl overflow-hidden shadow-lg border border-white/10 bg-surface">
+          {/* Table header with total count */}
+          <div className="px-6 py-3 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">
+              {filteredUsers.length} / {users.length} người dùng
+            </span>
+            {searchQuery || roleFilter !== "all" ? (
+              <button
+                onClick={() => { setSearchQuery(""); setRoleFilter("all"); }}
+                className="text-[10px] font-bold text-primary hover:text-primary/70 uppercase tracking-widest transition-colors"
+              >
+                Xóa bộ lọc
+              </button>
+            ) : null}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
