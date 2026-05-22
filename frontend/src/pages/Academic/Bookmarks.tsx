@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { BookmarkX, ArrowRight, ExternalLink, Loader2, Edit3, Save, X } from "lucide-react";
+import toast from "react-hot-toast";
 import { cn } from "@/src/lib/utils";
 import { api } from "@/src/lib/api";
 
@@ -44,8 +45,10 @@ export default function Bookmarks() {
     try {
       await api.delete(`/bookmarks/${id}`);
       fetchBookmarks();
+      toast.success("Đã xóa bài báo khỏi danh sách lưu!");
     } catch (err) {
       console.error(err);
+      toast.error("Lỗi khi xóa bài báo. Vui lòng thử lại.");
     }
   };
 

@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 import { Layout } from "./components/shared/Layout";
 import { ThemeProvider } from "./lib/theme";
 import Landing from "./pages/Shared/Landing";
@@ -19,6 +20,7 @@ import AdminSync from "./pages/Admin/Sync";
 export default function App() {
   return (
     <ThemeProvider>
+      <Toaster position="bottom-right" toastOptions={{ style: { background: '#1E293B', color: '#fff', borderRadius: '12px' } }} />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />

@@ -16,6 +16,11 @@ class Journal extends Model
         return $this->hasMany(ResearchPaper::class);
     }
 
+    public function followers()
+    {
+        return $this->belongsToMany(User::class, 'user_journal')->withTimestamps();
+    }
+
     public function paperCountByYear()
     {
         return $this->papers()

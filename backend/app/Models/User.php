@@ -68,4 +68,10 @@ class User extends Authenticatable
         return $this->belongsToMany(Keyword::class, 'user_keyword')
                     ->withTimestamps();
     }
+
+    public function followedJournals()
+    {
+        return $this->belongsToMany(Journal::class, 'user_journal')
+                    ->withTimestamps();
+    }
 }

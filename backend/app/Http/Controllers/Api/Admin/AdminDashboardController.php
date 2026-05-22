@@ -29,7 +29,7 @@ class AdminDashboardController extends Controller
 
         // API Source counts
         $totalApiSources  = ApiSource::count();
-        $activeApiSources = ApiSource::where('is_active', DB::raw('true'))->count();
+        $activeApiSources = ApiSource::whereRaw('is_active = true')->count();
 
         // Last sync timestamp
         $lastSyncLog = SyncLog::orderByDesc('created_at')->first();

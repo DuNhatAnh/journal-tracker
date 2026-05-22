@@ -117,17 +117,25 @@ class DashboardController extends Controller
         // 6. User-specific AI Insights Recommendations (Dynamic, not cached globally)
         $followedKeywords = $user ? $user->followedKeywords()->pluck('keywords.id') : collect();
         $bookmarkedPaperIds = $user ? $user->bookmarks()->pluck('paper_id') : collect();
+        
+        // Lấy tất cả từ khóa từ các bài báo đã lưu
+        $bookmarkedPaperKeywords = $user && $bookmarkedPaperIds->isNotEmpty()
+            ? DB::table('keyword_paper')->whereIn('paper_id', $bookmarkedPaperIds)->pluck('keyword_id')
+            : collect();
+            
+        $targetKeywords = $followedKeywords->merge($bookmarkedPaperKeywords)->unique();
+
         $bookmarkedJournalFields = $user 
             ? $user->bookmarks()->with('paper.journal')->get()->pluck('paper.journal.field')->filter()->unique() 
             : collect();
 
         $recommendedPapers = ResearchPaper::with(['authors', 'journal', 'keywords'])
             ->whereNotIn('id', $bookmarkedPaperIds)
-            ->when($followedKeywords->isNotEmpty() || $bookmarkedJournalFields->isNotEmpty(), function ($query) use ($followedKeywords, $bookmarkedJournalFields) {
-                $query->where(function ($q) use ($followedKeywords, $bookmarkedJournalFields) {
-                    if ($followedKeywords->isNotEmpty()) {
-                        $q->whereHas('keywords', function ($k) use ($followedKeywords) {
-                            $k->whereIn('keywords.id', $followedKeywords);
+            ->when($targetKeywords->isNotEmpty() || $bookmarkedJournalFields->isNotEmpty(), function ($query) use ($targetKeywords, $bookmarkedJournalFields) {
+                $query->where(function ($q) use ($targetKeywords, $bookmarkedJournalFields) {
+                    if ($targetKeywords->isNotEmpty()) {
+                        $q->whereHas('keywords', function ($k) use ($targetKeywords) {
+                            $k->whereIn('keywords.id', $targetKeywords);
                         });
                     }
                     if ($bookmarkedJournalFields->isNotEmpty()) {
@@ -140,19 +148,31 @@ class DashboardController extends Controller
             ->orderByDesc('citations_count')
             ->limit(2)
             ->get()
-            ->map(function ($paper) use ($followedKeywords, $bookmarkedJournalFields) {
-                $hasKeywordMatch = $followedKeywords->isNotEmpty() && $paper->keywords->pluck('id')->intersect($followedKeywords)->isNotEmpty();
+            ->map(function ($paper) use ($targetKeywords, $bookmarkedJournalFields) {
+                $matchedKeywordsCount = $paper->keywords->pluck('id')->intersect($targetKeywords)->count();
                 $hasFieldMatch = $bookmarkedJournalFields->isNotEmpty() && $paper->journal && $bookmarkedJournalFields->contains($paper->journal->field);
 
-                if ($hasKeywordMatch && $hasFieldMatch) {
-                    $match = 95 + ($paper->id % 5);
-                } elseif ($hasKeywordMatch) {
-                    $match = 90 + ($paper->id % 10);
-                } elseif ($hasFieldMatch) {
-                    $match = 85 + ($paper->id % 15);
+                if ($targetKeywords->isEmpty() && $bookmarkedJournalFields->isEmpty()) {
+                    // Người dùng mới chưa theo dõi/lưu: Dựa trên số trích dẫn
+                    $matchScore = 70 + min(25, (int)($paper->citations_count / 10));
                 } else {
-                    $match = 80 + ($paper->id % 15);
+                    $score = 50; // Điểm cơ bản
+                    
+                    // Tối đa 30 điểm cho mức độ khớp từ khóa (15đ/từ khóa khớp)
+                    $score += min(30, $matchedKeywordsCount * 15);
+                    
+                    // 15 điểm nếu cùng lĩnh vực tạp chí đã lưu
+                    if ($hasFieldMatch) {
+                        $score += 15;
+                    }
+                    
+                    // Tối đa 4 điểm cho độ phổ biến (trích dẫn)
+                    $score += min(4, (int)($paper->citations_count / 50));
+                    
+                    $matchScore = $score;
                 }
+
+                $matchScore = min(99, max(0, $matchScore)); // Giới hạn max 99%
 
                 $authorNames = $paper->authors->isNotEmpty()
                     ? $paper->authors->pluck('name')->join(', ')
@@ -161,8 +181,15 @@ class DashboardController extends Controller
                 return [
                     'id' => $paper->id,
                     'title' => $paper->title,
-                    'author' => $authorNames,
-                    'match' => $match . '%',
+                    'authors' => $authorNames,
+                    'journal' => $paper->journal?->name ?? 'Khác',
+                    'time' => (string) ($paper->published_year ?? ''),
+                    'impact' => $paper->citations_count ? round(($paper->citations_count / 10), 1) : 0,
+                    'citations' => $paper->citations_count ?? 0,
+                    'doi' => $paper->doi,
+                    'abstract' => $paper->abstract,
+                    'keywords' => $paper->keywords->pluck('name')->toArray(),
+                    'match' => $matchScore . '%',
                 ];
             });
 
@@ -176,6 +203,7 @@ class DashboardController extends Controller
             'top_journals'       => $topJournals,
             'fields_distribution'=> $fieldsDistribution,
             'latest_year'        => $latestYear,
+            'bookmarked_paper_ids' => $bookmarkedPaperIds,
         ]);
     }
 }

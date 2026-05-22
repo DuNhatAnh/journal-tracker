@@ -10,3 +10,7 @@ Quy tắc đặt tên bắt buộc cho CSDL dự án này:
   - Người dùng + Chủ đề: `user_keyword`
 
 *Lưu ý: Không dùng quy tắc alphabet tự động của framework cho 3 bảng pivot trên để tránh lỗi SQL.*
+
+- **Truy vấn Boolean (PostgreSQL):**
+  - Cấm dùng `where('is_active', true)` (Laravel dịch thành số `1` gây lỗi).
+  - **Bắt buộc dùng:** `whereRaw('is_active = true')` hoặc `where('is_active', '=', 'true')`.

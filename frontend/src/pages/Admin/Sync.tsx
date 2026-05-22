@@ -70,7 +70,7 @@ export default function AdminSync() {
       // Initialize sync params for each source
       const params: Record<number, { domain: string; field: string; pages: number; years: string }> = {};
       (response || []).forEach((src) => {
-        params[src.id] = { domain: "Computer Science", field: "", pages: 1, years: "2023-2024" };
+        params[src.id] = { domain: "Computer Science", field: "", pages: 1, years: "2023-2026" };
       });
       setSyncParams(params);
     } catch (err: any) {
@@ -177,9 +177,8 @@ export default function AdminSync() {
   const handleTriggerSync = async (sourceId: number, sourceName: string) => {
     setActionError(null);
     setActionSuccess(null);
-    const params = syncParams[sourceId] || { domain: "Computer Science", field: "", pages: 1, years: "2023-2024" };
-
-    const combinedQuery = [params.domain, params.field].filter(Boolean).join(" ");
+    const params = syncParams[sourceId] || { domain: "Computer Science", field: "", pages: 1, years: "2023-2026" };
+    const combinedQuery = params.domain ? `${params.domain} ${params.field}`.trim() : params.field;
 
     try {
       const response = await api.post<{ message: string }>(`/admin/api-sources/${sourceId}/sync`, {
@@ -240,7 +239,7 @@ export default function AdminSync() {
           ) : (
             <div className="space-y-6">
               {sources.map((source) => {
-                const params = syncParams[source.id] || { domain: "Computer Science", field: "", pages: 1, years: "2023-2024" };
+                const params = syncParams[source.id] || { domain: "Computer Science", field: "", pages: 1, years: "2023-2026" };
                 return (
                   <div key={source.id} className="glass-panel p-6 rounded-2xl bg-surface space-y-4">
                     <div className="flex items-start justify-between">
@@ -299,18 +298,7 @@ export default function AdminSync() {
                               value={params.field}
                               onChange={(e) => handleParamChange(source.id, "field", e.target.value)}
                               className="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-white/10 text-on-surface outline-none focus:border-primary/50"
-                              placeholder="vd: AI, NLP..."
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Năm (Years)</label>
-                            <input
-                              type="text"
-                              value={params.years}
-                              onChange={(e) => handleParamChange(source.id, "years", e.target.value)}
-                              className="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-white/10 text-on-surface outline-none focus:border-primary/50"
-                              placeholder="vd: 2023-2024"
+                              placeholder="deep learning"
                             />
                           </div>
 

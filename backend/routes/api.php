@@ -45,8 +45,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Journals
     Route::prefix('journals')->group(function () {
-        Route::get('/',           [JournalController::class, 'index']);
-        Route::get('/{journal}',  [JournalController::class, 'show']);
+        Route::get('/',                              [JournalController::class, 'index']);
+        Route::get('/feed',                          [JournalController::class, 'feed']);
+        Route::get('/{journal}',                     [JournalController::class, 'show']);
+        Route::post('/{journal}/follow',             [JournalController::class, 'follow']);
+        Route::delete('/{journal}/follow',           [JournalController::class, 'unfollow']);
     });
 
     // Keywords

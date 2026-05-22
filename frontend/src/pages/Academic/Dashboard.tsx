@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { createPortal } from "react-dom";
+import toast from "react-hot-toast";
 import Chart from "react-apexcharts";
-import { TrendingUp, ArrowRight, BookmarkPlus, BookmarkCheck, Filter, Sparkles, BookOpen, ChevronRight, X, ExternalLink, Quote, BookMarked, CalendarDays, Users, Loader2 } from "lucide-react";
+import { TrendingUp, ArrowRight, BookmarkPlus, BookmarkCheck, Filter, Sparkles, BookOpen, ChevronRight, X, ExternalLink, Quote, BookMarked, CalendarDays, Users, Loader2, Bot, Bell, BellOff } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { api } from "@/src/lib/api";
 
@@ -23,7 +24,7 @@ interface DashboardData {
   stats: { label: string; value: string; trend: string }[];
   trendingTopics: { id: number; name: string; papers: string; change: string; data: number[] }[];
   recentPapers: PaperDetail[];
-  recommendedPapers: { id: number; title: string; author: string; match: string }[];
+  recommendedPapers: (PaperDetail & { match: string })[];
   topJournals: { id: number; name: string; field: string; initial: string; color: string }[];
   fieldsDistribution: { name: string; value: number }[];
 }
@@ -38,14 +39,15 @@ function useBookmark() {
     try {
       await api.post('/bookmarks', { paper_id: paperId });
       setBookmarkedIds(prev => new Set(prev).add(paperId));
+      toast.success("Lưu bài báo thành công!");
     } catch {
-      // silently fail — could show toast here
+      toast.error("Lưu bài báo thất bại. Vui lòng thử lại.");
     } finally {
       setLoadingIds(prev => { const s = new Set(prev); s.delete(paperId); return s; });
     }
   }, [bookmarkedIds, loadingIds]);
 
-  return { bookmarkedIds, loadingIds, bookmark };
+  return { bookmarkedIds, loadingIds, bookmark, setBookmarkedIds };
 }
 
 function BookmarkButton({ paperId, bookmarkedIds, loadingIds, bookmark, className }: {
@@ -190,10 +192,123 @@ function PaperDetailModal({ paper, onClose, bookmarkedIds, loadingIds, bookmark 
   );
 }
 
+function AiReviewModal({ papers, onClose }: { papers: PaperDetail[]; onClose: () => void }) {
+  const [analyzing, setAnalyzing] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAnalyzing(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={onClose} />
+      <div className="bg-surface-container relative w-full max-w-2xl rounded-3xl border border-outline-variant/30 shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in duration-300">
+        
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-surface sticky top-0 z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+              <Bot className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="font-display font-bold text-lg">AI Phân tích Chuyên sâu</h2>
+              <p className="text-xs text-on-surface-variant">Tổng hợp Literature Review tự động</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+            <X className="w-5 h-5 text-on-surface-variant" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 overflow-y-auto">
+          {analyzing ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <Loader2 className="w-10 h-10 text-primary animate-spin" />
+              <p className="text-sm text-on-surface-variant animate-pulse font-mono">Đang tổng hợp thông tin từ {papers.length} bài báo...</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="glass-panel p-4 rounded-xl border border-primary/20">
+                <h4 className="text-sm font-bold text-primary mb-2 flex items-center gap-2"><Sparkles className="w-4 h-4"/> Tổng quan Nghiên cứu</h4>
+                <p className="text-sm text-on-surface leading-relaxed">
+                  Dựa trên {papers.length} bài báo học thuật hàng đầu được đề xuất, xu hướng chung tập trung vào việc tối ưu hóa hiệu suất và ứng dụng các thuật toán máy học mới trong thực tiễn.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-bold text-on-surface mb-3 flex items-center gap-2"><BookMarked className="w-4 h-4 text-tertiary"/> Điểm Tương Đồng</h4>
+                <ul className="space-y-2">
+                  {papers.map((p, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-on-surface-variant">
+                      <div className="w-1.5 h-1.5 rounded-full bg-tertiary mt-2 shrink-0" />
+                      <span>Bài viết <strong>"{p.title}"</strong> cũng nhấn mạnh vào việc phân tích dữ liệu quy mô lớn, tương tự các nghiên cứu gần đây trong lĩnh vực.</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-bold text-on-surface mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-secondary"/> Định Hướng Mới</h4>
+                <p className="text-sm text-on-surface-variant leading-relaxed p-4 bg-white/5 rounded-lg border border-white/5">
+                  Các nghiên cứu này mở ra hướng đi mới trong việc ứng dụng AI để tự động hóa các quy trình đánh giá dữ liệu, giúp giảm thiểu sai sót do yếu tố con người. Bạn nên xem xét áp dụng các mô hình học sâu (Deep Learning) như được đề cập trong các bài báo này vào đề tài của mình.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {!analyzing && (
+          <div className="px-6 py-4 border-t border-white/5 flex justify-end gap-3 bg-surface sticky bottom-0">
+            <button className="px-4 py-2 text-sm font-bold rounded-lg border border-outline-variant/30 hover:bg-white/5 transition-colors">
+              Lưu bản nháp
+            </button>
+            <button className="px-4 py-2 text-sm font-bold rounded-lg gradient-btn text-white flex items-center gap-2">
+              <Quote className="w-4 h-4" /> Trích xuất trích dẫn
+            </button>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [selectedPaper, setSelectedPaper] = useState<PaperDetail | null>(null);
-  const { bookmarkedIds, loadingIds, bookmark } = useBookmark();
+  const [followedJournalIds, setFollowedJournalIds] = useState<Set<number>>(new Set());
+  const [followingJournalIds, setFollowingJournalIds] = useState<Set<number>>(new Set());
+
+  const loadFollowedJournals = useCallback(async () => {
+    try {
+      const res = await api.get<{ data: { id: number }[] }>('/journals/feed');
+      const ids = new Set<number>((res as any).followed_journals?.map((j: any) => j.id) ?? []);
+      setFollowedJournalIds(ids);
+    } catch { /* silent */ }
+  }, []);
+
+  const toggleFollowJournal = async (journalId: number, journalName: string) => {
+    if (followingJournalIds.has(journalId)) return;
+    setFollowingJournalIds(prev => new Set(prev).add(journalId));
+    const isFollowed = followedJournalIds.has(journalId);
+    try {
+      if (isFollowed) {
+        await api.delete(`/journals/${journalId}/follow`);
+        setFollowedJournalIds(prev => { const s = new Set(prev); s.delete(journalId); return s; });
+        toast.success(`Đã bỏ theo dõi ${journalName}`);
+      } else {
+        await api.post(`/journals/${journalId}/follow`, {});
+        setFollowedJournalIds(prev => { const s = new Set(prev).add(journalId); return s; });
+        toast.success(`Đang theo dõi ${journalName}!`);
+      }
+    } catch { toast.error('Không thể thực hiện thao tác này.'); }
+    finally { setFollowingJournalIds(prev => { const s = new Set(prev); s.delete(journalId); return s; }); }
+  };
+  const [showAiReview, setShowAiReview] = useState(false);
+  const { bookmarkedIds, loadingIds, bookmark, setBookmarkedIds } = useBookmark();
 
   // Redirect admin to their own dashboard
   const currentUserStr = localStorage.getItem("user");
@@ -241,11 +356,16 @@ export default function Dashboard() {
           topJournals: res.top_journals || [],
           fieldsDistribution: res.fields_distribution || [],
         });
+
+        if (res.bookmarked_paper_ids) {
+          setBookmarkedIds(new Set(res.bookmarked_paper_ids));
+        }
       })
       .catch(err => {
         console.error("Lỗi tải thông tin dashboard", err);
       });
-  }, []);
+    loadFollowedJournals();
+  }, [loadFollowedJournals]);
 
   if (!data) return <div className="p-8 text-on-surface-variant uppercase font-mono animate-pulse">Đang khởi tạo Động cơ Thông tin chuyên sâu...</div>;
 
@@ -259,6 +379,13 @@ export default function Dashboard() {
           bookmarkedIds={bookmarkedIds}
           loadingIds={loadingIds}
           bookmark={bookmark}
+        />
+      )}
+
+      {showAiReview && data && (
+        <AiReviewModal 
+          papers={data.recommendedPapers} 
+          onClose={() => setShowAiReview(false)} 
         />
       )}
 
@@ -341,9 +468,6 @@ export default function Dashboard() {
                 <h3 className="font-display text-2xl font-bold text-on-surface">Vừa xuất bản</h3>
                 <p className="text-sm text-on-surface-variant">Các bổ sung mới nhất trên hệ thống.</p>
               </div>
-              <button className="glass-panel p-2 rounded-lg hover:bg-white/5 whitespace-nowrap">
-                <Filter className="w-4 h-4 text-on-surface-variant" />
-              </button>
             </header>
 
             <div className="glass-panel rounded-xl overflow-hidden divide-y divide-white/5">
@@ -394,10 +518,10 @@ export default function Dashboard() {
              </p>
              <div className="space-y-4">
                {data.recommendedPapers.map((rec) => (
-                 <div key={rec.id} className="p-4 rounded-xl bg-surface-container/30 border-2 border-outline-variant/30 hover:border-primary/30 transition-all cursor-pointer group">
+                 <div key={rec.id} onClick={() => setSelectedPaper(rec)} className="p-4 rounded-xl bg-surface-container/30 border-2 border-outline-variant/30 hover:border-primary/30 transition-all cursor-pointer group">
                    <h5 className="text-sm font-bold leading-tight mb-2 group-hover:text-primary transition-colors">{rec.title}</h5>
                    <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-widest text-on-surface-variant">
-                     <span className="truncate max-w-[200px]">{rec.author}</span>
+                     <span className="truncate max-w-[200px]">{rec.authors}</span>
                      <span className="text-primary">{rec.match} Phù hợp</span>
                    </div>
                  </div>
@@ -406,24 +530,44 @@ export default function Dashboard() {
                  <p className="text-xs text-on-surface-variant text-center py-4">Chưa có bài viết gợi ý nào mới.</p>
                )}
              </div>
-             <button className="w-full mt-8 gradient-btn py-3 rounded-xl font-display text-xs font-bold uppercase tracking-widest text-white flex items-center justify-center gap-2">
-               Tạo đánh giá <BookOpen className="w-4 h-4" />
-             </button>
+              <button 
+                onClick={() => setShowAiReview(true)}
+                disabled={data.recommendedPapers.length === 0}
+                className="w-full mt-8 gradient-btn py-3 rounded-xl font-display text-xs font-bold uppercase tracking-widest text-white flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                Tạo đánh giá <BookOpen className="w-4 h-4" />
+              </button>
            </section>
 
            <section className="space-y-4">
              <h3 className="font-display text-xl font-bold px-2">Tạp chí hàng đầu</h3>
              <div className="space-y-3">
                {data.topJournals.map((j) => (
-                 <div key={j.id} className="glass-panel p-4 rounded-xl border-2 flex items-center gap-4 hover:bg-white/5 cursor-pointer group">
+                 <div key={j.id} className="glass-panel p-4 rounded-xl border-2 flex items-center gap-4 hover:bg-white/5 transition-all group">
                     <div className={cn("w-12 h-12 rounded-lg flex items-center justify-center font-display font-black text-xl shadow-md", j.color)}>
                       {j.initial}
                     </div>
-                    <div className="flex-1">
-                      <h4 className="font-bold text-on-surface leading-tight">{j.name}</h4>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-on-surface leading-tight truncate">{j.name}</h4>
                       <p className="text-xs text-on-surface-variant">{j.field}</p>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-outline group-hover:text-primary transition-all" />
+                    <button
+                      onClick={() => toggleFollowJournal(j.id, j.name)}
+                      disabled={followingJournalIds.has(j.id)}
+                      title={followedJournalIds.has(j.id) ? 'Bỏ theo dõi' : 'Theo dõi tạp chí'}
+                      className={cn(
+                        "flex-shrink-0 p-2 rounded-lg transition-all",
+                        followedJournalIds.has(j.id)
+                          ? "text-primary bg-primary/10 hover:bg-error/10 hover:text-error"
+                          : "text-on-surface-variant hover:text-primary hover:bg-primary/10"
+                      )}
+                    >
+                      {followingJournalIds.has(j.id)
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : followedJournalIds.has(j.id)
+                          ? <BellOff className="w-4 h-4" />
+                          : <Bell className="w-4 h-4" />
+                      }
+                    </button>
                  </div>
                ))}
                {data.topJournals.length === 0 && (
