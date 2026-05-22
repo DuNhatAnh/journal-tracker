@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\Admin\AdminUserController;
 use App\Http\Controllers\Api\Admin\ApiSourceController;
+use App\Http\Controllers\Api\Admin\AdminDashboardController;
 
 /*
 |--------------------------------------------------------------------------
@@ -82,7 +83,13 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::middleware('role:admin')->prefix('admin')->group(function () {
+        // Admin Dashboard Stats
+        Route::get('stats', [AdminDashboardController::class, 'stats']);
+
+        // User Management
         Route::apiResource('users',       AdminUserController::class);
+
+        // API Source Management & Sync
         Route::apiResource('api-sources', ApiSourceController::class);
         Route::post('api-sources/{api_source}/sync', [ApiSourceController::class, 'sync']);
         Route::get('sync-logs', [ApiSourceController::class, 'syncLogs']);

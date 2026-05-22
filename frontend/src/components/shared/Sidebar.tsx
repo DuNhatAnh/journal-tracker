@@ -14,7 +14,7 @@ export function Sidebar() {
   const role = user?.role || "student";
 
   const adminItems = [
-    { icon: LayoutDashboard, label: "Bảng điều khiển", path: "/dashboard" },
+    { icon: LayoutDashboard, label: "Tổng quan hệ thống", path: "/admin/dashboard" },
     { icon: Users, label: "Quản lý người dùng", path: "/admin/users" },
     { icon: Settings, label: "Đồng bộ API", path: "/admin/sync" },
   ];

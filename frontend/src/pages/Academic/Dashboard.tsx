@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import Chart from "react-apexcharts";
 import { TrendingUp, ArrowRight, BookmarkPlus, BookmarkCheck, Filter, Sparkles, BookOpen, ChevronRight, X, ExternalLink, Quote, BookMarked, CalendarDays, Users, Loader2 } from "lucide-react";
@@ -194,6 +194,13 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [selectedPaper, setSelectedPaper] = useState<PaperDetail | null>(null);
   const { bookmarkedIds, loadingIds, bookmark } = useBookmark();
+
+  // Redirect admin to their own dashboard
+  const currentUserStr = localStorage.getItem("user");
+  const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+  if (currentUser?.role === "admin") {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
 
   useEffect(() => {
     api.get<any>(`/dashboard?t=${Date.now()}`)

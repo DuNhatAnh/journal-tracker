@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Settings, Play, CheckCircle2, XCircle, RotateCw, HelpCircle, Eye, Power, ToggleLeft, ToggleRight, Calendar } from "lucide-react";
+import { Settings, Play, CheckCircle2, XCircle, RotateCw, HelpCircle, Eye, Power, ToggleLeft, ToggleRight, Calendar, Plus, Edit2, Trash2, X, Link as LinkIcon } from "lucide-react";
 import { api } from "@/src/lib/api";
 
 type ApiSource = {
@@ -40,6 +40,12 @@ export default function AdminSync() {
 
   // Sync Form State
   const [syncParams, setSyncParams] = useState<Record<number, { field: string; pages: number }>>({});
+
+  // Modal State for CRUD API Sources
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalType, setModalType] = useState<"add" | "edit">("add");
+  const [selectedSource, setSelectedSource] = useState<ApiSource | null>(null);
+  const [formData, setFormData] = useState({ name: "", api_url: "" });
 
   const currentUserStr = localStorage.getItem("user");
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
@@ -116,6 +122,58 @@ export default function AdminSync() {
     }));
   };
 
+  const handleOpenAddModal = () => {
+    setModalType("add");
+    setSelectedSource(null);
+    setFormData({ name: "", api_url: "" });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (source: ApiSource) => {
+    setModalType("edit");
+    setSelectedSource(source);
+    setFormData({ name: source.name, api_url: source.api_url });
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+  };
+
+  const handleSubmitSource = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionError(null);
+    setActionSuccess(null);
+
+    try {
+      if (modalType === "add") {
+        await api.post("/admin/api-sources", { ...formData, is_active: true });
+        setActionSuccess("Đã thêm nguồn dữ liệu API mới thành công.");
+      } else if (modalType === "edit" && selectedSource) {
+        await api.put(`/admin/api-sources/${selectedSource.id}`, formData);
+        setActionSuccess("Đã cập nhật nguồn dữ liệu API thành công.");
+      }
+      setIsModalOpen(false);
+      await loadSources();
+    } catch (err: any) {
+      setActionError(err.message || "Lỗi khi lưu thông tin nguồn API.");
+    }
+  };
+
+  const handleDeleteSource = async (id: number, name: string) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa nguồn API ${name}? Toàn bộ lịch sử đồng bộ của nguồn này cũng có thể bị ảnh hưởng.`)) {
+      return;
+    }
+    setActionError(null);
+    try {
+      await api.delete(`/admin/api-sources/${id}`);
+      setActionSuccess(`Đã xóa nguồn API ${name}.`);
+      await loadSources();
+    } catch (err: any) {
+      setActionError(err.message || "Lỗi khi xóa nguồn API.");
+    }
+  };
+
   const handleTriggerSync = async (sourceId: number, sourceName: string) => {
     setActionError(null);
     setActionSuccess(null);
@@ -138,11 +196,19 @@ export default function AdminSync() {
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-20 max-w-6xl mx-auto">
       {/* Left panel: Sources and triggers */}
       <div className="lg:col-span-7 space-y-8">
-        <header className="border-b border-white/5 pb-6">
-          <h2 className="font-display text-4xl font-bold text-on-surface">Cấu hình đồng bộ</h2>
-          <p className="text-on-surface-variant mt-2 font-medium">
-            Quản lý các nguồn dữ liệu học thuật quốc tế và kích hoạt đồng bộ hóa dữ liệu.
-          </p>
+        <header className="flex justify-between items-end border-b border-white/5 pb-6">
+          <div>
+            <h2 className="font-display text-4xl font-bold text-on-surface">Cấu hình đồng bộ</h2>
+            <p className="text-on-surface-variant mt-2 font-medium">
+              Quản lý các nguồn dữ liệu học thuật quốc tế và kích hoạt đồng bộ hóa dữ liệu.
+            </p>
+          </div>
+          <button
+            onClick={handleOpenAddModal}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/20 text-primary font-bold text-xs uppercase tracking-widest hover:bg-primary/30 transition-all"
+          >
+            <Plus className="w-4 h-4" /> Thêm nguồn
+          </button>
         </header>
 
         {actionError && (
@@ -180,7 +246,24 @@ export default function AdminSync() {
                           {source.name}
                           <span className={`inline-block w-2.5 h-2.5 rounded-full ${source.is_active ? "bg-tertiary" : "bg-on-surface-variant/30"}`} />
                         </h4>
-                        <span className="font-mono text-xs text-on-surface-variant">{source.api_url}</span>
+                        <span className="font-mono text-xs text-on-surface-variant break-all">{source.api_url}</span>
+                        
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            onClick={() => handleOpenEditModal(source)}
+                            className="p-1.5 rounded-md text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors"
+                            title="Chỉnh sửa nguồn"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSource(source.id, source.name)}
+                            className="p-1.5 rounded-md text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors"
+                            title="Xóa nguồn"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                       
                       <button
@@ -333,6 +416,72 @@ export default function AdminSync() {
           )}
         </div>
       </div>
+      {/* Add/Edit API Source Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-md" onClick={handleCloseModal} />
+
+          <div className="glass-panel-intense rounded-3xl p-8 max-w-md w-full relative z-10 space-y-6 shadow-2xl animate-in fade-in-50 zoom-in-95">
+            <header className="flex justify-between items-center">
+              <h3 className="font-display text-2xl font-bold">
+                {modalType === "add" ? "Thêm nguồn API mới" : "Chỉnh sửa nguồn API"}
+              </h3>
+              <button onClick={handleCloseModal} className="p-1.5 rounded-full hover:bg-white/5 transition-all text-on-surface-variant hover:text-on-surface">
+                <X className="w-5 h-5" />
+              </button>
+            </header>
+
+            <form onSubmit={handleSubmitSource} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Tên nguồn cung cấp</label>
+                <div className="relative">
+                  <Settings className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-on-surface placeholder:text-on-surface-variant focus:border-primary/50 transition-all outline-none"
+                    placeholder="VD: OpenAlex"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">URL Endpoint</label>
+                <div className="relative">
+                  <LinkIcon className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+                  <input
+                    type="url"
+                    required
+                    value={formData.api_url}
+                    onChange={(e) => setFormData({ ...formData, api_url: e.target.value })}
+                    className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-on-surface placeholder:text-on-surface-variant focus:border-primary/50 transition-all outline-none"
+                    placeholder="https://api.example.com/v1"
+                  />
+                </div>
+                <p className="text-[10px] text-on-surface-variant px-1 mt-1">Đảm bảo URL trả về đúng cấu trúc chuẩn của hệ thống đồng bộ.</p>
+              </div>
+
+              <div className="pt-4 flex gap-4">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="flex-1 py-3.5 rounded-xl border border-white/10 text-on-surface font-bold text-xs uppercase tracking-widest hover:bg-white/5 transition-all"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3.5 rounded-xl bg-primary text-on-primary font-bold text-xs uppercase tracking-widest hover:bg-primary-container transition-all"
+                >
+                  {modalType === "add" ? "Thêm nguồn" : "Lưu thay đổi"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
