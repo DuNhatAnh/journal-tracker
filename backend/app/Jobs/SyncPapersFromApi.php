@@ -48,18 +48,53 @@ class SyncPapersFromApi implements ShouldQueue
         $this->syncedCount = 0;
 
         try {
-            for ($page = 1; $page <= $this->maxPages; $page++) {
-                $data = $openAlex->searchWorks($this->query, $page, 100, $this->topicId, $this->years);
-
-                if (empty($data['results'])) {
-                    break;
+            // 1. TOP CONCEPTS: Identify the base concept ID from the query
+            $conceptId = null;
+            if (!empty($this->query)) {
+                $conceptId = $openAlex->searchConcepts($this->query);
+                if ($conceptId) {
+                    Log::info("Found Top Concept for query", ['query' => $this->query, 'concept_id' => $conceptId]);
                 }
+            }
 
+            // Distribute pages between Top Cited and Recent
+            $pagesEach = max(1, floor($this->maxPages / 2));
+
+            // 2. TOP CITED PAPERS (Classics)
+            for ($page = 1; $page <= $pagesEach; $page++) {
+                $data = $openAlex->searchWorks(
+                    query: $this->query, 
+                    page: $page, 
+                    perPage: 100, 
+                    topicId: $this->topicId, 
+                    years: '', // All-time top cited
+                    sort: 'cited_by_count:desc',
+                    conceptId: $conceptId
+                );
+
+                if (empty($data['results'])) break;
                 foreach ($data['results'] as $item) {
                     $this->processWork($item);
                 }
+                sleep(1);
+            }
 
-                // Respect rate limits — polite crawling
+            // 3. RECENT PAPERS (Cutting-edge)
+            for ($page = 1; $page <= $pagesEach; $page++) {
+                $data = $openAlex->searchWorks(
+                    query: $this->query, 
+                    page: $page, 
+                    perPage: 100, 
+                    topicId: $this->topicId, 
+                    years: $this->years, // Respect configured years or default recent
+                    sort: 'publication_date:desc',
+                    conceptId: $conceptId
+                );
+
+                if (empty($data['results'])) break;
+                foreach ($data['results'] as $item) {
+                    $this->processWork($item);
+                }
                 sleep(1);
             }
 

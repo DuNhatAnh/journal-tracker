@@ -29,6 +29,9 @@ class OpenAlexService
 
     /**
      * Search works (papers) by keyword or concept.
+     * Scope is ALWAYS restricted to Computer Science:
+     *  - primary_topic.field.id = 17  (OpenAlex field: Computer Science)
+     *  - concepts.id = C41008148       (OpenAlex concept: Computer Science)
      *
      * @param  string  $query   Search query
      * @param  int     $page    Page number (1-indexed)
@@ -43,7 +46,8 @@ class OpenAlexService
         int $perPage = 100, 
         string $topicId = '', 
         string $years = '',
-        string $sort = 'cited_by_count:desc,publication_year:desc'
+        string $sort = 'cited_by_count:desc,publication_year:desc',
+        ?string $conceptId = null
     ): array {
         // Default year range: from 2023 to current year
         if (empty($years)) {
@@ -53,10 +57,10 @@ class OpenAlexService
             // Build the filter
             $filters = [];
 
-            // Always restrict to Computer Science field (OpenAlex field ID: 17)
+            // ALWAYS restrict to Computer Science field based on user requirement
             $filters[] = "primary_topic.field.id:17";
 
-            // Optionally narrow down to a specific topic within CS
+            // Optionally narrow down to a specific topic within CS or other
             if (!empty($topicId)) {
                 $filters[] = "topics.id:{$topicId}";
             }
@@ -64,7 +68,9 @@ class OpenAlexService
             if (!empty($years)) {
                 $filters[] = "publication_year:{$years}";
             }
-            if (!empty(trim($query))) {
+            if (!empty($conceptId)) {
+                $filters[] = "concepts.id:{$conceptId}";
+            } elseif (!empty(trim($query))) {
                 $filters[] = "default.search:{$query}";
             }
 
@@ -89,6 +95,31 @@ class OpenAlexService
             Log::error('OpenAlex searchWorks failed', ['error' => $e->getMessage()]);
             return [];
         }
+    }
+
+    /**
+     * Search for the top concept matching the query.
+     */
+    public function searchConcepts(string $query): ?string
+    {
+        if (empty(trim($query))) return null;
+
+        try {
+            $response = $this->client->get('/concepts', [
+                'query' => [
+                    'search' => $query,
+                    'per-page' => 1,
+                    'mailto' => $this->email,
+                ],
+            ]);
+            $data = json_decode($response->getBody()->getContents(), true);
+            if (!empty($data['results'])) {
+                return $data['results'][0]['id'];
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('OpenAlex searchConcepts failed', ['error' => $e->getMessage()]);
+        }
+        return null;
     }
 
     /**

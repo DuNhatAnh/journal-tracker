@@ -29,7 +29,7 @@ class AdminDashboardController extends Controller
 
         // API Source counts
         $totalApiSources  = ApiSource::count();
-        $activeApiSources = ApiSource::where('is_active', true)->count();
+        $activeApiSources = ApiSource::where('is_active', DB::raw('true'))->count();
 
         // Last sync timestamp
         $lastSyncLog = SyncLog::orderByDesc('created_at')->first();
@@ -58,6 +58,46 @@ class AdminDashboardController extends Controller
             'last_sync_at'        => $lastSyncLog?->created_at,
             'users_by_role'       => $usersByRole,
             'recent_sync_logs'    => $recentSyncLogs,
+        ]);
+    }
+
+    /**
+     * GET /api/admin/charts
+     * Returns chart data for papers/journals/keywords visualizations.
+     */
+    public function charts()
+    {
+        // Chart 1: Papers published per year — last 10 years only
+        $papersPerYear = ResearchPaper::select(
+                'published_year',
+                DB::raw('count(*) as total')
+            )
+            ->whereNotNull('published_year')
+            ->where('published_year', '>=', date('Y') - 9)
+            ->where('published_year', '<=', date('Y'))
+            ->groupBy('published_year')
+            ->orderBy('published_year')
+            ->get()
+            ->map(fn($r) => ['year' => (int)$r->published_year, 'total' => (int)$r->total]);
+
+        // Chart 2: Top 10 journals by paper count (donut chart)
+        $topJournals = Journal::withCount('papers')
+            ->orderByDesc('papers_count')
+            ->limit(10)
+            ->get()
+            ->map(fn($r) => ['name' => $r->name, 'total' => $r->papers_count]);
+
+        // Chart 3: Top 15 keywords by paper count (horizontal bar chart)
+        $topKeywords = Keyword::withCount('papers')
+            ->orderByDesc('papers_count')
+            ->limit(15)
+            ->get()
+            ->map(fn($r) => ['name' => $r->name, 'total' => $r->papers_count]);
+
+        return response()->json([
+            'papers_per_year' => $papersPerYear,
+            'top_journals'    => $topJournals,
+            'top_keywords'    => $topKeywords,
         ]);
     }
 }

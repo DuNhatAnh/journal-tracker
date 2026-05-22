@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Settings, Play, CheckCircle2, XCircle, RotateCw, HelpCircle, Eye, Power, ToggleLeft, ToggleRight, Calendar, Plus, Edit2, Trash2, X, Link as LinkIcon } from "lucide-react";
+import { Settings, Play, CheckCircle2, XCircle, RotateCw, Calendar, Plus, Edit2, Trash2, X, Link as LinkIcon, ToggleLeft, ToggleRight, Lock } from "lucide-react";
 import { api } from "@/src/lib/api";
 
 type ApiSource = {
@@ -39,7 +39,7 @@ export default function AdminSync() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   // Sync Form State
-  const [syncParams, setSyncParams] = useState<Record<number, { field: string; pages: number }>>({});
+  const [syncParams, setSyncParams] = useState<Record<number, { domain: string; field: string; pages: number; years: string }>>({});
 
   // Modal State for CRUD API Sources
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -68,9 +68,9 @@ export default function AdminSync() {
       setSources(response || []);
       
       // Initialize sync params for each source
-      const params: Record<number, { field: string; pages: number }> = {};
+      const params: Record<number, { domain: string; field: string; pages: number; years: string }> = {};
       (response || []).forEach((src) => {
-        params[src.id] = { field: "deep learning", pages: 1 };
+        params[src.id] = { domain: "Computer Science", field: "", pages: 1, years: "2023-2024" };
       });
       setSyncParams(params);
     } catch (err: any) {
@@ -177,12 +177,15 @@ export default function AdminSync() {
   const handleTriggerSync = async (sourceId: number, sourceName: string) => {
     setActionError(null);
     setActionSuccess(null);
-    const params = syncParams[sourceId] || { field: "deep learning", pages: 1 };
+    const params = syncParams[sourceId] || { domain: "Computer Science", field: "", pages: 1, years: "2023-2024" };
+
+    const combinedQuery = [params.domain, params.field].filter(Boolean).join(" ");
 
     try {
       const response = await api.post<{ message: string }>(`/admin/api-sources/${sourceId}/sync`, {
-        field: params.field,
+        field: combinedQuery,
         pages: params.pages,
+        years: params.years,
       });
       setActionSuccess(response.message || `Đã gửi yêu cầu đồng bộ nguồn ${sourceName}.`);
       // Refresh logs after brief delay
@@ -237,14 +240,14 @@ export default function AdminSync() {
           ) : (
             <div className="space-y-6">
               {sources.map((source) => {
-                const params = syncParams[source.id] || { field: "deep learning", pages: 1 };
+                const params = syncParams[source.id] || { domain: "Computer Science", field: "", pages: 1, years: "2023-2024" };
                 return (
                   <div key={source.id} className="glass-panel p-6 rounded-2xl bg-surface space-y-4">
                     <div className="flex items-start justify-between">
                       <div>
                         <h4 className="font-display text-lg font-bold text-on-surface flex items-center gap-2">
                           {source.name}
-                          <span className={`inline-block w-2.5 h-2.5 rounded-full ${source.is_active ? "bg-tertiary" : "bg-on-surface-variant/30"}`} />
+                          <span className="inline-block w-2.5 h-2.5 rounded-full bg-tertiary" />
                         </h4>
                         <span className="font-mono text-xs text-on-surface-variant break-all">{source.api_url}</span>
                         
@@ -266,32 +269,48 @@ export default function AdminSync() {
                         </div>
                       </div>
                       
-                      <button
-                        onClick={() => handleToggleActive(source)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all ${
-                          source.is_active 
-                            ? "bg-tertiary/10 text-tertiary hover:bg-tertiary/20" 
-                            : "bg-on-surface-variant/10 text-on-surface-variant hover:bg-on-surface-variant/20"
-                        }`}
-                      >
-                        {source.is_active ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
-                        {source.is_active ? "Bật" : "Tắt"}
-                      </button>
+                      {/* Active badge - display only, no toggle */}
+                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase bg-tertiary/10 text-tertiary">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse" />
+                        Đang hoạt động
+                      </span>
                     </div>
 
-                    {source.is_active && (
+                    {(
                       <div className="border-t border-white/5 pt-4 space-y-4">
                         <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Đồng bộ thủ công</p>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Từ khóa tìm kiếm</label>
+                            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Lĩnh vực (Domain)</label>
+                            <input
+                              type="text"
+                              value={params.domain}
+                              disabled
+                              title="Nguyên tắc hệ thống mới: Cập nhật mặc định Khóa luôn ở Khoa học máy tính"
+                              className="w-full px-3 py-2 text-xs rounded-lg bg-surface-container border border-white/10 text-on-surface-variant cursor-not-allowed outline-none"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Từ khóa</label>
                             <input
                               type="text"
                               value={params.field}
                               onChange={(e) => handleParamChange(source.id, "field", e.target.value)}
                               className="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-white/10 text-on-surface outline-none focus:border-primary/50"
-                              placeholder="deep learning"
+                              placeholder="vd: AI, NLP..."
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Năm (Years)</label>
+                            <input
+                              type="text"
+                              value={params.years}
+                              onChange={(e) => handleParamChange(source.id, "years", e.target.value)}
+                              className="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-white/10 text-on-surface outline-none focus:border-primary/50"
+                              placeholder="vd: 2023-2024"
                             />
                           </div>
 
@@ -305,6 +324,9 @@ export default function AdminSync() {
                               onChange={(e) => handleParamChange(source.id, "pages", parseInt(e.target.value) || 1)}
                               className="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-white/10 text-on-surface outline-none focus:border-primary/50"
                             />
+                            <p className="text-[10px] text-on-surface-variant leading-relaxed">
+                              1 trang = 100 bài báo. Hệ thống chia đều: {params.pages} trang → <span className="text-primary font-bold">{Math.floor(params.pages / 2) + (params.pages % 2)} trang</span> Trích dẫn cao + <span className="text-tertiary font-bold">{Math.floor(params.pages / 2)} trang</span> Mới nhất = <span className="text-amber-400 font-bold">~{params.pages * 100} bài</span>
+                            </p>
                           </div>
                         </div>
 
@@ -312,7 +334,7 @@ export default function AdminSync() {
                           onClick={() => handleTriggerSync(source.id, source.name)}
                           className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs uppercase tracking-widest hover:bg-primary-container transition-all"
                         >
-                          <Play className="w-4 h-4" /> Bắt đầu đồng bộ ngầm
+                          <Play className="w-4 h-4" /> Thực hiện đồng bộ ngay
                         </button>
                       </div>
                     )}

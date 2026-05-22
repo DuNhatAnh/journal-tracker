@@ -83,8 +83,9 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::middleware('role:admin')->prefix('admin')->group(function () {
-        // Admin Dashboard Stats
-        Route::get('stats', [AdminDashboardController::class, 'stats']);
+        // Admin Dashboard Stats & Charts
+        Route::get('stats',  [AdminDashboardController::class, 'stats']);
+        Route::get('charts', [AdminDashboardController::class, 'charts']);
 
         // User Management
         Route::apiResource('users',       AdminUserController::class);
