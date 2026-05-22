@@ -1,19 +1,17 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Layout } from "./components/Layout";
-import { ThemeProvider } from "./lib/ThemeContext";
-import Landing from "./pages/Landing";
-import Dashboard from "./pages/Dashboard";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Search from "./pages/Search";
-import Trending from "./pages/Trending";
-import Bookmarks from "./pages/Bookmarks";
-import Following from "./pages/Following";
-import Notifications from "./pages/Notifications";
-import Profile from "./pages/Profile";
-import Settings from "./pages/Settings";
-import AdminUsers from "./pages/Admin/Users";
-import AdminSync from "./pages/Admin/Sync";
+import { Layout } from "./components/shared/Layout";
+import { ThemeProvider } from "./lib/theme";
+import Landing from "./pages/Shared/Landing";
+import Dashboard from "./pages/Academic/Dashboard";
+import Login from "./pages/Auth/Login";
+import Register from "./pages/Auth/Register";
+import Search from "./pages/Shared/Search";
+import Trending from "./pages/Researcher/Trending";
+import Bookmarks from "./pages/Academic/Bookmarks";
+import Following from "./pages/Researcher/Following";
+import Notifications from "./pages/Shared/Notifications";
+import Profile from "./pages/Shared/Profile";
+import Settings from "./pages/Shared/Settings";
 
 export default function App() {
   return (
@@ -32,8 +30,6 @@ export default function App() {
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/admin/users" element={<AdminUsers />} />
-            <Route path="/admin/sync" element={<AdminSync />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

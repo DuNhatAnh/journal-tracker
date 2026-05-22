@@ -24,17 +24,44 @@ class PaperController extends Controller
     }
 
     /**
-     * GET /api/papers/search?q=
+     * GET /api/papers/search?q=&year=&sort=
      */
     public function search(Request $request)
     {
-        $request->validate(['q' => 'required|string|min:2']);
+        $request->validate([
+            'q' => 'nullable|string',
+            'year' => 'nullable|integer',
+            'author' => 'nullable|string',
+            'journal' => 'nullable|string',
+            'sort' => 'nullable|string|in:relevance,citations'
+        ]);
 
-        $papers = ResearchPaper::with(['journal', 'authors', 'keywords'])
-            ->search($request->q)
-            ->orderByDesc('citations_count')
-            ->paginate(20)
-            ->withQueryString();
+        $query = ResearchPaper::with(['journal', 'authors', 'keywords']);
+        
+        if ($request->filled('q')) {
+            $query->search($request->q);
+        }
+
+        if ($request->year) {
+            $query->byYear((int) $request->year);
+        }
+
+        if ($request->filled('author')) {
+            $query->whereHas('authors', fn($q) => $q->where('name', 'ilike', "%{$request->author}%"));
+        }
+
+        if ($request->filled('journal')) {
+            $query->whereHas('journal', fn($q) => $q->where('name', 'ilike', "%{$request->journal}%"));
+        }
+
+        if ($request->sort === 'citations') {
+            $query->orderByDesc('citations_count');
+        } else {
+            // relevance (default): Just order by latest for now, or let DB handle order
+            $query->orderByDesc('published_year')->orderByDesc('citations_count');
+        }
+
+        $papers = $query->paginate(20)->withQueryString();
 
         return response()->json($papers);
     }

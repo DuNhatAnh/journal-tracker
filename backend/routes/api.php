@@ -65,6 +65,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('bookmarks')->group(function () {
         Route::get('/',              [BookmarkController::class, 'index']);
         Route::post('/',             [BookmarkController::class, 'store']);
+        Route::put('/{bookmark}',    [BookmarkController::class, 'update']);
         Route::delete('/{bookmark}', [BookmarkController::class, 'destroy']);
     });
 

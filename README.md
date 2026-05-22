@@ -1,5 +1,7 @@
 # 📚 Journal Tracker — Scientific Journal Publication Trend Tracking System
 
+> **Lưu ý / Scope**: Hệ thống được thiết kế **chỉ giới hạn thu thập và phân tích các bài báo học thuật thuộc lĩnh vực Computer Science (Khoa học Máy tính)** thông qua OpenAlex API. Việc này giúp giảm độ phức tạp của hệ thống và tập trung vào dữ liệu của một chuyên ngành cụ thể.
+
 ## 🏗️ Project Structure
 
 ```

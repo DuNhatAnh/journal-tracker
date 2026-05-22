@@ -33,19 +33,55 @@ class OpenAlexService
      * @param  string  $query   Search query
      * @param  int     $page    Page number (1-indexed)
      * @param  int     $perPage Results per page (max 200 for OpenAlex)
+     * @param  string  $topicId Topic ID
+     * @param  string  $years   Year range
      * @return array
      */
-    public function searchWorks(string $query, int $page = 1, int $perPage = 50): array
-    {
+    public function searchWorks(
+        string $query = '', 
+        int $page = 1, 
+        int $perPage = 100, 
+        string $topicId = '', 
+        string $years = '',
+        string $sort = 'cited_by_count:desc,publication_year:desc'
+    ): array {
+        // Default year range: from 2023 to current year
+        if (empty($years)) {
+            $years = '2023-' . date('Y');
+        }
         try {
+            // Build the filter
+            $filters = [];
+
+            // Always restrict to Computer Science field (OpenAlex field ID: 17)
+            $filters[] = "primary_topic.field.id:17";
+
+            // Optionally narrow down to a specific topic within CS
+            if (!empty($topicId)) {
+                $filters[] = "topics.id:{$topicId}";
+            }
+
+            if (!empty($years)) {
+                $filters[] = "publication_year:{$years}";
+            }
+            if (!empty(trim($query))) {
+                $filters[] = "default.search:{$query}";
+            }
+
+            $queryParams = [
+                'page'       => $page,
+                'per-page'   => $perPage,
+                'sort'       => $sort,
+                'select'     => 'id,title,abstract_inverted_index,publication_year,primary_location,authorships,concepts,topics,cited_by_count,doi',
+                'mailto'     => $this->email,
+            ];
+
+            if (!empty($filters)) {
+                $queryParams['filter'] = implode(',', $filters);
+            }
+
             $response = $this->client->get('/works', [
-                'query' => [
-                    'search'     => $query,
-                    'page'       => $page,
-                    'per-page'   => $perPage,
-                    'select'     => 'id,title,abstract_inverted_index,publication_year,primary_location,authorships,concepts,cited_by_count,doi',
-                    'mailto'     => $this->email,
-                ],
+                'query' => $queryParams,
             ]);
 
             return json_decode($response->getBody()->getContents(), true);
