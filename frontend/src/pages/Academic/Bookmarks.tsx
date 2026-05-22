@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { BookmarkX, ArrowRight, ExternalLink, Loader2, Edit3, Save, X } from "lucide-react";
+import { BookmarkX, ArrowRight, ExternalLink, Loader2, Edit3, Save, X, Download } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/src/lib/utils";
 import { api } from "@/src/lib/api";
@@ -24,6 +24,40 @@ export default function Bookmarks() {
   
   const [data, setData] = useState<Bookmark[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const token = localStorage.getItem("token");
+      const headers: HeadersInit = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const response = await fetch("/api/bookmarks/export", {
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error("Không thể xuất báo cáo.");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `bao_cao_dau_trang_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Lỗi khi xuất báo cáo");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const fetchBookmarks = useCallback(async () => {
     setIsLoading(true);
@@ -69,8 +103,18 @@ export default function Bookmarks() {
           <h2 className="font-display text-4xl font-bold text-on-surface">Dấu trang</h2>
           <p className="text-on-surface-variant mt-2">Quản lý các bài báo học thuật đã lưu và ghi chú cá nhân.</p>
         </div>
-        <div className="flex p-1 bg-surface-container-low border border-white/5 rounded-xl">
-           <button className="px-6 py-2.5 rounded-lg bg-primary text-on-primary text-xs font-bold uppercase tracking-widest shadow-lg">Bài báo đã lưu</button>
+        <div className="flex items-center gap-3">
+          <div className="flex p-1 bg-surface-container-low border border-white/5 rounded-xl">
+             <button className="px-6 py-2.5 rounded-lg bg-primary text-on-primary text-xs font-bold uppercase tracking-widest shadow-lg">Bài báo đã lưu</button>
+          </div>
+          <button 
+             onClick={handleExport}
+             disabled={isExporting}
+             className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-surface-container-low border border-white/5 text-on-surface hover:bg-white/5 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
+          >
+             {isExporting ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : <Download className="w-4 h-4 text-tertiary" />}
+             Xuất báo cáo (CSV)
+          </button>
         </div>
       </header>
 

@@ -312,7 +312,7 @@ export default function Trending() {
     }
     const trends = selectedDetail.trends;
     const latest = trends[trends.length - 1];
-    const growth = latest ? `+${latest.growth_rate}%` : "+0%";
+    const growth = latest ? (latest.growth_rate >= 0 ? `+${latest.growth_rate}%` : `${latest.growth_rate}%`) : "+0%";
     const totalPapers = trends.reduce((sum, t) => sum + (t.paper_count ?? 0), 0);
     const totalCitations = trends.reduce((sum, t) => sum + (t.citation_count ?? 0), 0);
     const impact = totalPapers > 0 
@@ -623,7 +623,7 @@ export default function Trending() {
                       </span>
                     </div>
                     <span className="bg-tertiary-container/10 text-tertiary text-[10px] font-bold px-2 py-0.5 rounded border border-tertiary/20 flex items-center gap-0.5">
-                      +{item.growth_rate}%
+                      {item.growth_rate >= 0 ? `+${item.growth_rate}` : item.growth_rate}%
                     </span>
                   </div>
                 );

@@ -327,13 +327,16 @@ export default function Dashboard() {
           { label: "Bài báo đã lưu", value: String(res.stats?.total_bookmarks ?? 0), trend: "Bộ sưu tập" },
         ];
 
-        const mappedTrending = (res.trending_topics || []).map((t: any) => ({
-          id: t.id,
-          name: t.keyword?.name || "Chủ đề",
-          papers: `${t.paper_count ?? 0}`,
-          change: `+${t.growth_rate ?? 0}%`,
-          data: t.chart_data || [0, 0, 0, 0, 0, 0, 0],
-        }));
+        const mappedTrending = (res.trending_topics || []).map((t: any) => {
+          const rate = t.growth_rate ?? 0;
+          return {
+            id: t.id,
+            name: t.keyword?.name || "Chủ đề",
+            papers: `${t.paper_count ?? 0}`,
+            change: rate >= 0 ? `+${rate}%` : `${rate}%`,
+            data: t.chart_data || [0, 0, 0, 0, 0, 0, 0],
+          };
+        });
 
         const mappedRecent = (res.recent_papers || []).map((p: any) => ({
           id: p.id,

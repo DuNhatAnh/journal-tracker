@@ -66,4 +66,62 @@ class BookmarkController extends Controller
 
         return response()->json(['message' => 'Đã xóa bookmark.']);
     }
+
+    /**
+     * GET /api/bookmarks/export
+     */
+    public function export()
+    {
+        $bookmarks = auth()->user()
+            ->bookmarks()
+            ->with(['paper.journal', 'paper.authors', 'paper.keywords'])
+            ->latest()
+            ->get();
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="bao_cao_dau_trang_' . now()->format('Ymd_His') . '.csv"',
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $callback = function () use ($bookmarks) {
+            $file = fopen('php://output', 'w');
+            
+            // Write UTF-8 BOM
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            // Write CSV headers
+            fputcsv($file, [
+                'Tiêu đề bài báo',
+                'Tác giả',
+                'Tạp chí',
+                'Năm xuất bản',
+                'Số trích dẫn',
+                'Ghi chú cá nhân',
+                'Ngày lưu'
+            ]);
+
+            foreach ($bookmarks as $bookmark) {
+                $paper = $bookmark->paper;
+                $authors = $paper->authors->pluck('name')->join(', ');
+                $journal = $paper->journal ? $paper->journal->name : ($paper->source ?: 'N/A');
+                
+                fputcsv($file, [
+                    $paper->title,
+                    $authors,
+                    $journal,
+                    $paper->published_year,
+                    $paper->citations_count,
+                    $bookmark->note ?? '',
+                    $bookmark->created_at->format('d/m/Y H:i:s'),
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
 }

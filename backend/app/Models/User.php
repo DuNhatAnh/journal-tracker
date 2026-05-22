@@ -74,4 +74,10 @@ class User extends Authenticatable
         return $this->belongsToMany(Journal::class, 'user_journal')
                     ->withTimestamps();
     }
+
+    public function followedAuthors()
+    {
+        return $this->belongsToMany(Author::class, 'user_author')
+                    ->withTimestamps();
+    }
 }

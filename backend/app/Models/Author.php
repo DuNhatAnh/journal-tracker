@@ -15,4 +15,10 @@ class Author extends Model
     {
         return $this->belongsToMany(ResearchPaper::class, 'paper_author');
     }
+
+    public function followers()
+    {
+        return $this->belongsToMany(User::class, 'user_author')
+                    ->withTimestamps();
+    }
 }

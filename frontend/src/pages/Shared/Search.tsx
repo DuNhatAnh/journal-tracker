@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Filter, ChevronLeft, ChevronRight, Bookmark, Lock, Quote, History, Info, Loader2, Search as SearchIcon, X, ExternalLink } from "lucide-react";
 import { cn } from "@/src/lib/utils";

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\JournalController;
 use App\Http\Controllers\Api\KeywordController;
 use App\Http\Controllers\Api\TrendController;
 use App\Http\Controllers\Api\BookmarkController;
+use App\Http\Controllers\Api\FollowingController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\Admin\AdminUserController;
@@ -68,9 +69,23 @@ Route::middleware('auth:sanctum')->group(function () {
     // Bookmarks
     Route::prefix('bookmarks')->group(function () {
         Route::get('/',              [BookmarkController::class, 'index']);
+        Route::get('/export',        [BookmarkController::class, 'export']);
         Route::post('/',             [BookmarkController::class, 'store']);
         Route::put('/{bookmark}',    [BookmarkController::class, 'update']);
         Route::delete('/{bookmark}', [BookmarkController::class, 'destroy']);
+    });
+
+    // Following
+    Route::prefix('following')->group(function () {
+        Route::get('/status',        [FollowingController::class, 'index']);
+        Route::get('/feed',          [FollowingController::class, 'feed']);
+        Route::get('/search',        [FollowingController::class, 'search']);
+        Route::post('/keywords',     [FollowingController::class, 'followKeyword']);
+        Route::delete('/keywords/{keyword}', [FollowingController::class, 'unfollowKeyword']);
+        Route::post('/journals',     [FollowingController::class, 'followJournal']);
+        Route::delete('/journals/{journal}', [FollowingController::class, 'unfollowJournal']);
+        Route::post('/authors',      [FollowingController::class, 'followAuthor']);
+        Route::delete('/authors/{author}', [FollowingController::class, 'unfollowAuthor']);
     });
 
     // Notifications
