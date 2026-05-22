@@ -19,6 +19,11 @@ interface Bookmark {
 }
 
 export default function Bookmarks() {
+  const userStr = localStorage.getItem("user");
+  const user = userStr ? JSON.parse(userStr) : null;
+  const role = user?.role || "student";
+  const showExport = role === "researcher" || role === "admin";
+
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editNote, setEditNote] = useState("");
   
@@ -107,14 +112,16 @@ export default function Bookmarks() {
           <div className="flex p-1 bg-surface-container-low border border-white/5 rounded-xl">
              <button className="px-6 py-2.5 rounded-lg bg-primary text-on-primary text-xs font-bold uppercase tracking-widest shadow-lg">Bài báo đã lưu</button>
           </div>
-          <button 
-             onClick={handleExport}
-             disabled={isExporting}
-             className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-surface-container-low border border-white/5 text-on-surface hover:bg-white/5 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
-          >
-             {isExporting ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : <Download className="w-4 h-4 text-tertiary" />}
-             Xuất báo cáo (CSV)
-          </button>
+          {showExport && (
+            <button 
+               onClick={handleExport}
+               disabled={isExporting}
+               className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-surface-container-low border border-white/5 text-on-surface hover:bg-white/5 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
+            >
+               {isExporting ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : <Download className="w-4 h-4 text-tertiary" />}
+               Xuất báo cáo (CSV)
+            </button>
+          )}
         </div>
       </header>
 

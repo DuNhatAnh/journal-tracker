@@ -49,8 +49,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/',                              [JournalController::class, 'index']);
         Route::get('/feed',                          [JournalController::class, 'feed']);
         Route::get('/{journal}',                     [JournalController::class, 'show']);
-        Route::post('/{journal}/follow',             [JournalController::class, 'follow']);
-        Route::delete('/{journal}/follow',           [JournalController::class, 'unfollow']);
+        Route::post('/{journal}/follow',             [JournalController::class, 'follow'])->middleware('role:researcher,admin');
+        Route::delete('/{journal}/follow',           [JournalController::class, 'unfollow'])->middleware('role:researcher,admin');
     });
 
     // Keywords
@@ -69,14 +69,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // Bookmarks
     Route::prefix('bookmarks')->group(function () {
         Route::get('/',              [BookmarkController::class, 'index']);
-        Route::get('/export',        [BookmarkController::class, 'export']);
+        Route::get('/export',        [BookmarkController::class, 'export'])->middleware('role:researcher,admin');
         Route::post('/',             [BookmarkController::class, 'store']);
         Route::put('/{bookmark}',    [BookmarkController::class, 'update']);
         Route::delete('/{bookmark}', [BookmarkController::class, 'destroy']);
     });
 
     // Following
-    Route::prefix('following')->group(function () {
+    Route::prefix('following')->middleware('role:researcher,admin')->group(function () {
         Route::get('/status',        [FollowingController::class, 'index']);
         Route::get('/feed',          [FollowingController::class, 'feed']);
         Route::get('/search',        [FollowingController::class, 'search']);

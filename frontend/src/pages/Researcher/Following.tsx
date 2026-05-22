@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Activity, Users, Plus, Tag, X, Clock, Quote, ArrowRight, Loader2, Search, BookOpen, ExternalLink, Bookmark } from "lucide-react";
 import toast from "react-hot-toast";
+import { Navigate } from "react-router-dom";
 import { cn } from "@/src/lib/utils";
 import { api } from "@/src/lib/api";
 
@@ -38,6 +39,14 @@ interface Paper {
 }
 
 export default function Following() {
+  const userStr = localStorage.getItem("user");
+  const user = userStr ? JSON.parse(userStr) : null;
+  const role = user?.role || "student";
+
+  if (role !== "researcher" && role !== "admin") {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   // Sidebar tabs state
   const [activeTab, setActiveTab] = useState<"keyword" | "journal" | "author">("keyword");
 
