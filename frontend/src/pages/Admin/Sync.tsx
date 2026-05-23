@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Settings, Play, CheckCircle2, XCircle, RotateCw, Calendar, Plus, Edit2, Trash2, X, Link as LinkIcon, ToggleLeft, ToggleRight, Lock } from "lucide-react";
+import { Settings, Play, CheckCircle2, XCircle, RotateCw, Calendar, Plus, Edit2, Trash2, X, Link as LinkIcon, ToggleLeft, ToggleRight, Lock, StopCircle } from "lucide-react";
 import { api } from "@/src/lib/api";
 
 type ApiSource = {
@@ -39,7 +39,7 @@ export default function AdminSync() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   // Sync Form State
-  const [syncParams, setSyncParams] = useState<Record<number, { domain: string; field: string; pages: number; years: string }>>({});
+  const [syncParams, setSyncParams] = useState<Record<number, { domain: string; field: string; pages: number; yearFrom: string; yearTo: string }>>({});
 
   // Modal State for CRUD API Sources
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -57,6 +57,19 @@ export default function AdminSync() {
     }
   }, []);
 
+  // Auto-polling when there is a running sync task
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (logs.some((log) => log.status === "running")) {
+      interval = setInterval(() => {
+        loadLogs(logsPagination.current);
+      }, 3000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [logs, logsPagination.current]);
+
   if (currentUser?.role !== "admin") {
     return <Navigate to="/dashboard" replace />;
   }
@@ -68,9 +81,9 @@ export default function AdminSync() {
       setSources(response || []);
       
       // Initialize sync params for each source
-      const params: Record<number, { domain: string; field: string; pages: number; years: string }> = {};
+      const params: Record<number, { domain: string; field: string; pages: number; yearFrom: string; yearTo: string }> = {};
       (response || []).forEach((src) => {
-        params[src.id] = { domain: "Computer Science", field: "", pages: 1, years: "2023-2026" };
+        params[src.id] = { domain: "Computer Science", field: "", pages: 50, yearFrom: "2023", yearTo: "2026" };
       });
       setSyncParams(params);
     } catch (err: any) {
@@ -177,20 +190,38 @@ export default function AdminSync() {
   const handleTriggerSync = async (sourceId: number, sourceName: string) => {
     setActionError(null);
     setActionSuccess(null);
-    const params = syncParams[sourceId] || { domain: "Computer Science", field: "", pages: 1, years: "2023-2026" };
+    const params = syncParams[sourceId] || { domain: "Computer Science", field: "", pages: 50, yearFrom: "2023", yearTo: "2026" };
     const combinedQuery = params.domain ? `${params.domain} ${params.field}`.trim() : params.field;
+    
+    // Validate years
+    if (parseInt(params.yearFrom) > parseInt(params.yearTo)) {
+      setActionError("Năm bắt đầu không được lớn hơn năm kết thúc.");
+      return;
+    }
 
     try {
       const response = await api.post<{ message: string }>(`/admin/api-sources/${sourceId}/sync`, {
         field: combinedQuery,
         pages: params.pages,
-        years: params.years,
+        years: `${params.yearFrom}-${params.yearTo}`,
       });
       setActionSuccess(response.message || `Đã gửi yêu cầu đồng bộ nguồn ${sourceName}.`);
       // Refresh logs after brief delay
       setTimeout(() => loadLogs(1), 1000);
     } catch (err: any) {
       setActionError(err.message || "Lỗi khi kích hoạt đồng bộ.");
+    }
+  };
+
+  const handleCancelSync = async (logId: number) => {
+    if (!window.confirm("Bạn có chắc muốn hủy tiến trình đồng bộ đang chạy?")) return;
+    setActionError(null);
+    try {
+      const response = await api.post<{ message: string }>(`/admin/sync-logs/${logId}/cancel`);
+      setActionSuccess(response.message || "Đã hủy tiến trình đồng bộ.");
+      setTimeout(() => loadLogs(logsPagination.current), 500);
+    } catch (err: any) {
+      setActionError(err.message || "Lỗi khi hủy tiến trình.");
     }
   };
 
@@ -239,7 +270,7 @@ export default function AdminSync() {
           ) : (
             <div className="space-y-6">
               {sources.map((source) => {
-                const params = syncParams[source.id] || { domain: "Computer Science", field: "", pages: 1, years: "2023-2026" };
+                const params = syncParams[source.id] || { domain: "Computer Science", field: "", pages: 50, yearFrom: "2023", yearTo: "2026" };
                 return (
                   <div key={source.id} className="glass-panel p-6 rounded-2xl bg-surface space-y-4">
                     <div className="flex items-start justify-between">
@@ -279,7 +310,7 @@ export default function AdminSync() {
                       <div className="border-t border-white/5 pt-4 space-y-4">
                         <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Đồng bộ thủ công</p>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="space-y-1">
                             <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Lĩnh vực (Domain)</label>
                             <input
@@ -303,18 +334,47 @@ export default function AdminSync() {
                           </div>
 
                           <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Số trang đồng bộ</label>
-                            <input
-                              type="number"
-                              min="1"
-                              max="10"
+                            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Khoảng năm xuất bản</label>
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={params.yearFrom}
+                                onChange={(e) => handleParamChange(source.id, "yearFrom", e.target.value)}
+                                className="flex-1 px-3 py-[9px] text-xs rounded-lg bg-white/5 border border-white/10 text-on-surface outline-none focus:border-primary/50 cursor-pointer"
+                              >
+                                {Array.from({ length: 15 }).map((_, i) => {
+                                  const y = 2026 - i;
+                                  return <option key={y} value={y} className="bg-surface text-on-surface">{y}</option>;
+                                })}
+                              </select>
+                              <span className="text-on-surface-variant text-[10px] font-bold uppercase">đến</span>
+                              <select
+                                value={params.yearTo}
+                                onChange={(e) => handleParamChange(source.id, "yearTo", e.target.value)}
+                                className="flex-1 px-3 py-[9px] text-xs rounded-lg bg-white/5 border border-white/10 text-on-surface outline-none focus:border-primary/50 cursor-pointer"
+                              >
+                                {Array.from({ length: 15 }).map((_, i) => {
+                                  const y = 2026 - i;
+                                  return <option key={y} value={y} className="bg-surface text-on-surface">{y}</option>;
+                                })}
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Số lượng bài</label>
+                            <select
                               value={params.pages}
-                              onChange={(e) => handleParamChange(source.id, "pages", parseInt(e.target.value) || 1)}
-                              className="w-full px-3 py-2 text-xs rounded-lg bg-white/5 border border-white/10 text-on-surface outline-none focus:border-primary/50"
-                            />
-                            <p className="text-[10px] text-on-surface-variant leading-relaxed">
-                              1 trang = 100 bài báo. Hệ thống chia đều: {params.pages} trang → <span className="text-primary font-bold">{Math.floor(params.pages / 2) + (params.pages % 2)} trang</span> Trích dẫn cao + <span className="text-tertiary font-bold">{Math.floor(params.pages / 2)} trang</span> Mới nhất = <span className="text-amber-400 font-bold">~{params.pages * 100} bài</span>
-                            </p>
+                              onChange={(e) => handleParamChange(source.id, "pages", parseInt(e.target.value) || 50)}
+                              className="w-full px-3 py-[9px] text-xs rounded-lg bg-white/5 border border-white/10 text-on-surface outline-none focus:border-primary/50 cursor-pointer"
+                            >
+                              <option value="50" className="bg-surface text-on-surface">50 bài</option>
+                              <option value="100" className="bg-surface text-on-surface">100 bài</option>
+                              <option value="150" className="bg-surface text-on-surface">150 bài</option>
+                              <option value="200" className="bg-surface text-on-surface">200 bài</option>
+                              <option value="300" className="bg-surface text-on-surface">300 bài</option>
+                              <option value="500" className="bg-surface text-on-surface">500 bài</option>
+                              <option value="1000" className="bg-surface text-on-surface">1000 bài</option>
+                            </select>
                           </div>
                         </div>
 
@@ -368,23 +428,38 @@ export default function AdminSync() {
                     <span className="font-bold text-xs text-on-surface">
                       {log.api_source?.name || `Nguồn #${log.api_source_id}`}
                     </span>
-                    <span
-                      className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                        log.status === "completed" || log.status === "success"
-                          ? "bg-tertiary/15 text-tertiary"
-                          : log.status === "failed"
-                          ? "bg-error/15 text-error"
-                          : "bg-secondary/15 text-secondary animate-pulse"
-                      }`}
-                    >
-                      {log.status === "completed" || log.status === "success" ? (
-                        <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Thành công</span>
-                      ) : log.status === "failed" ? (
-                        <span className="flex items-center gap-1"><XCircle className="w-3 h-3" /> Lỗi</span>
-                      ) : (
-                        <span className="flex items-center gap-1"><RotateCw className="w-3 h-3 animate-spin" /> Đang chạy</span>
+                    <div className="flex items-center gap-2">
+                      {log.status === "running" && (
+                        <button
+                          onClick={() => handleCancelSync(log.id)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-error/15 text-error hover:bg-error/30 transition-all cursor-pointer"
+                          title="Hủy tiến trình"
+                        >
+                          <StopCircle className="w-3 h-3" /> Hủy
+                        </button>
                       )}
-                    </span>
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                          log.status === "completed" || log.status === "success"
+                            ? "bg-tertiary/15 text-tertiary"
+                            : log.status === "failed"
+                            ? "bg-error/15 text-error"
+                            : log.status === "cancelled"
+                            ? "bg-amber-500/15 text-amber-400"
+                            : "bg-secondary/15 text-secondary animate-pulse"
+                        }`}
+                      >
+                        {log.status === "completed" || log.status === "success" ? (
+                          <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Thành công</span>
+                        ) : log.status === "failed" ? (
+                          <span className="flex items-center gap-1"><XCircle className="w-3 h-3" /> Lỗi</span>
+                        ) : log.status === "cancelled" ? (
+                          <span className="flex items-center gap-1"><StopCircle className="w-3 h-3" /> Đã hủy</span>
+                        ) : (
+                          <span className="flex items-center gap-1"><RotateCw className="w-3 h-3 animate-spin" /> Đang chạy</span>
+                        )}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="flex justify-between items-center text-xs text-on-surface-variant font-medium">
@@ -392,10 +467,18 @@ export default function AdminSync() {
                     <span>{new Date(log.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} - {new Date(log.created_at).toLocaleDateString("vi-VN")}</span>
                   </div>
 
-                  {log.error_message && (
-                    <p className="text-[10px] text-error bg-error-container/10 p-2 rounded border border-error/20 font-mono break-words">
+                  {log.error_message && log.status !== "running" && (
+                    <p className="text-[10px] text-error bg-error-container/10 p-2 rounded border border-error/20 font-mono break-words mt-2">
                       {log.error_message}
                     </p>
+                  )}
+                  {log.status === "running" && log.error_message && (
+                    <div className="flex items-center gap-2 mt-2 bg-secondary/10 p-2.5 rounded-lg border border-secondary/20">
+                      <RotateCw className="w-3.5 h-3.5 text-secondary animate-spin flex-shrink-0" />
+                      <p className="text-[11px] font-medium text-secondary truncate" title={log.error_message}>
+                        {log.error_message}
+                      </p>
+                    </div>
                   )}
                 </div>
               ))}

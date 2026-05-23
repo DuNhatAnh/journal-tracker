@@ -20,6 +20,8 @@ import {
   BarChart2,
   PieChart,
   AlignLeft,
+  RotateCw,
+  StopCircle,
 } from "lucide-react";
 import { api } from "@/src/lib/api";
 
@@ -376,14 +378,16 @@ export default function AdminDashboard() {
           ) : stats?.recent_sync_logs && stats.recent_sync_logs.length > 0 ? (
             <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
               {stats.recent_sync_logs.map((log) => (
-                <div key={log.id} className="flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/5">
+                <div key={log.id} className="flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors">
                   <div className="flex items-center gap-3">
                     {log.status === "completed" || log.status === "success" ? (
                       <CheckCircle2 className="w-4 h-4 text-tertiary shrink-0" />
                     ) : log.status === "failed" ? (
                       <XCircle className="w-4 h-4 text-error shrink-0" />
+                    ) : log.status === "cancelled" ? (
+                      <StopCircle className="w-4 h-4 text-amber-400 shrink-0" />
                     ) : (
-                      <Clock className="w-4 h-4 text-secondary shrink-0 animate-pulse" />
+                      <RotateCw className="w-4 h-4 text-secondary shrink-0 animate-spin" />
                     )}
                     <div>
                       <p className="text-sm font-bold text-on-surface leading-tight">
@@ -395,14 +399,24 @@ export default function AdminDashboard() {
                       </p>
                     </div>
                   </div>
-                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
                     log.status === "completed" || log.status === "success"
                       ? "bg-tertiary/15 text-tertiary"
                       : log.status === "failed"
                       ? "bg-error/15 text-error"
-                      : "bg-secondary/15 text-secondary"
+                      : log.status === "cancelled"
+                      ? "bg-amber-500/15 text-amber-400"
+                      : "bg-secondary/15 text-secondary animate-pulse"
                   }`}>
-                    {log.status === "completed" || log.status === "success" ? "Thành công" : log.status === "failed" ? "Lỗi" : "Đang chạy"}
+                    {log.status === "completed" || log.status === "success" ? (
+                      <><CheckCircle2 className="w-3 h-3" /> Thành công</>
+                    ) : log.status === "failed" ? (
+                      <><XCircle className="w-3 h-3" /> Lỗi</>
+                    ) : log.status === "cancelled" ? (
+                      <><StopCircle className="w-3 h-3" /> Đã hủy</>
+                    ) : (
+                      <><RotateCw className="w-3 h-3 animate-spin" /> Đang chạy</>
+                    )}
                   </span>
                 </div>
               ))}

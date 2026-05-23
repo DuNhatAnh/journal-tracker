@@ -81,6 +81,22 @@ class ApiSourceController extends Controller
         ]);
     }
 
+    public function cancelSync($id)
+    {
+        $syncLog = \App\Models\SyncLog::findOrFail($id);
+
+        if ($syncLog->status !== 'running') {
+            return response()->json(['message' => 'Tiến trình này không đang chạy.'], 422);
+        }
+
+        $syncLog->update([
+            'status'        => 'cancelled',
+            'error_message' => 'Đã bị hủy bởi quản trị viên.',
+        ]);
+
+        return response()->json(['message' => 'Đã hủy tiến trình đồng bộ.']);
+    }
+
     public function syncLogs()
     {
         $logs = \App\Models\SyncLog::with('apiSource')
