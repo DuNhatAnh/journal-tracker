@@ -8,6 +8,7 @@ use App\Models\Keyword;
 use App\Models\PublicationTrend;
 use App\Models\Journal;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {

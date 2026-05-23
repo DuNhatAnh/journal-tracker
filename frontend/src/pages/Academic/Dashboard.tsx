@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 import Chart from "react-apexcharts";
 import { TrendingUp, ArrowRight, BookmarkPlus, BookmarkCheck, Filter, Sparkles, BookOpen, ChevronRight, X, ExternalLink, Quote, BookMarked, CalendarDays, Users, Loader2, Bot, Bell, BellOff } from "lucide-react";
-import { cn } from "@/src/lib/utils";
+import { cn, cleanTitle } from "@/src/lib/utils";
 import { api } from "@/src/lib/api";
 
 interface PaperDetail {
@@ -124,7 +124,7 @@ function PaperDetailModal({ paper, onClose, bookmarkedIds, loadingIds, bookmark,
                 <CalendarDays className="w-3 h-3" /> {paper.time}
               </span>
             </div>
-            <h2 className="font-display text-lg font-bold text-on-surface leading-snug">{paper.title}</h2>
+            <h2 className="font-display text-lg font-bold text-on-surface leading-snug">{cleanTitle(paper.title)}</h2>
           </div>
           <button
             id="paper-detail-close-btn"
@@ -570,7 +570,7 @@ export default function Dashboard() {
                        <span className="bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded border border-primary/20 uppercase tracking-widest">{paper.journal}</span>
                        <span className="text-[10px] text-on-surface-variant uppercase tracking-widest">{paper.time}</span>
                     </div>
-                    <h4 className="font-display font-bold text-on-surface group-hover:text-primary transition-colors">{paper.title}</h4>
+                    <h4 className="font-display font-bold text-on-surface group-hover:text-primary transition-colors">{cleanTitle(paper.title)}</h4>
                     <p className="text-sm text-on-surface-variant mt-1">{paper.authors}</p>
                   </div>
                   <div className="flex items-center gap-6">

@@ -9,7 +9,11 @@ class KeywordController extends Controller
 {
     public function index()
     {
+        $q = request('q');
         $keywords = Keyword::withCount('papers')
+            ->when($q, function ($query, $q) {
+                $query->where('name', 'like', "%{$q}%");
+            })
             ->orderByDesc('papers_count')
             ->paginate(30);
 

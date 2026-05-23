@@ -60,7 +60,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Trends
-    Route::prefix('trends')->group(function () {
+    Route::prefix('trends')->middleware('role:researcher,admin')->group(function () {
         Route::get('/',           [TrendController::class, 'index']);
         Route::get('/trending',   [TrendController::class, 'trending']);
         Route::get('/{keyword}',  [TrendController::class, 'show']);

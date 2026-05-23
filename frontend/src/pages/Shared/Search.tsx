@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Filter, ChevronLeft, ChevronRight, Bookmark, BookmarkPlus, Lock, Quote, History, Info, Loader2, Search as SearchIcon, X, ExternalLink } from "lucide-react";
-import { cn } from "@/src/lib/utils";
+import { cn, cleanTitle } from "@/src/lib/utils";
 import { api } from "@/src/lib/api";
 import toast from "react-hot-toast";
 
@@ -310,7 +310,7 @@ export default function Search() {
                           onClick={() => setSelectedPaper(paper)}
                           className="font-display text-2xl font-bold leading-tight group-hover:text-primary transition-colors cursor-pointer"
                         >
-                          {paper.title}
+                          {cleanTitle(paper.title)}
                         </h3>
                       </div>
                       <div className="relative group/tooltip">
@@ -404,7 +404,7 @@ export default function Search() {
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary mb-3">
                   {selectedPaper.source.toUpperCase()}
                 </span>
-                <h2 className="font-display text-2xl sm:text-3xl font-bold leading-tight text-on-surface">{selectedPaper.title}</h2>
+                <h2 className="font-display text-2xl sm:text-3xl font-bold leading-tight text-on-surface">{cleanTitle(selectedPaper.title)}</h2>
               </div>
               
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-on-surface-variant border-y border-white/5 py-4">

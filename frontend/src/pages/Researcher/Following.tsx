@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Activity, Users, Plus, Tag, X, Clock, Quote, ArrowRight, Loader2, Search, BookOpen, ExternalLink, Bookmark, BookmarkPlus, BookmarkCheck } from "lucide-react";
 import toast from "react-hot-toast";
 import { Navigate } from "react-router-dom";
-import { cn } from "@/src/lib/utils";
+import { cn, cleanTitle } from "@/src/lib/utils";
 import { api } from "@/src/lib/api";
 
 interface Keyword {
@@ -298,7 +298,7 @@ export default function Following() {
                     onClick={() => setSelectedPaper(paper)}
                     className="font-display text-2xl font-bold mb-4 pr-16 group-hover:text-primary transition-colors cursor-pointer leading-tight"
                   >
-                    {paper.title}
+                    {cleanTitle(paper.title)}
                   </h4>
                   
                   <p className="text-sm text-secondary font-medium mb-4">
@@ -458,7 +458,7 @@ export default function Following() {
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary mb-3">
                   {selectedPaper.source.toUpperCase()}
                 </span>
-                <h2 className="font-display text-2xl sm:text-3xl font-bold leading-tight text-on-surface">{selectedPaper.title}</h2>
+                <h2 className="font-display text-2xl sm:text-3xl font-bold leading-tight text-on-surface">{cleanTitle(selectedPaper.title)}</h2>
               </div>
               
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-on-surface-variant border-y border-white/5 py-4">

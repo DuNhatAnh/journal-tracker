@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { BookmarkX, ArrowRight, ExternalLink, Loader2, Edit3, Save, X, Download } from "lucide-react";
 import toast from "react-hot-toast";
-import { cn } from "@/src/lib/utils";
+import { cn, cleanTitle } from "@/src/lib/utils";
 import { api } from "@/src/lib/api";
 
 interface Bookmark {
@@ -231,7 +231,7 @@ export default function Bookmarks() {
                   </div>
                 </div>
 
-                <h3 className="font-display text-xl font-bold leading-tight mb-4 group-hover:text-primary transition-colors">{bookmark.paper.title}</h3>
+                <h3 className="font-display text-xl font-bold leading-tight mb-4 group-hover:text-primary transition-colors">{cleanTitle(bookmark.paper.title)}</h3>
                 
                 {/* Note section */}
                 <div className="mb-6 flex-1 flex flex-col">
@@ -334,7 +334,7 @@ export default function Bookmarks() {
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary mb-3">
                   {(selectedPaper.journal?.name || selectedPaper.source || "Nghiên cứu").toUpperCase()}
                 </span>
-                <h2 className="font-display text-2xl sm:text-3xl font-bold leading-tight text-on-surface">{selectedPaper.title}</h2>
+                <h2 className="font-display text-2xl sm:text-3xl font-bold leading-tight text-on-surface">{cleanTitle(selectedPaper.title)}</h2>
               </div>
               
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-on-surface-variant border-y border-white/5 py-4">
