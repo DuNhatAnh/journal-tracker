@@ -205,8 +205,8 @@ export default function Landing() {
                 <Bookmark className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-lg font-bold text-on-surface">Lưu dấu trang & Theo dõi</h4>
-                <p className="text-sm text-on-surface-variant mt-1">Bookmark các bài báo hay và Đăng ký theo dõi các chủ đề/tạp chí bạn quan tâm.</p>
+                <h4 className="text-lg font-bold text-on-surface">Lưu bài báo & Theo dõi</h4>
+                <p className="text-sm text-on-surface-variant mt-1">Lưu các bài báo hay và Đăng ký theo dõi các chủ đề/tạp chí bạn quan tâm.</p>
               </div>
             </div>
             <div className="flex gap-4">

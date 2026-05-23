@@ -15,7 +15,7 @@ class BookmarkController extends Controller
     {
         $bookmarks = auth()->user()
             ->bookmarks()
-            ->with(['paper.journal', 'paper.keywords'])
+            ->with(['paper.journal', 'paper.keywords', 'paper.authors'])
             ->latest()
             ->paginate(20);
 
@@ -63,6 +63,22 @@ class BookmarkController extends Controller
         }
 
         $bookmark->delete();
+
+        return response()->json(['message' => 'Đã xóa bookmark.']);
+    }
+
+    /**
+     * DELETE /api/bookmarks/paper/{paper_id}
+     */
+    public function destroyByPaperId($paperId)
+    {
+        $deleted = Bookmark::where('user_id', auth()->id())
+            ->where('paper_id', $paperId)
+            ->delete();
+
+        if (!$deleted) {
+            return response()->json(['message' => 'Không tìm thấy bookmark cho bài báo này.'], 404);
+        }
 
         return response()->json(['message' => 'Đã xóa bookmark.']);
     }

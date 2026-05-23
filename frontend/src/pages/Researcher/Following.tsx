@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Activity, Users, Plus, Tag, X, Clock, Quote, ArrowRight, Loader2, Search, BookOpen, ExternalLink, Bookmark } from "lucide-react";
+import { Activity, Users, Plus, Tag, X, Clock, Quote, ArrowRight, Loader2, Search, BookOpen, ExternalLink, Bookmark, BookmarkPlus, BookmarkCheck } from "lucide-react";
 import toast from "react-hot-toast";
 import { Navigate } from "react-router-dom";
 import { cn } from "@/src/lib/utils";
@@ -65,6 +65,9 @@ export default function Following() {
   // Quick view paper modal
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
 
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<number>>(new Set());
+  const [bookmarkLoadingIds, setBookmarkLoadingIds] = useState<Set<number>>(new Set());
+
   // Follow Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalSearchType, setModalSearchType] = useState<"keyword" | "journal" | "author">("keyword");
@@ -106,6 +109,15 @@ export default function Following() {
   useEffect(() => {
     fetchStatus();
     fetchFeed(1);
+    api.get<any>("/dashboard")
+      .then(res => {
+        if (res.bookmarked_paper_ids) {
+          setBookmarkedIds(new Set(res.bookmarked_paper_ids));
+        }
+      })
+      .catch(err => {
+        console.error("Lỗi lấy thông tin bookmark:", err);
+      });
   }, [fetchStatus, fetchFeed]);
 
   // Handle follow addition
@@ -172,13 +184,33 @@ export default function Following() {
     return false;
   };
 
-  // Add bookmark
-  const handleAddBookmark = async (paperId: number) => {
+  // Toggle bookmark
+  const handleToggleBookmark = async (paperId: number) => {
+    if (bookmarkLoadingIds.has(paperId)) return;
+    const isBookmarked = bookmarkedIds.has(paperId);
+    setBookmarkLoadingIds(prev => new Set(prev).add(paperId));
     try {
-      await api.post("/bookmarks", { paper_id: paperId });
-      toast.success("Đã lưu bài báo vào dấu trang thành công!");
+      if (isBookmarked) {
+        await api.delete(`/bookmarks/paper/${paperId}`);
+        setBookmarkedIds(prev => {
+          const s = new Set(prev);
+          s.delete(paperId);
+          return s;
+        });
+        toast.success("Đã hủy lưu bài báo!");
+      } else {
+        await api.post("/bookmarks", { paper_id: paperId });
+        setBookmarkedIds(prev => new Set(prev).add(paperId));
+        toast.success("Lưu bài báo thành công!");
+      }
     } catch (err: any) {
-      toast.error(err.message || "Lỗi khi lưu dấu trang.");
+      toast.error(err.message || "Lỗi thao tác bookmark.");
+    } finally {
+      setBookmarkLoadingIds(prev => {
+        const s = new Set(prev);
+        s.delete(paperId);
+        return s;
+      });
     }
   };
 
@@ -226,13 +258,29 @@ export default function Following() {
               {feedPapers.map((paper: Paper) => (
                 <article key={paper.id} className="glass-panel p-8 rounded-2xl relative group hover:bg-white/[0.02] transition-all">
                   <div className="absolute top-6 right-6 flex gap-2">
-                    <button 
-                      onClick={() => handleAddBookmark(paper.id)}
-                      className="p-2 rounded-full hover:bg-white/5 text-on-surface-variant hover:text-tertiary transition-colors"
-                      title="Lưu dấu trang"
-                    >
-                      <Bookmark className="w-5 h-5" />
-                    </button>
+                    <div className="relative group/tooltip">
+                      <button 
+                        disabled={bookmarkLoadingIds.has(paper.id)}
+                        onClick={() => handleToggleBookmark(paper.id)}
+                        className={cn(
+                          "p-2 rounded-full hover:bg-white/5 transition-colors",
+                          bookmarkedIds.has(paper.id) 
+                            ? "text-tertiary" 
+                            : "text-on-surface-variant hover:text-tertiary"
+                        )}
+                      >
+                        {bookmarkLoadingIds.has(paper.id) ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : bookmarkedIds.has(paper.id) ? (
+                          <BookmarkCheck className="w-5 h-5" />
+                        ) : (
+                          <BookmarkPlus className="w-5 h-5" />
+                        )}
+                      </button>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 text-[10px] font-bold text-on-surface bg-surface-container-high rounded-lg opacity-0 pointer-events-none group-hover/tooltip:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10 shadow-xl border border-outline-variant/30">
+                        {bookmarkedIds.has(paper.id) ? "Hủy lưu bài báo" : "Lưu bài báo ngay"}
+                      </div>
+                    </div>
                   </div>
                   
                   <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -456,13 +504,22 @@ export default function Following() {
                   Đóng
                 </button>
                 <button
-                  onClick={() => {
-                    handleAddBookmark(selectedPaper.id);
-                    setSelectedPaper(null);
-                  }}
-                  className="px-5 py-2.5 rounded-xl bg-secondary/10 border border-secondary/20 text-xs font-bold uppercase tracking-widest text-secondary hover:bg-secondary/20 transition-all"
+                  disabled={bookmarkLoadingIds.has(selectedPaper.id)}
+                  onClick={() => handleToggleBookmark(selectedPaper.id)}
+                  className={cn(
+                    "px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
+                    bookmarkedIds.has(selectedPaper.id)
+                      ? "bg-tertiary/20 text-tertiary border border-tertiary/30 hover:bg-tertiary/30"
+                      : "bg-secondary/10 border border-secondary/20 text-secondary hover:bg-secondary/20"
+                  )}
                 >
-                  Lưu dấu trang
+                  {bookmarkLoadingIds.has(selectedPaper.id) ? (
+                    <span className="flex items-center gap-1"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang xử lý...</span>
+                  ) : bookmarkedIds.has(selectedPaper.id) ? (
+                    "Hủy lưu bài báo"
+                  ) : (
+                    "Lưu bài báo"
+                  )}
                 </button>
                 {selectedPaper.doi && (
                   <a 

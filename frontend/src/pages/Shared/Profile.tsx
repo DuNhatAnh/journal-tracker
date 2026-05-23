@@ -46,7 +46,7 @@ export default function Profile() {
            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
              {[
                { label: "Bài báo đã đọc", value: 142, icon: Eye, color: "text-primary" },
-               { label: "Dấu trang", value: 89, icon: Bookmark, color: "text-secondary" },
+               { label: "Đã lưu", value: 89, icon: Bookmark, color: "text-secondary" },
                { label: "Đã theo dõi", value: 34, icon: Star, color: "text-tertiary" },
                { label: "Ảnh hưởng", value: 4.8, icon: TrendingUp, color: "text-error" },
              ].map((stat, i) => (

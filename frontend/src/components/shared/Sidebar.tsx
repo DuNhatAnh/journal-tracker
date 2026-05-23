@@ -23,7 +23,7 @@ export function Sidebar() {
     { icon: LayoutDashboard, label: "Bảng điều khiển", path: "/dashboard" },
     { icon: Search, label: "Khám phá bài báo", path: "/search" },
     { icon: TrendingUp, label: "Xu hướng nghiên cứu", path: "/trending" },
-    { icon: Bookmark, label: "Dấu trang", path: "/bookmarks" },
+    { icon: Bookmark, label: "Đã lưu", path: "/bookmarks" },
     ...(role === "researcher" ? [{ icon: Users, label: "Đang theo dõi", path: "/following" }] : []),
     { icon: Bell, label: "Thông báo", path: "/notifications" },
   ];

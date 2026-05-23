@@ -188,7 +188,7 @@ class DashboardController extends Controller
                     'citations' => $paper->citations_count ?? 0,
                     'doi' => $paper->doi,
                     'abstract' => $paper->abstract,
-                    'keywords' => $paper->keywords->pluck('name')->toArray(),
+                    'keywords' => $paper->keywords->map(fn($k) => ['id' => $k->id, 'name' => $k->name])->toArray(),
                     'match' => $matchScore . '%',
                 ];
             });

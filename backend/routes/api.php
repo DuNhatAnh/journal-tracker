@@ -71,21 +71,25 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/',              [BookmarkController::class, 'index']);
         Route::get('/export',        [BookmarkController::class, 'export'])->middleware('role:researcher,admin');
         Route::post('/',             [BookmarkController::class, 'store']);
+        Route::delete('/paper/{paper_id}', [BookmarkController::class, 'destroyByPaperId']);
         Route::put('/{bookmark}',    [BookmarkController::class, 'update']);
         Route::delete('/{bookmark}', [BookmarkController::class, 'destroy']);
     });
 
     // Following
-    Route::prefix('following')->middleware('role:researcher,admin')->group(function () {
+    Route::prefix('following')->group(function () {
         Route::get('/status',        [FollowingController::class, 'index']);
-        Route::get('/feed',          [FollowingController::class, 'feed']);
-        Route::get('/search',        [FollowingController::class, 'search']);
         Route::post('/keywords',     [FollowingController::class, 'followKeyword']);
         Route::delete('/keywords/{keyword}', [FollowingController::class, 'unfollowKeyword']);
-        Route::post('/journals',     [FollowingController::class, 'followJournal']);
-        Route::delete('/journals/{journal}', [FollowingController::class, 'unfollowJournal']);
-        Route::post('/authors',      [FollowingController::class, 'followAuthor']);
-        Route::delete('/authors/{author}', [FollowingController::class, 'unfollowAuthor']);
+
+        Route::middleware('role:researcher,admin')->group(function () {
+            Route::get('/feed',          [FollowingController::class, 'feed']);
+            Route::get('/search',        [FollowingController::class, 'search']);
+            Route::post('/journals',     [FollowingController::class, 'followJournal']);
+            Route::delete('/journals/{journal}', [FollowingController::class, 'unfollowJournal']);
+            Route::post('/authors',      [FollowingController::class, 'followAuthor']);
+            Route::delete('/authors/{author}', [FollowingController::class, 'unfollowAuthor']);
+        });
     });
 
     // Notifications

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Filter, ChevronLeft, ChevronRight, Bookmark, Lock, Quote, History, Info, Loader2, Search as SearchIcon, X, ExternalLink } from "lucide-react";
+import { Filter, ChevronLeft, ChevronRight, Bookmark, BookmarkPlus, Lock, Quote, History, Info, Loader2, Search as SearchIcon, X, ExternalLink } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { api } from "@/src/lib/api";
+import toast from "react-hot-toast";
 
 interface Author {
   id: number;
@@ -18,6 +19,7 @@ interface Paper {
   source: string;
   doi?: string;
   authors: Author[];
+  keywords?: { id: number; name: string }[];
 }
 
 interface SearchResponse {
@@ -44,6 +46,80 @@ export default function Search() {
   const [data, setData] = useState<SearchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<number>>(new Set());
+  const [bookmarkLoadingIds, setBookmarkLoadingIds] = useState<Set<number>>(new Set());
+  const [followedKeywordIds, setFollowedKeywordIds] = useState<Set<number>>(new Set());
+  const [followingKeywordIds, setFollowingKeywordIds] = useState<Set<number>>(new Set());
+
+  // Fetch followed keyword IDs on mount
+  const loadFollowedKeywords = useCallback(async () => {
+    try {
+      const res = await api.get<{ keywords: { id: number }[] }>('/following/status');
+      const ids = new Set<number>(res.keywords?.map((k: any) => k.id) ?? []);
+      setFollowedKeywordIds(ids);
+    } catch { /* silent */ }
+  }, []);
+
+  const toggleFollowKeyword = async (keywordId: number, keywordName: string) => {
+    if (followingKeywordIds.has(keywordId)) return;
+    setFollowingKeywordIds(prev => new Set(prev).add(keywordId));
+    const isFollowed = followedKeywordIds.has(keywordId);
+    try {
+      if (isFollowed) {
+        await api.delete(`/following/keywords/${keywordId}`);
+        setFollowedKeywordIds(prev => { const s = new Set(prev); s.delete(keywordId); return s; });
+        toast.success(`Đã hủy lưu từ khóa "${keywordName}"`);
+      } else {
+        await api.post(`/following/keywords`, { keyword_id: keywordId });
+        setFollowedKeywordIds(prev => { const s = new Set(prev).add(keywordId); return s; });
+        toast.success(`Đã lưu từ khóa "${keywordName}"!`);
+      }
+    } catch { toast.error('Không thể thực hiện thao tác này.'); }
+    finally { setFollowingKeywordIds(prev => { const s = new Set(prev); s.delete(keywordId); return s; }); }
+  };
+
+  // Fetch bookmarked paper IDs on mount
+  useEffect(() => {
+    api.get<any>("/dashboard")
+      .then(res => {
+        if (res.bookmarked_paper_ids) {
+          setBookmarkedIds(new Set(res.bookmarked_paper_ids));
+        }
+      })
+      .catch(err => {
+        console.error("Lỗi lấy thông tin bookmark:", err);
+      });
+    loadFollowedKeywords();
+  }, [loadFollowedKeywords]);
+
+  const handleBookmark = async (paperId: number) => {
+    if (bookmarkLoadingIds.has(paperId)) return;
+    const isBookmarked = bookmarkedIds.has(paperId);
+    setBookmarkLoadingIds(prev => new Set(prev).add(paperId));
+    try {
+      if (isBookmarked) {
+        await api.delete(`/bookmarks/paper/${paperId}`);
+        setBookmarkedIds(prev => {
+          const s = new Set(prev);
+          s.delete(paperId);
+          return s;
+        });
+        toast.success("Đã hủy lưu bài báo!");
+      } else {
+        await api.post("/bookmarks", { paper_id: paperId });
+        setBookmarkedIds(prev => new Set(prev).add(paperId));
+        toast.success("Lưu bài báo thành công!");
+      }
+    } catch (err) {
+      toast.error("Thao tác thất bại. Vui lòng thử lại.");
+    } finally {
+      setBookmarkLoadingIds(prev => {
+        const s = new Set(prev);
+        s.delete(paperId);
+        return s;
+      });
+    }
+  };
 
   // Load history from local storage
   useEffect(() => {
@@ -237,7 +313,32 @@ export default function Search() {
                           {paper.title}
                         </h3>
                       </div>
-                      <button className="p-2 rounded-full hover:bg-white/5 text-on-surface-variant hover:text-tertiary transition-colors"><Bookmark className="w-5 h-5" /></button>
+                      <div className="relative group/tooltip">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBookmark(paper.id);
+                          }}
+                          disabled={bookmarkLoadingIds.has(paper.id)}
+                          className={cn(
+                            "p-2 rounded-full hover:bg-white/5 transition-colors",
+                            bookmarkedIds.has(paper.id) 
+                              ? "text-tertiary" 
+                              : "text-on-surface-variant hover:text-tertiary"
+                          )}
+                        >
+                          {bookmarkLoadingIds.has(paper.id) ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          ) : bookmarkedIds.has(paper.id) ? (
+                            <Bookmark className="w-5 h-5 fill-current" />
+                          ) : (
+                            <Bookmark className="w-5 h-5" />
+                          )}
+                        </button>
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 text-[10px] font-bold text-on-surface bg-surface-container-high rounded-lg opacity-0 pointer-events-none group-hover/tooltip:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10 shadow-xl border border-outline-variant/30">
+                          {bookmarkedIds.has(paper.id) ? "Hủy lưu bài báo" : "Lưu bài báo ngay"}
+                        </div>
+                      </div>
                     </div>
                     <p className="text-sm text-secondary font-medium mb-4">
                       {paper.authors?.map(a => a.name).join(", ")} • <span className="text-on-surface">{paper.source} | {paper.published_year}</span>
@@ -327,6 +428,48 @@ export default function Search() {
                   {selectedPaper.abstract || "Không có tóm tắt cho bài báo này."}
                 </p>
               </div>
+
+              {selectedPaper.keywords && selectedPaper.keywords.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-bold uppercase tracking-widest text-secondary">Từ khóa (Chủ đề)</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedPaper.keywords.map((kw) => {
+                      const isFollowed = followedKeywordIds.has(kw.id);
+                      const isBtnLoading = followingKeywordIds.has(kw.id);
+                      return (
+                        <span 
+                          key={kw.id} 
+                          className={cn(
+                            "text-xs px-2.5 py-1 rounded-full border flex items-center gap-1.5 transition-all select-none",
+                            isFollowed 
+                              ? "bg-secondary/15 text-secondary border-secondary/30" 
+                              : "bg-primary/10 text-primary border-primary/20"
+                          )}
+                        >
+                          #{kw.name}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFollowKeyword(kw.id, kw.name);
+                            }}
+                            disabled={isBtnLoading}
+                            className="hover:scale-110 active:scale-95 transition-all ml-1 p-0.5 rounded-full hover:bg-white/10"
+                            title={isFollowed ? "Hủy lưu chủ đề này" : "Lưu chủ đề này"}
+                          >
+                            {isBtnLoading ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : isFollowed ? (
+                              <X className="w-3 h-3 text-secondary hover:text-error" />
+                            ) : (
+                              <BookmarkPlus className="w-3 h-3 hover:text-tertiary" />
+                            )}
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               
               <div className="flex justify-end gap-4 pt-4 border-t border-white/5">
                 <button 
@@ -334,6 +477,24 @@ export default function Search() {
                   className="px-5 py-2.5 rounded-xl border border-white/10 text-xs font-bold uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface"
                 >
                   Đóng
+                </button>
+                <button
+                  disabled={bookmarkLoadingIds.has(selectedPaper.id)}
+                  onClick={() => handleBookmark(selectedPaper.id)}
+                  className={cn(
+                    "px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
+                    bookmarkedIds.has(selectedPaper.id)
+                      ? "bg-tertiary/20 text-tertiary border border-tertiary/30 hover:bg-tertiary/30"
+                      : "bg-secondary/10 border border-secondary/20 text-secondary hover:bg-secondary/20"
+                  )}
+                >
+                  {bookmarkLoadingIds.has(selectedPaper.id) ? (
+                    <span className="flex items-center gap-1"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang xử lý...</span>
+                  ) : bookmarkedIds.has(selectedPaper.id) ? (
+                    "Hủy lưu bài báo"
+                  ) : (
+                    "Lưu bài báo"
+                  )}
                 </button>
                 <a 
                   href={selectedPaper.doi ? `https://doi.org/${selectedPaper.doi}` : "#"} 

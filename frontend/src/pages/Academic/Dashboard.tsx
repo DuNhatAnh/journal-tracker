@@ -17,7 +17,7 @@ interface PaperDetail {
   citations: number;
   doi?: string;
   abstract?: string;
-  keywords?: string[];
+  keywords?: { id: number; name: string }[];
 }
 
 interface DashboardData {
@@ -34,14 +34,25 @@ function useBookmark() {
   const [loadingIds, setLoadingIds] = useState<Set<number>>(new Set());
 
   const bookmark = useCallback(async (paperId: number) => {
-    if (bookmarkedIds.has(paperId) || loadingIds.has(paperId)) return;
+    if (loadingIds.has(paperId)) return;
+    const isBookmarked = bookmarkedIds.has(paperId);
     setLoadingIds(prev => new Set(prev).add(paperId));
     try {
-      await api.post('/bookmarks', { paper_id: paperId });
-      setBookmarkedIds(prev => new Set(prev).add(paperId));
-      toast.success("Lưu bài báo thành công!");
+      if (isBookmarked) {
+        await api.delete(`/bookmarks/paper/${paperId}`);
+        setBookmarkedIds(prev => {
+          const s = new Set(prev);
+          s.delete(paperId);
+          return s;
+        });
+        toast.success("Đã hủy lưu bài báo!");
+      } else {
+        await api.post('/bookmarks', { paper_id: paperId });
+        setBookmarkedIds(prev => new Set(prev).add(paperId));
+        toast.success("Lưu bài báo thành công!");
+      }
     } catch {
-      toast.error("Lưu bài báo thất bại. Vui lòng thử lại.");
+      toast.error("Thao tác thất bại. Vui lòng thử lại.");
     } finally {
       setLoadingIds(prev => { const s = new Set(prev); s.delete(paperId); return s; });
     }
@@ -60,26 +71,34 @@ function BookmarkButton({ paperId, bookmarkedIds, loadingIds, bookmark, classNam
   const saved = bookmarkedIds.has(paperId);
   const loading = loadingIds.has(paperId);
   return (
-    <button
-      disabled={saved || loading}
-      onClick={e => { e.stopPropagation(); bookmark(paperId); }}
-      className={cn(
-        "transition-all flex items-center justify-center gap-2 font-bold",
-        saved ? "text-tertiary" : "text-on-surface-variant hover:text-tertiary",
-        className
-      )}
-    >
-      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <BookmarkCheck className="w-4 h-4" /> : <BookmarkPlus className="w-4 h-4" />}
-    </button>
+    <div className="relative group/tooltip">
+      <button
+        disabled={loading}
+        onClick={e => { e.stopPropagation(); bookmark(paperId); }}
+        className={cn(
+          "transition-all flex items-center justify-center gap-2 font-bold",
+          saved ? "text-tertiary" : "text-on-surface-variant hover:text-tertiary",
+          className
+        )}
+      >
+        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <BookmarkCheck className="w-4 h-4" /> : <BookmarkPlus className="w-4 h-4" />}
+      </button>
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 text-[10px] font-bold text-on-surface bg-surface-container-high rounded-lg opacity-0 pointer-events-none group-hover/tooltip:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10 shadow-xl border border-outline-variant/30">
+        {saved ? "Hủy lưu bài báo" : "Lưu bài báo ngay"}
+      </div>
+    </div>
   );
 }
 
-function PaperDetailModal({ paper, onClose, bookmarkedIds, loadingIds, bookmark }: {
+function PaperDetailModal({ paper, onClose, bookmarkedIds, loadingIds, bookmark, followedKeywordIds, followingKeywordIds, toggleFollowKeyword }: {
   paper: PaperDetail;
   onClose: () => void;
   bookmarkedIds: Set<number>;
   loadingIds: Set<number>;
   bookmark: (id: number) => void;
+  followedKeywordIds: Set<number>;
+  followingKeywordIds: Set<number>;
+  toggleFollowKeyword: (id: number, name: string) => void;
 }) {
   const saved = bookmarkedIds.has(paper.id);
   const loading = loadingIds.has(paper.id);
@@ -143,11 +162,42 @@ function PaperDetailModal({ paper, onClose, bookmarkedIds, loadingIds, bookmark 
 
           {paper.keywords && paper.keywords.length > 0 && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Từ khóa</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Từ khóa (Chủ đề)</p>
               <div className="flex flex-wrap gap-2">
-                {paper.keywords.map((kw, i) => (
-                  <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">{kw}</span>
-                ))}
+                {paper.keywords.map((kw) => {
+                  const isFollowed = followedKeywordIds.has(kw.id);
+                  const isBtnLoading = followingKeywordIds.has(kw.id);
+                  return (
+                    <span 
+                      key={kw.id} 
+                      className={cn(
+                        "text-xs px-2.5 py-1 rounded-full border flex items-center gap-1.5 transition-all select-none",
+                        isFollowed 
+                          ? "bg-secondary/15 text-secondary border-secondary/30" 
+                          : "bg-primary/10 text-primary border-primary/20"
+                      )}
+                    >
+                      #{kw.name}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFollowKeyword(kw.id, kw.name);
+                        }}
+                        disabled={isBtnLoading}
+                        className="hover:scale-110 active:scale-95 transition-all ml-1 p-0.5 rounded-full hover:bg-white/10"
+                        title={isFollowed ? "Hủy lưu chủ đề này" : "Lưu chủ đề này"}
+                      >
+                        {isBtnLoading ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : isFollowed ? (
+                          <X className="w-3 h-3 text-secondary hover:text-error" />
+                        ) : (
+                          <BookmarkPlus className="w-3 h-3 hover:text-tertiary" />
+                        )}
+                      </button>
+                    </span>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -175,15 +225,15 @@ function PaperDetailModal({ paper, onClose, bookmarkedIds, loadingIds, bookmark 
         <div className="sticky bottom-0 bg-surface-container/95 backdrop-blur-md border-t border-outline-variant/20 p-4">
           <button
             id="paper-detail-bookmark-btn"
-            disabled={saved || loading}
+            disabled={loading}
             onClick={() => bookmark(paper.id)}
             className={cn(
               "w-full py-2.5 rounded-xl font-display text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all",
-              saved ? "bg-tertiary/20 text-tertiary border border-tertiary/30 cursor-default" : "gradient-btn text-white"
+              saved ? "bg-tertiary/20 text-tertiary border border-tertiary/30 hover:bg-tertiary/30" : "gradient-btn text-white"
             )}
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <BookmarkCheck className="w-4 h-4" /> : <BookmarkPlus className="w-4 h-4" />}
-            {saved ? "Đã lưu" : "Lưu bài báo"}
+            {saved ? "Hủy lưu bài báo" : "Lưu bài báo"}
           </button>
         </div>
       </div>
@@ -281,6 +331,34 @@ export default function Dashboard() {
   const [selectedPaper, setSelectedPaper] = useState<PaperDetail | null>(null);
   const [followedJournalIds, setFollowedJournalIds] = useState<Set<number>>(new Set());
   const [followingJournalIds, setFollowingJournalIds] = useState<Set<number>>(new Set());
+  const [followedKeywordIds, setFollowedKeywordIds] = useState<Set<number>>(new Set());
+  const [followingKeywordIds, setFollowingKeywordIds] = useState<Set<number>>(new Set());
+
+  const loadFollowedKeywords = useCallback(async () => {
+    try {
+      const res = await api.get<{ keywords: { id: number }[] }>('/following/status');
+      const ids = new Set<number>(res.keywords?.map((k: any) => k.id) ?? []);
+      setFollowedKeywordIds(ids);
+    } catch { /* silent */ }
+  }, []);
+
+  const toggleFollowKeyword = async (keywordId: number, keywordName: string) => {
+    if (followingKeywordIds.has(keywordId)) return;
+    setFollowingKeywordIds(prev => new Set(prev).add(keywordId));
+    const isFollowed = followedKeywordIds.has(keywordId);
+    try {
+      if (isFollowed) {
+        await api.delete(`/following/keywords/${keywordId}`);
+        setFollowedKeywordIds(prev => { const s = new Set(prev); s.delete(keywordId); return s; });
+        toast.success(`Đã hủy lưu từ khóa "${keywordName}"`);
+      } else {
+        await api.post(`/following/keywords`, { keyword_id: keywordId });
+        setFollowedKeywordIds(prev => { const s = new Set(prev).add(keywordId); return s; });
+        toast.success(`Đã lưu từ khóa "${keywordName}"!`);
+      }
+    } catch { toast.error('Không thể thực hiện thao tác này.'); }
+    finally { setFollowingKeywordIds(prev => { const s = new Set(prev); s.delete(keywordId); return s; }); }
+  };
 
   const loadFollowedJournals = useCallback(async () => {
     try {
@@ -350,7 +428,7 @@ export default function Dashboard() {
           citations: p.citations_count ?? 0,
           doi: p.doi ?? null,
           abstract: p.abstract ?? null,
-          keywords: (p.keywords || []).map((k: any) => k.name),
+          keywords: (p.keywords || []).map((k: any) => ({ id: k.id, name: k.name })),
         }));
 
         setData({
@@ -370,7 +448,8 @@ export default function Dashboard() {
         console.error("Lỗi tải thông tin dashboard", err);
       });
     loadFollowedJournals();
-  }, [loadFollowedJournals]);
+    loadFollowedKeywords();
+  }, [loadFollowedJournals, loadFollowedKeywords]);
 
   if (!data) return <div className="p-8 text-on-surface-variant uppercase font-mono animate-pulse">Đang khởi tạo Động cơ Thông tin chuyên sâu...</div>;
 
@@ -384,6 +463,9 @@ export default function Dashboard() {
           bookmarkedIds={bookmarkedIds}
           loadingIds={loadingIds}
           bookmark={bookmark}
+          followedKeywordIds={followedKeywordIds}
+          followingKeywordIds={followingKeywordIds}
+          toggleFollowKeyword={toggleFollowKeyword}
         />
       )}
 
