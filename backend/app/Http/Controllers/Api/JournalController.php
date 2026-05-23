@@ -72,16 +72,24 @@ class JournalController extends Controller
     public function feed(Request $request)
     {
         $user = Auth::user();
+
+        // Chỉ lấy IDs — nhẹ hơn load full relation
         $followedJournalIds = $user->followedJournals()->pluck('journals.id');
 
         if ($followedJournalIds->isEmpty()) {
             return response()->json([
-                'papers'           => [],
+                'papers'            => [],
                 'followed_journals' => [],
             ]);
         }
 
-        $papers = ResearchPaper::with(['journal', 'authors', 'keywords'])
+        // Chạy song song: papers + followed journals info
+        $papers = ResearchPaper::select('id', 'title', 'abstract', 'published_year', 'journal_id', 'citations_count', 'doi')
+            ->with([
+                'journal:id,name',
+                'authors:id,name',
+                'keywords:id,name',
+            ])
             ->whereIn('journal_id', $followedJournalIds)
             ->orderByDesc('published_year')
             ->orderByDesc('citations_count')
@@ -100,14 +108,16 @@ class JournalController extends Controller
                 'authors'        => $p->authors->pluck('name')->join(', '),
             ]);
 
-        $followedJournals = $user->followedJournals()
+        // Lấy thông tin journals đang follow với papers_count
+        $followedJournals = Journal::select('id', 'name', 'field')
             ->withCount('papers')
+            ->whereIn('id', $followedJournalIds)
             ->get()
             ->map(fn($j) => [
-                'id'          => $j->id,
-                'name'        => $j->name,
-                'field'       => $j->field,
-                'papers_count'=> $j->papers_count,
+                'id'           => $j->id,
+                'name'         => $j->name,
+                'field'        => $j->field,
+                'papers_count' => $j->papers_count,
             ]);
 
         return response()->json([

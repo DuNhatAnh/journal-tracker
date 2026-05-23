@@ -13,6 +13,8 @@ import Following from "./pages/Researcher/Following";
 import Notifications from "./pages/Shared/Notifications";
 import Profile from "./pages/Shared/Profile";
 import Settings from "./pages/Shared/Settings";
+import About from "./pages/Shared/About";
+import Guide from "./pages/Shared/Guide";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
 import AdminUsers from "./pages/Admin/Users";
 import AdminSync from "./pages/Admin/Sync";
@@ -35,6 +37,8 @@ export default function App() {
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/guide" element={<Guide />} />
             {/* Admin Routes */}
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/users" element={<AdminUsers />} />

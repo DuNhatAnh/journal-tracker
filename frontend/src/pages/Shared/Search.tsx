@@ -176,103 +176,33 @@ export default function Search() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-20">
-      <aside className="lg:col-span-3 space-y-6 sticky top-[100px] self-start order-2 lg:order-2">
-        <div className="glass-panel p-6 rounded-2xl space-y-8">
-           <div className="flex justify-between items-center">
-             <h3 className="font-display font-bold text-lg flex items-center gap-2"><Filter className="w-4 h-4 text-primary" /> Lọc</h3>
-             <button 
-               onClick={() => { setYear(""); setAuthor(""); setJournal(""); setSort("relevance"); setSearchParams({ q, page: "1" }); }}
-               className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors"
-             >
-               Đặt lại
-             </button>
-           </div>
-
-           <div className="space-y-4">
-             <div>
-               <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Năm xuất bản</h4>
-               <select 
-                 value={year}
-                 onChange={(e) => setYear(e.target.value)}
-                 className="w-full bg-surface-container-high border border-white/10 rounded-lg p-2.5 text-sm outline-none focus:border-primary/50"
-               >
-                 <option value="">Tất cả các năm</option>
-                 {[2024, 2023, 2022, 2021, 2020, 2019, 2018].map(y => (
-                   <option key={y} value={y}>{y}</option>
-                 ))}
-               </select>
-             </div>
-
-             <div>
-               <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Tác giả</h4>
-               <input 
-                 type="text"
-                 placeholder="Tên tác giả..."
-                 value={author}
-                 onChange={(e) => setAuthor(e.target.value)}
-                 className="w-full bg-surface-container-high border border-white/10 rounded-lg p-2.5 text-sm outline-none focus:border-primary/50 placeholder:text-outline-variant text-on-surface"
-               />
-             </div>
-
-             <div>
-               <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Tạp chí</h4>
-               <input 
-                 type="text"
-                 placeholder="Tên tạp chí..."
-                 value={journal}
-                 onChange={(e) => setJournal(e.target.value)}
-                 className="w-full bg-surface-container-high border border-white/10 rounded-lg p-2.5 text-sm outline-none focus:border-primary/50 placeholder:text-outline-variant text-on-surface"
-               />
-             </div>
-
-             <button onClick={handleApplyFilter} className="w-full py-2 bg-primary/10 text-primary text-xs font-bold rounded hover:bg-primary/20 transition">Áp dụng lọc</button>
-           </div>
-           
-           <div className="space-y-4 pt-4 border-t border-white/5">
-             <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant flex items-center gap-2"><History className="w-3 h-3" /> Lịch sử tìm kiếm</h4>
-             {history.length > 0 ? (
-               <div className="flex flex-wrap gap-2">
-                 {history.map((h, i) => (
-                   <button 
-                     key={i}
-                     onClick={() => setSearchParams({ q: h, page: "1" })}
-                     className="px-2 py-1 bg-surface-container-high border border-white/5 rounded text-xs text-on-surface-variant hover:text-primary hover:border-primary/30 transition-all text-left"
-                   >
-                     {h}
-                   </button>
-                 ))}
-               </div>
-             ) : (
-               <p className="text-xs text-on-surface-variant">Chưa có lịch sử</p>
-             )}
-           </div>
-
-           <div className="space-y-4 pt-4 border-t border-white/5">
-             <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant flex items-center gap-2 text-tertiary"><Info className="w-3 h-3" /> Mẹo Boolean</h4>
-             <ul className="text-xs text-on-surface-variant space-y-2 leading-relaxed">
-               <li><strong className="text-on-surface">"Cụm từ"</strong>: Tìm chính xác cụm từ.</li>
-               <li><strong className="text-tertiary">AND</strong>: Chứa cả hai từ khóa.</li>
-               <li><strong className="text-tertiary">OR</strong>: Chứa một trong hai.</li>
-               <li><strong className="text-error">NOT</strong>: Loại trừ từ khóa.</li>
-             </ul>
-           </div>
-        </div>
-      </aside>
-
-      <div className="lg:col-span-9 space-y-8 order-1 lg:order-1">
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end border-b border-white/5 pb-6 gap-4">
-          <div className="w-full sm:w-auto flex-1">
-            <p className="text-[10px] font-mono text-on-surface-variant uppercase tracking-widest mb-2">
-              Hiển thị {data?.total || 0} bài báo
-            </p>
-            {q ? (
-              <h2 className="font-display text-3xl font-bold mb-4">Kết quả cho <span className="gradient-text">"{q}"</span></h2>
-            ) : (
-              <h2 className="font-display text-3xl font-bold mb-4">Khám phá <span className="gradient-text">Bài báo mới nhất</span></h2>
-            )}
-            
-            <div className="relative max-w-xl group">
+    <div className="pb-20 space-y-6 pt-4">
+      {/* Grid: papers (left) + sidebar (right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* Papers list & Header */}
+        <div className="lg:col-span-9 space-y-8 order-1 lg:order-1">
+          <header className="bg-transparent">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+              <div>
+                <p className="text-[10px] font-mono text-on-surface-variant uppercase tracking-widest mb-1">
+                  KIẾN THỨC: {data?.total || 0} BÀI BÁO
+                </p>
+                {q ? (
+                  <h2 className="font-display text-3xl font-bold">Kết quả cho <span className="gradient-text">"{q}"</span></h2>
+                ) : (
+                  <h2 className="font-display text-3xl font-bold">Khám phá <span className="gradient-text">bài báo mới nhất</span></h2>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">SẮP XẾP:</span>
+                <select value={sort} onChange={handleSortChange} className="bg-transparent border-none text-xs font-bold text-primary focus:ring-0 outline-none">
+                   <option value="relevance">Độ liên quan / Mới nhất</option>
+                   <option value="citations">Trích dẫn nhiều nhất</option>
+                </select>
+              </div>
+            </div>
+            <div className="relative group w-full">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline group-focus-within:text-primary transition-colors" />
               <input 
                 type="text" 
@@ -283,25 +213,21 @@ export default function Search() {
                     setSearchParams({ q: e.currentTarget.value, year, sort, page: "1" });
                   }
                 }}
-                className="w-full bg-surface-container border-2 border-outline-variant/30 rounded-full py-2.5 pl-10 pr-4 text-on-surface text-sm focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all placeholder:text-outline-variant"
+                className="w-full bg-surface-container border border-white/5 rounded-full py-2.5 pl-10 pr-4 text-on-surface text-sm focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all placeholder:text-outline-variant"
               />
             </div>
-          </div>
-          <div className="flex items-center gap-2 glass-panel p-1 rounded-lg shrink-0 mt-4 sm:mt-0">
-            <span className="text-[10px] font-bold uppercase tracking-widest px-3 text-on-surface-variant">Sắp xếp:</span>
-            <select value={sort} onChange={handleSortChange} className="bg-transparent border-none text-xs font-bold text-primary focus:ring-0 outline-none">
-               <option value="relevance">Độ liên quan / Mới nhất</option>
-               <option value="citations">Trích dẫn nhiều nhất</option>
-            </select>
-          </div>
-        </header>
+          </header>
 
-        {isLoading ? (
-          <div className="flex justify-center items-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
-        ) : data?.data && data.data.length > 0 ? (
-          <div className="space-y-6">
+          {isLoading ? (
+            <div className="flex justify-center items-center py-20">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : data?.data && data.data.length > 0 ? (
+            <div className="relative space-y-6">
+              <div 
+                className="overflow-y-auto max-h-[700px] pr-2 space-y-6 scroll-smooth"
+                style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.15) transparent' }}
+              >
                 {data.data.map((paper: Paper) => (
                   <article key={paper.id} className="glass-panel p-8 rounded-2xl relative overflow-hidden group hover:border-primary/30 transition-all">
                     <div className="flex justify-between items-start gap-4 mb-2">
@@ -347,46 +273,135 @@ export default function Search() {
                     
                     <div className="flex flex-wrap items-center gap-6 pt-6 border-t border-white/5">
                        <div className="flex items-center gap-6 mr-auto">
-                          <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"><Quote className="w-3 h-3" /> {paper.citations_count} Trích dẫn</span>
+                          <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"><Quote className="w-3 h-3" /> {paper.citations_count} TRÍCH DẪN</span>
                        </div>
                        <button 
                          onClick={() => setSelectedPaper(paper)}
-                         className="px-4 py-2 rounded-lg border border-white/10 text-[10px] font-bold uppercase tracking-widest hover:bg-white/5 transition-all"
+                         className="px-6 py-2.5 rounded-full border border-white/20 text-[10px] font-bold uppercase tracking-widest hover:bg-white/5 transition-all text-white"
                        >
-                         Xem chi tiết
+                         XEM CHI TIẾT
                        </button>
-                       <button className="px-4 py-2 rounded-lg gradient-btn text-[10px] font-bold uppercase tracking-widest text-white">Tải xuống PDF</button>
+                       <button className="px-6 py-2.5 rounded-full bg-primary text-[10px] font-bold uppercase tracking-widest text-white shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:bg-primary/90 transition">
+                         TẢI XUỐNG PDF
+                       </button>
                     </div>
                   </article>
                 ))}
               </div>
-            ) : (
-              <div className="text-center py-20 text-on-surface-variant">
-                Không tìm thấy kết quả nào phù hợp. Thử thay đổi từ khóa hoặc loại bỏ bộ lọc.
-              </div>
-            )}
+              {data.data.length > 2 && (
+                <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background/90 to-transparent z-10" />
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-20 text-on-surface-variant">
+              Không tìm thấy kết quả nào phù hợp. Thử thay đổi từ khóa hoặc loại bỏ bộ lọc.
+            </div>
+          )}
 
-            {data?.last_page && data.last_page > 1 && (
-              <div className="flex justify-center items-center gap-2 pt-8">
-                 <button 
-                   onClick={() => handlePageChange(pageParam - 1)}
-                   disabled={pageParam === 1}
-                   className="p-2 rounded border border-white/10 hover:bg-white/5 disabled:opacity-50"
+          {data?.last_page && data.last_page > 1 && (
+            <div className="flex justify-center items-center gap-2 pt-8">
+               <button 
+                 onClick={() => handlePageChange(pageParam - 1)}
+                 disabled={pageParam === 1}
+                 className="p-2 rounded border border-white/10 hover:bg-white/5 disabled:opacity-50"
+               >
+                 <ChevronLeft className="w-4 h-4" />
+               </button>
+               <span className="text-xs font-bold text-on-surface-variant px-4">
+                 Trang {pageParam} / {data.last_page}
+               </span>
+               <button 
+                 onClick={() => handlePageChange(pageParam + 1)}
+                 disabled={pageParam === data.last_page}
+                 className="p-2 rounded border border-white/10 hover:bg-white/5 disabled:opacity-50"
+               >
+                 <ChevronRight className="w-4 h-4" />
+               </button>
+            </div>
+          )}
+        </div>
+
+        {/* Sidebar */}
+        <aside className="lg:col-span-3 space-y-6 sticky top-[100px] self-start order-2 lg:order-2">
+          <div className="glass-panel p-6 rounded-2xl space-y-8">
+             <div className="flex justify-between items-center">
+               <h3 className="font-display font-bold text-lg flex items-center gap-2"><Filter className="w-4 h-4 text-primary" /> BỘ LỌC</h3>
+               <button 
+                 onClick={() => { setYear(""); setAuthor(""); setJournal(""); setSort("relevance"); setSearchParams({ q, page: "1" }); }}
+                 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors"
+               >
+                 ĐẶT LẠI
+               </button>
+             </div>
+
+             <div className="space-y-4">
+               <div>
+                 <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">NĂM XUẤT BẢN</h4>
+                 <select 
+                   value={year}
+                   onChange={(e) => setYear(e.target.value)}
+                   className="w-full bg-surface-container-high border border-white/10 rounded-full p-2.5 px-4 text-sm outline-none focus:border-primary/50"
                  >
-                   <ChevronLeft className="w-4 h-4" />
-                 </button>
-                 <span className="text-xs font-bold text-on-surface-variant px-4">
-                   Trang {pageParam} / {data.last_page}
-                 </span>
-                 <button 
-                   onClick={() => handlePageChange(pageParam + 1)}
-                   disabled={pageParam === data.last_page}
-                   className="p-2 rounded border border-white/10 hover:bg-white/5 disabled:opacity-50"
-                 >
-                   <ChevronRight className="w-4 h-4" />
-                 </button>
-              </div>
-            )}
+                   <option value="">Tất cả các năm</option>
+                   {[2024, 2023, 2022, 2021, 2020, 2019, 2018].map(y => (
+                     <option key={y} value={y}>{y}</option>
+                   ))}
+                 </select>
+               </div>
+
+               <div>
+                 <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">TÁC GIẢ</h4>
+                 <input 
+                   type="text"
+                   value={author}
+                   onChange={(e) => setAuthor(e.target.value)}
+                   className="w-full bg-surface-container-high border border-white/10 rounded-full p-2.5 px-4 text-sm outline-none focus:border-primary/50 placeholder:text-outline-variant text-on-surface"
+                 />
+               </div>
+
+               <div>
+                 <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">TẠP CHÍ</h4>
+                 <input 
+                   type="text"
+                   value={journal}
+                   onChange={(e) => setJournal(e.target.value)}
+                   className="w-full bg-surface-container-high border border-white/10 rounded-full p-2.5 px-4 text-sm outline-none focus:border-primary/50 placeholder:text-outline-variant text-on-surface"
+                 />
+               </div>
+
+               <button onClick={handleApplyFilter} className="w-full py-2.5 bg-primary text-white text-xs font-bold rounded-full hover:bg-primary/90 transition shadow-[0_0_15px_rgba(37,99,235,0.3)]">ÁP DỤNG LỌC</button>
+             </div>
+             
+             <div className="space-y-4 pt-4 border-t border-white/5">
+               <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant flex items-center gap-2"><History className="w-3 h-3" /> LỊCH SỬ TÌM KIẾM</h4>
+               {history.length > 0 ? (
+                 <div className="flex flex-wrap gap-2">
+                   {history.map((h, i) => (
+                     <button 
+                       key={i}
+                       onClick={() => setSearchParams({ q: h, page: "1" })}
+                       className="px-2 py-1 bg-surface-container-high border border-white/5 rounded text-xs text-on-surface-variant hover:text-primary hover:border-primary/30 transition-all text-left"
+                     >
+                       {h}
+                     </button>
+                   ))}
+                 </div>
+               ) : (
+                 <p className="text-xs text-on-surface-variant">Chưa có lịch sử</p>
+               )}
+             </div>
+
+             <div className="space-y-4 pt-4 border-t border-white/5">
+               <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant flex items-center gap-2 text-tertiary"><Info className="w-3 h-3" /> MẸO BOOLEAN</h4>
+               <ul className="text-xs text-on-surface-variant space-y-2 leading-relaxed">
+                 <li><strong className="text-on-surface">"Cụm từ"</strong>: Tìm chính xác cụm từ.</li>
+                 <li><strong className="text-tertiary">AND</strong>: Chứa cả hai từ khóa.</li>
+                 <li><strong className="text-tertiary">OR</strong>: Chứa một trong hai.</li>
+                 <li><strong className="text-error">NOT</strong>: Loại trừ từ khóa.</li>
+               </ul>
+             </div>
+          </div>
+        </aside>
       </div>
 
       {selectedPaper && (

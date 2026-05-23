@@ -9,7 +9,7 @@ class Journal extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'issn', 'publisher', 'url', 'field'];
+    protected $fillable = ['name', 'issn', 'publisher', 'url', 'field', 'source_type'];
 
     public function papers()
     {
