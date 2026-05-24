@@ -13,11 +13,16 @@ class BookmarkController extends Controller
      */
     public function index()
     {
-        $bookmarks = auth()->user()
-            ->bookmarks()
-            ->with(['paper.journal', 'paper.keywords', 'paper.authors'])
-            ->latest()
-            ->paginate(20);
+        $userId = auth()->id();
+        $page = request('page', 1);
+
+        $bookmarks = \Illuminate\Support\Facades\Cache::tags(["bookmarks_{$userId}"])->remember("bookmarks_page_{$page}", 3600, function () {
+            return auth()->user()
+                ->bookmarks()
+                ->with(['paper.journal', 'paper.keywords', 'paper.authors'])
+                ->latest()
+                ->paginate(20);
+        });
 
         return response()->json($bookmarks);
     }
@@ -33,6 +38,10 @@ class BookmarkController extends Controller
             ['user_id'  => auth()->id(), 'paper_id' => $request->paper_id],
             ['note'     => $request->note]
         );
+
+        \Illuminate\Support\Facades\Cache::tags(["bookmarks_" . auth()->id()])->flush();
+        \Illuminate\Support\Facades\Cache::forget("dash.bookmarks_new." . auth()->id());
+        \Illuminate\Support\Facades\Cache::forget("dash.bookmarks." . auth()->id());
 
         return response()->json($bookmark->load('paper'), 201);
     }
@@ -50,6 +59,8 @@ class BookmarkController extends Controller
 
         $bookmark->update(['note' => $request->note]);
 
+        \Illuminate\Support\Facades\Cache::tags(["bookmarks_" . auth()->id()])->flush();
+
         return response()->json($bookmark->load('paper'));
     }
 
@@ -63,6 +74,10 @@ class BookmarkController extends Controller
         }
 
         $bookmark->delete();
+
+        \Illuminate\Support\Facades\Cache::tags(["bookmarks_" . auth()->id()])->flush();
+        \Illuminate\Support\Facades\Cache::forget("dash.bookmarks_new." . auth()->id());
+        \Illuminate\Support\Facades\Cache::forget("dash.bookmarks." . auth()->id());
 
         return response()->json(['message' => 'Đã xóa bookmark.']);
     }
@@ -79,6 +94,10 @@ class BookmarkController extends Controller
         if (!$deleted) {
             return response()->json(['message' => 'Không tìm thấy bookmark cho bài báo này.'], 404);
         }
+
+        \Illuminate\Support\Facades\Cache::tags(["bookmarks_" . auth()->id()])->flush();
+        \Illuminate\Support\Facades\Cache::forget("dash.bookmarks_new." . auth()->id());
+        \Illuminate\Support\Facades\Cache::forget("dash.bookmarks." . auth()->id());
 
         return response()->json(['message' => 'Đã xóa bookmark.']);
     }

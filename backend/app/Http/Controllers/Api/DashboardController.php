@@ -9,49 +9,119 @@ use App\Models\PublicationTrend;
 use App\Models\Journal;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    // Cache TTL constants (giây)
-    const TTL_STATS   = 1800; // 30 phút — dữ liệu tổng hợp ít thay đổi
-    const TTL_TRENDING = 3600; // 1 giờ  — trending ổn định
-    const TTL_PAPERS   = 900;  // 15 phút — bài báo mới hơn
-    const TTL_JOURNALS = 3600; // 1 giờ  — journals ổn định
-    const TTL_FIELDS   = 3600; // 1 giờ  — phân bổ ổn định
+    const TTL_STATS   = 1800;
+    const TTL_TRENDING = 2592000; // 30 days (changes yearly)
+    const TTL_PAPERS   = 900;
+    const TTL_JOURNALS = 3600;
+    const TTL_FIELDS   = 3600;
 
-    /**
-     * GET /api/dashboard
-     */
-    public function index()
+    private function getBookmarkedPaperIds($user)
     {
-        $user = auth()->user();
-        $userId = $user?->id;
+        if (!$user) return collect();
+        return Cache::remember("dash.bookmarks.{$user->id}", 300, function () use ($user) {
+            return $user->bookmarks()->pluck('paper_id');
+        });
+    }
 
-        // ── 1. STATIC DATA (cached per key, không phụ thuộc user) ──────────────
-        // Chạy tất cả cached queries trong một lần, độc lập nhau
+    public function stats(Request $request)
+    {
+        $user = $request->user();
+        
+        $generalStats = Cache::remember('dash.stats_v4', self::TTL_STATS, function () {
+            $yesterday = now()->subDay();
 
-        $generalStats = Cache::remember('dash.stats', self::TTL_STATS, function () {
+            $total_papers = ResearchPaper::count();
+            $papers_new = ResearchPaper::where('created_at', '>=', $yesterday)->count();
+            $papers_prev = max(1, $total_papers - $papers_new);
+            $papers_percent = $papers_new > 0 ? round(($papers_new / $papers_prev) * 100, 1) : 0;
+
+            $total_keywords = Keyword::count();
+            $keywords_new = Keyword::where('created_at', '>=', $yesterday)->count();
+            $keywords_prev = max(1, $total_keywords - $keywords_new);
+            $keywords_percent = $keywords_new > 0 ? round(($keywords_new / $keywords_prev) * 100, 1) : 0;
+
+            $papers_this_year = ResearchPaper::where('published_year', now()->year)->count();
+            $papers_this_year_new = ResearchPaper::where('published_year', now()->year)->where('created_at', '>=', $yesterday)->count();
+
             return [
-                'total_papers'     => ResearchPaper::count(),
-                'total_keywords'   => Keyword::count(),
-                'papers_this_year' => ResearchPaper::where('published_year', now()->year)->count(),
+                'total_papers'         => $total_papers,
+                'papers_percent'       => $papers_percent > 0 ? "+{$papers_percent}%" : "0%",
+                'total_keywords'       => $total_keywords,
+                'keywords_percent'     => $keywords_percent > 0 ? "+{$keywords_percent}%" : "0%",
+                'papers_this_year'     => $papers_this_year,
+                'papers_this_year_new' => $papers_this_year_new,
             ];
         });
 
+        $bookmarkedPaperIds = collect();
+        $totalBookmarks = 0;
+        $bookmarks_new = 0;
+
+        if ($user) {
+            $bookmarkedPaperIds = $this->getBookmarkedPaperIds($user);
+            $totalBookmarks = $bookmarkedPaperIds->count();
+            
+            $bookmarks_new = Cache::remember("dash.bookmarks_new.{$user->id}", self::TTL_STATS, function () use ($user) {
+                return \App\Models\Bookmark::where('user_id', $user->id)
+                    ->where('created_at', '>=', now()->subDay())
+                    ->count();
+            });
+        }
+
+        $stats = array_merge($generalStats, [
+            'total_bookmarks' => $totalBookmarks,
+            'bookmarks_new'   => $bookmarks_new,
+        ]);
+
+        return response()->json([
+            'stats' => $stats,
+            'stats_updated_at' => now()->format('H:i - d/m/Y'),
+            'bookmarked_paper_ids' => $bookmarkedPaperIds
+        ]);
+    }
+
+    public function bookmarks(Request $request)
+    {
+        $user = $request->user();
+        $bookmarkedPaperIds = $this->getBookmarkedPaperIds($user);
+
+        return response()->json([
+            'bookmarked_paper_ids' => $bookmarkedPaperIds
+        ]);
+    }
+
+    public function trending()
+    {
         $trendingTopics = Cache::remember('dash.trending', self::TTL_TRENDING, function () {
             $latestYear = PublicationTrend::max('year');
             if (!$latestYear) return collect();
 
-            // Lấy top 6 trending dựa trên composite score
             $topics = PublicationTrend::with('keyword:id,name')
                 ->where('year', $latestYear)
-                ->orderByRaw('(growth_rate * 0.4 + paper_count * 3.0 + citation_count * 0.3) DESC')
+                ->where('paper_count', '>=', 3)
+                ->where('growth_rate', '>', 0)
+                ->orderByRaw('(growth_rate * 0.6 + paper_count * 2.0 + citation_count * 0.2) DESC')
                 ->limit(6)
                 ->get(['id', 'keyword_id', 'year', 'paper_count', 'citation_count', 'growth_rate']);
 
+            if ($topics->count() < 6) {
+                $existingIds = $topics->pluck('keyword_id')->toArray();
+                $extra = PublicationTrend::with('keyword:id,name')
+                    ->where('year', $latestYear)
+                    ->where('paper_count', '>=', 3)
+                    ->whereNotIn('keyword_id', $existingIds)
+                    ->orderByDesc('paper_count')
+                    ->limit(6 - $topics->count())
+                    ->get(['id', 'keyword_id', 'year', 'paper_count', 'citation_count', 'growth_rate']);
+                $topics = $topics->merge($extra);
+            }
+
             if ($topics->isEmpty()) return collect();
 
-            // Lấy lịch sử 7 năm cho tất cả keywords trong 1 query
             $keywordIds = $topics->pluck('keyword_id');
             $trendsHistory = PublicationTrend::whereIn('keyword_id', $keywordIds)
                 ->where('year', '>=', $latestYear - 6)
@@ -72,8 +142,18 @@ class DashboardController extends Controller
             return $topics;
         });
 
+        $latestYear = $trendingTopics->isNotEmpty() ? $trendingTopics->first()->year : null;
+
+        return response()->json([
+            'trending_topics' => $trendingTopics,
+            'latest_year' => $latestYear,
+            'trending_topics_updated_at' => now()->format('H:i - d/m/Y')
+        ]);
+    }
+
+    public function recent()
+    {
         $recentPapers = Cache::remember('dash.recent_papers_v2', self::TTL_PAPERS, function () {
-            // Chỉ select các cột cần thiết, tránh load toàn bộ record
             $items = ResearchPaper::select('id', 'title', 'abstract', 'published_year', 'journal_id', 'citations_count', 'doi')
                 ->with([
                     'journal:id,name',
@@ -91,6 +171,14 @@ class DashboardController extends Controller
             ];
         });
 
+        return response()->json([
+            'recent_papers' => $recentPapers['items'] ?? [],
+            'recent_papers_updated_at' => $recentPapers['updated_at'] ?? now()->format('H:i - d/m/Y')
+        ]);
+    }
+
+    public function journals()
+    {
         $topJournals = Cache::remember('dash.top_journals_v2', self::TTL_JOURNALS, function () {
             $colors = [
                 'bg-white text-black',
@@ -98,7 +186,6 @@ class DashboardController extends Controller
                 'bg-tertiary-container text-on-tertiary-container',
             ];
 
-            // Ánh xạ OpenAlex source_type → ghi chú ISSN thân thiện
             $issnNotes = [
                 'repository'      => 'Kho lưu trữ preprint — không cấp ISSN',
                 'conference'      => 'Kỷ yếu hội nghị — thường không có ISSN',
@@ -114,11 +201,9 @@ class DashboardController extends Controller
                 ->get()
                 ->values()
                 ->map(function($j, $i) use ($colors, $issnNotes) {
-                    // Tạo dữ liệu giả lập cho Impact Factor và Nguồn
                     $mockImpactFactor = round(($j->papers_count * 1.5) + ($j->id % 10), 1) + 2.5;
                     $sources = ['Scopus® (Q1)', 'Web of Science™ (SCIE)', 'SCImago Journal Rank'];
 
-                    // Ghi chú ISSN — nếu có ISSN rồi thì bỏ qua
                     $issnNote = null;
                     if (empty($j->issn)) {
                         $issnNote = $issnNotes[$j->source_type] ?? 'Chưa thu thập được';
@@ -147,7 +232,14 @@ class DashboardController extends Controller
             ];
         });
 
+        return response()->json([
+            'top_journals' => $topJournals['items'] ?? [],
+            'top_journals_updated_at' => $topJournals['updated_at'] ?? now()->format('H:i - d/m/Y')
+        ]);
+    }
 
+    public function fields()
+    {
         $fieldsDistribution = Cache::remember('dash.fields_dist', self::TTL_FIELDS, function () {
             return DB::table('keyword_paper')
                 ->join('keywords', 'keyword_paper.keyword_id', '=', 'keywords.id')
@@ -162,108 +254,90 @@ class DashboardController extends Controller
                 ]);
         });
 
-        // ── 2. USER-SPECIFIC DATA (không cache global, cache theo user_id) ──────
-        $bookmarkedPaperIds = collect();
-        $totalBookmarks     = 0;
-        $recommendedPapers  = collect();
+        return response()->json([
+            'fields_distribution' => $fieldsDistribution
+        ]);
+    }
 
-        if ($user) {
-            // Cache bookmark list theo user, TTL ngắn hơn
-            $bookmarkCache = Cache::remember("dash.bookmarks.{$userId}", 300, function () use ($user) {
-                return $user->bookmarks()->pluck('paper_id');
-            });
-            $bookmarkedPaperIds = $bookmarkCache;
-            $totalBookmarks     = $bookmarkedPaperIds->count();
+    public function recommended(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) return response()->json(['recommended_papers' => []]);
 
-            // Cache recommendations theo user
-            $recommendedPapers = Cache::remember("dash.recommended.{$userId}", 600, function () use ($user, $bookmarkedPaperIds) {
-                // Lấy keyword IDs từ các bài đã lưu + theo dõi trong 1 query
-                $followedKeywordIds = $user->followedKeywords()->pluck('keywords.id');
+        $bookmarkedPaperIds = $this->getBookmarkedPaperIds($user);
 
-                $bookmarkedKeywordIds = $bookmarkedPaperIds->isNotEmpty()
-                    ? DB::table('keyword_paper')
-                        ->whereIn('paper_id', $bookmarkedPaperIds)
-                        ->pluck('keyword_id')
-                    : collect();
+        $recommendedPapers = Cache::remember("dash.recommended.{$user->id}", 600, function () use ($user, $bookmarkedPaperIds) {
+            $followedKeywordIds = $user->followedKeywords()->pluck('keywords.id');
 
-                $targetKeywordIds = $followedKeywordIds->merge($bookmarkedKeywordIds)->unique();
+            $bookmarkedKeywordIds = $bookmarkedPaperIds->isNotEmpty()
+                ? DB::table('keyword_paper')
+                    ->whereIn('paper_id', $bookmarkedPaperIds)
+                    ->pluck('keyword_id')
+                : collect();
 
-                // Lấy field của journals từ bookmarked papers
-                $bookmarkedJournalFields = $bookmarkedPaperIds->isNotEmpty()
-                    ? DB::table('research_papers')
-                        ->join('journals', 'research_papers.journal_id', '=', 'journals.id')
-                        ->whereIn('research_papers.id', $bookmarkedPaperIds)
-                        ->whereNotNull('journals.field')
-                        ->pluck('journals.field')
-                        ->unique()
-                    : collect();
+            $targetKeywordIds = $followedKeywordIds->merge($bookmarkedKeywordIds)->unique();
 
-                $query = ResearchPaper::select('id', 'title', 'abstract', 'published_year', 'journal_id', 'citations_count', 'doi')
-                    ->with(['authors:id,name', 'journal:id,name', 'keywords:id,name'])
-                    ->whereNotIn('id', $bookmarkedPaperIds);
+            $bookmarkedJournalFields = $bookmarkedPaperIds->isNotEmpty()
+                ? DB::table('research_papers')
+                    ->join('journals', 'research_papers.journal_id', '=', 'journals.id')
+                    ->whereIn('research_papers.id', $bookmarkedPaperIds)
+                    ->whereNotNull('journals.field')
+                    ->pluck('journals.field')
+                    ->unique()
+                : collect();
 
-                if ($targetKeywordIds->isNotEmpty() || $bookmarkedJournalFields->isNotEmpty()) {
-                    $query->where(function ($q) use ($targetKeywordIds, $bookmarkedJournalFields) {
-                        if ($targetKeywordIds->isNotEmpty()) {
-                            $q->whereHas('keywords', fn($k) => $k->whereIn('keywords.id', $targetKeywordIds));
-                        }
-                        if ($bookmarkedJournalFields->isNotEmpty()) {
-                            $q->orWhereHas('journal', fn($j) => $j->whereIn('field', $bookmarkedJournalFields));
-                        }
-                    });
-                }
+            $query = ResearchPaper::select('id', 'title', 'abstract', 'published_year', 'journal_id', 'citations_count', 'doi')
+                ->with(['authors:id,name', 'journal:id,name', 'keywords:id,name'])
+                ->whereNotIn('id', $bookmarkedPaperIds);
 
-                return $query->orderByDesc('citations_count')->limit(2)->get()
-                    ->map(function ($paper) use ($targetKeywordIds, $bookmarkedJournalFields) {
-                        $matchedCount   = $paper->keywords->pluck('id')->intersect($targetKeywordIds)->count();
-                        $hasFieldMatch  = $bookmarkedJournalFields->isNotEmpty()
-                            && $paper->journal
-                            && $bookmarkedJournalFields->contains($paper->journal->field);
+            if ($targetKeywordIds->isNotEmpty() || $bookmarkedJournalFields->isNotEmpty()) {
+                $query->where(function ($q) use ($targetKeywordIds, $bookmarkedJournalFields) {
+                    if ($targetKeywordIds->isNotEmpty()) {
+                        $q->whereHas('keywords', fn($k) => $k->whereIn('keywords.id', $targetKeywordIds));
+                    }
+                    if ($bookmarkedJournalFields->isNotEmpty()) {
+                        $q->orWhereHas('journal', fn($j) => $j->whereIn('field', $bookmarkedJournalFields));
+                    }
+                });
+            }
 
-                        if ($targetKeywordIds->isEmpty() && $bookmarkedJournalFields->isEmpty()) {
-                            $score = 70 + min(25, (int)($paper->citations_count / 10));
-                        } else {
-                            $score = 50 + min(30, $matchedCount * 15) + ($hasFieldMatch ? 15 : 0) + min(4, (int)($paper->citations_count / 50));
-                        }
+            return $query->orderByDesc('citations_count')->limit(2)->get()
+                ->map(function ($paper) use ($targetKeywordIds, $bookmarkedJournalFields) {
+                    $matchedCount   = $paper->keywords->pluck('id')->intersect($targetKeywordIds)->count();
+                    $hasFieldMatch  = $bookmarkedJournalFields->isNotEmpty()
+                        && $paper->journal
+                        && $bookmarkedJournalFields->contains($paper->journal->field);
 
-                        $matchScore = min(99, max(0, $score));
+                    if ($targetKeywordIds->isEmpty() && $bookmarkedJournalFields->isEmpty()) {
+                        $score = 70 + min(25, (int)($paper->citations_count / 10));
+                    } else {
+                        $score = 50 + min(30, $matchedCount * 15) + ($hasFieldMatch ? 15 : 0) + min(4, (int)($paper->citations_count / 50));
+                    }
 
-                        $authorNames = $paper->authors->isNotEmpty()
-                            ? $paper->authors->pluck('name')->join(', ')
-                            : 'Chưa rõ tác giả';
+                    $matchScore = min(99, max(0, $score));
 
-                        return [
-                            'id'       => $paper->id,
-                            'title'    => $paper->title,
-                            'authors'  => $authorNames,
-                            'journal'  => $paper->journal?->name ?? 'Khác',
-                            'time'     => (string) ($paper->published_year ?? ''),
-                            'impact'   => $paper->citations_count ? round(($paper->citations_count / 10), 1) : 0,
-                            'citations'=> $paper->citations_count ?? 0,
-                            'doi'      => $paper->doi,
-                            'abstract' => $paper->abstract,
-                            'keywords' => $paper->keywords->map(fn($k) => ['id' => $k->id, 'name' => $k->name])->toArray(),
-                            'match'    => $matchScore . '%',
-                        ];
-                    });
-            });
-        }
+                    $authorNames = $paper->authors->isNotEmpty()
+                        ? $paper->authors->pluck('name')->join(', ')
+                        : 'Chưa rõ tác giả';
 
-        // ── 3. BUILD RESPONSE ───────────────────────────────────────────────────
-        $stats = array_merge($generalStats, ['total_bookmarks' => $totalBookmarks]);
-        $latestYear = $trendingTopics->isNotEmpty() ? $trendingTopics->first()->year : null;
+                    return [
+                        'id'       => $paper->id,
+                        'title'    => $paper->title,
+                        'authors'  => $authorNames,
+                        'journal'  => $paper->journal?->name ?? 'Khác',
+                        'time'     => (string) ($paper->published_year ?? ''),
+                        'impact'   => $paper->citations_count ? round(($paper->citations_count / 10), 1) : 0,
+                        'citations'=> $paper->citations_count ?? 0,
+                        'doi'      => $paper->doi,
+                        'abstract' => $paper->abstract,
+                        'keywords' => $paper->keywords->map(fn($k) => ['id' => $k->id, 'name' => $k->name])->toArray(),
+                        'match'    => $matchScore . '%',
+                    ];
+                });
+        });
 
         return response()->json([
-            'stats'               => $stats,
-            'trending_topics'     => $trendingTopics,
-            'recent_papers'       => $recentPapers['items'] ?? [],
-            'recent_papers_updated_at' => $recentPapers['updated_at'] ?? now()->format('H:i - d/m/Y'),
-            'recommended_papers'  => $recommendedPapers,
-            'top_journals'        => $topJournals['items'] ?? [],
-            'top_journals_updated_at' => $topJournals['updated_at'] ?? now()->format('H:i - d/m/Y'),
-            'fields_distribution' => $fieldsDistribution,
-            'latest_year'         => $latestYear,
-            'bookmarked_paper_ids'=> $bookmarkedPaperIds,
+            'recommended_papers' => $recommendedPapers
         ]);
     }
 }

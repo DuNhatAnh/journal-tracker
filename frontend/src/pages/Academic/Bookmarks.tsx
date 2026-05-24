@@ -37,8 +37,9 @@ export default function Bookmarks() {
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"papers" | "keywords">("papers");
+  const [activeTab, setActiveTab] = useState<"papers" | "keywords" | "journals">("papers");
   const [followedKeywords, setFollowedKeywords] = useState<Keyword[]>([]);
+  const [followedJournals, setFollowedJournals] = useState<any[]>([]);
   const [isKeywordsLoading, setIsKeywordsLoading] = useState(false);
   const [selectedPaper, setSelectedPaper] = useState<any | null>(null);
   const [bookmarkLoadingIds, setBookmarkLoadingIds] = useState<Set<number>>(new Set());
@@ -88,13 +89,14 @@ export default function Bookmarks() {
     }
   }, []);
 
-  const fetchFollowedKeywords = useCallback(async () => {
+  const fetchFollowedData = useCallback(async () => {
     setIsKeywordsLoading(true);
     try {
-      const res = await api.get<{ keywords: Keyword[] }>("/following/status");
+      const res = await api.get<{ keywords: Keyword[], journals: any[] }>("/following/status");
       setFollowedKeywords(res.keywords || []);
+      setFollowedJournals(res.journals || []);
     } catch (err) {
-      console.error("Lỗi khi tải danh sách từ khóa:", err);
+      console.error("Lỗi khi tải dữ liệu theo dõi:", err);
     } finally {
       setIsKeywordsLoading(false);
     }
@@ -104,18 +106,29 @@ export default function Bookmarks() {
     if (activeTab === "papers") {
       fetchBookmarks();
     } else {
-      fetchFollowedKeywords();
+      fetchFollowedData();
     }
-  }, [activeTab, fetchBookmarks, fetchFollowedKeywords]);
+  }, [activeTab, fetchBookmarks, fetchFollowedData]);
 
   const deleteKeyword = async (id: number, name: string) => {
     try {
       await api.delete(`/following/keywords/${id}`);
-      fetchFollowedKeywords();
+      fetchFollowedData();
       toast.success(`Đã hủy lưu từ khóa "${name}"!`);
     } catch (err) {
       console.error(err);
       toast.error("Lỗi khi hủy lưu từ khóa. Vui lòng thử lại.");
+    }
+  };
+
+  const deleteJournal = async (id: number, name: string) => {
+    try {
+      await api.delete(`/following/journals/${id}`);
+      fetchFollowedData();
+      toast.success(`Đã hủy theo dõi tạp chí "${name}"!`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Lỗi khi hủy theo dõi tạp chí. Vui lòng thử lại.");
     }
   };
 
@@ -185,6 +198,15 @@ export default function Bookmarks() {
                )}
              >
                Chủ đề quan tâm
+             </button>
+             <button 
+               onClick={() => setActiveTab("journals")}
+               className={cn(
+                 "px-6 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all",
+                 activeTab === "journals" ? "bg-primary text-on-primary shadow-lg" : "text-on-surface-variant hover:text-on-surface"
+               )}
+             >
+               Tạp chí
              </button>
           </div>
           {showExport && (
@@ -287,7 +309,7 @@ export default function Bookmarks() {
             Bạn chưa lưu bài báo nào. Hãy sử dụng thanh tìm kiếm để khám phá.
           </div>
         )
-      ) : (
+      ) : activeTab === "keywords" ? (
         isKeywordsLoading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -315,6 +337,41 @@ export default function Bookmarks() {
         ) : (
           <div className="text-center py-20 text-on-surface-variant">
             Bạn chưa lưu chủ đề/từ khóa nào. Hãy lưu các chủ đề quan tâm từ chi tiết bài báo.
+          </div>
+        )
+      ) : (
+        isKeywordsLoading ? (
+          <div className="flex justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : followedJournals.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in duration-300">
+            {followedJournals.map((journal) => (
+              <div 
+                key={journal.id} 
+                className="glass-panel p-6 rounded-2xl flex flex-col h-full gap-4 border border-white/10 hover:border-primary/30 transition-all group bg-surface-container/30"
+              >
+                <div className="flex justify-between items-start">
+                  <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest border bg-tertiary/10 text-tertiary border-tertiary/20">
+                    Tạp chí
+                  </span>
+                  <button 
+                    onClick={() => deleteJournal(journal.id, journal.name)}
+                    className="p-1.5 rounded-full hover:bg-error/10 text-on-surface-variant hover:text-error transition-colors shrink-0"
+                    title="Hủy theo dõi tạp chí này"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <h3 className="font-display font-semibold text-lg text-on-surface group-hover:text-primary transition-colors line-clamp-2 mt-auto">
+                  {journal.name}
+                </h3>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-20 text-on-surface-variant">
+            Bạn chưa theo dõi tạp chí nào. Hãy khám phá và theo dõi các tạp chí trong ngành.
           </div>
         )
       )}

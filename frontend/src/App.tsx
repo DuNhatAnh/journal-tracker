@@ -12,6 +12,7 @@ import Bookmarks from "./pages/Academic/Bookmarks";
 import Following from "./pages/Researcher/Following";
 import Notifications from "./pages/Shared/Notifications";
 import Profile from "./pages/Shared/Profile";
+import AllPapers from "./pages/Shared/AllPapers";
 import Settings from "./pages/Shared/Settings";
 import About from "./pages/Shared/About";
 import Guide from "./pages/Shared/Guide";
@@ -31,6 +32,7 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/search" element={<Search />} />
+            <Route path="/papers" element={<AllPapers />} />
             <Route path="/trending" element={<Trending />} />
             <Route path="/bookmarks" element={<Bookmarks />} />
             <Route path="/following" element={<Following />} />

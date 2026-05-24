@@ -2,7 +2,7 @@ FROM php:8.4-cli-alpine
 
 # Install PHP extensions using mlocati/php-extension-installer
 COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
-RUN install-php-extensions pdo_pgsql pgsql zip bcmath gd opcache
+RUN install-php-extensions pdo_pgsql pgsql zip bcmath gd opcache pcntl
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

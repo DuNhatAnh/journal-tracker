@@ -13,12 +13,16 @@ class PaperController extends Controller
      */
     public function index(Request $request)
     {
-        $papers = ResearchPaper::with(['journal', 'authors', 'keywords'])
-            ->when($request->keyword, fn($q) => $q->byKeyword($request->keyword))
-            ->when($request->year,    fn($q) => $q->byYear((int) $request->year))
-            ->orderByDesc('published_year')
-            ->paginate(20)
-            ->withQueryString();
+        $cacheKey = 'papers.index.' . md5(json_encode($request->all()));
+        
+        $papers = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($request) {
+            return ResearchPaper::with(['journal', 'authors', 'keywords'])
+                ->when($request->keyword, fn($q) => $q->byKeyword($request->keyword))
+                ->when($request->year,    fn($q) => $q->byYear((int) $request->year))
+                ->orderByDesc('published_year')
+                ->paginate(10)
+                ->withQueryString();
+        });
 
         return response()->json($papers);
     }
@@ -36,32 +40,35 @@ class PaperController extends Controller
             'sort' => 'nullable|string|in:relevance,citations'
         ]);
 
-        $query = ResearchPaper::with(['journal', 'authors', 'keywords']);
-        
-        if ($request->filled('q')) {
-            $query->search($request->q);
-        }
+        $cacheKey = 'papers.search.' . md5(json_encode($request->all()));
 
-        if ($request->year) {
-            $query->byYear((int) $request->year);
-        }
+        $papers = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($request) {
+            $query = ResearchPaper::with(['journal', 'authors', 'keywords']);
+            
+            if ($request->filled('q')) {
+                $query->search($request->q);
+            }
 
-        if ($request->filled('author')) {
-            $query->whereHas('authors', fn($q) => $q->where('name', 'ilike', "%{$request->author}%"));
-        }
+            if ($request->year) {
+                $query->byYear((int) $request->year);
+            }
 
-        if ($request->filled('journal')) {
-            $query->whereHas('journal', fn($q) => $q->where('name', 'ilike', "%{$request->journal}%"));
-        }
+            if ($request->filled('author')) {
+                $query->whereHas('authors', fn($q) => $q->where('name', 'ilike', "%{$request->author}%"));
+            }
 
-        if ($request->sort === 'citations') {
-            $query->orderByDesc('citations_count');
-        } else {
-            // relevance (default): Just order by latest for now, or let DB handle order
-            $query->orderByDesc('published_year')->orderByDesc('citations_count');
-        }
+            if ($request->filled('journal')) {
+                $query->whereHas('journal', fn($q) => $q->where('name', 'ilike', "%{$request->journal}%"));
+            }
 
-        $papers = $query->paginate(20)->withQueryString();
+            if ($request->sort === 'citations') {
+                $query->orderByDesc('citations_count');
+            } else {
+                $query->orderByDesc('published_year')->orderByDesc('citations_count');
+            }
+
+            return $query->paginate(10)->withQueryString();
+        });
 
         return response()->json($papers);
     }

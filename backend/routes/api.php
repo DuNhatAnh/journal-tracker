@@ -35,7 +35,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me',       [AuthController::class, 'me']);
 
     // Dashboard
-    Route::get('/dashboard', [DashboardController::class, 'index']);
+    Route::prefix('dashboard')->group(function () {
+        Route::get('/stats',       [DashboardController::class, 'stats']);
+        Route::get('/bookmarks',   [DashboardController::class, 'bookmarks']);
+        Route::get('/trending',    [DashboardController::class, 'trending']);
+        Route::get('/recent',      [DashboardController::class, 'recent']);
+        Route::get('/recommended', [DashboardController::class, 'recommended']);
+        Route::get('/journals',    [DashboardController::class, 'journals']);
+        Route::get('/fields',      [DashboardController::class, 'fields']);
+    });
 
     // Research Papers
     Route::prefix('papers')->group(function () {
@@ -49,8 +57,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/',                              [JournalController::class, 'index']);
         Route::get('/feed',                          [JournalController::class, 'feed']);
         Route::get('/{journal}',                     [JournalController::class, 'show']);
-        Route::post('/{journal}/follow',             [JournalController::class, 'follow'])->middleware('role:researcher,admin');
-        Route::delete('/{journal}/follow',           [JournalController::class, 'unfollow'])->middleware('role:researcher,admin');
+        Route::post('/{journal}/follow',             [JournalController::class, 'follow']);
+        Route::delete('/{journal}/follow',           [JournalController::class, 'unfollow']);
     });
 
     // Keywords
@@ -82,14 +90,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/keywords',     [FollowingController::class, 'followKeyword']);
         Route::delete('/keywords/{keyword}', [FollowingController::class, 'unfollowKeyword']);
 
-        Route::middleware('role:researcher,admin')->group(function () {
-            Route::get('/feed',          [FollowingController::class, 'feed']);
-            Route::get('/search',        [FollowingController::class, 'search']);
-            Route::post('/journals',     [FollowingController::class, 'followJournal']);
-            Route::delete('/journals/{journal}', [FollowingController::class, 'unfollowJournal']);
-            Route::post('/authors',      [FollowingController::class, 'followAuthor']);
-            Route::delete('/authors/{author}', [FollowingController::class, 'unfollowAuthor']);
-        });
+        Route::get('/feed',          [FollowingController::class, 'feed']);
+        Route::get('/search',        [FollowingController::class, 'search']);
+        Route::post('/journals',     [FollowingController::class, 'followJournal']);
+        Route::delete('/journals/{journal}', [FollowingController::class, 'unfollowJournal']);
+        Route::post('/authors',      [FollowingController::class, 'followAuthor']);
+        Route::delete('/authors/{author}', [FollowingController::class, 'unfollowAuthor']);
     });
 
     // Notifications
