@@ -61,6 +61,11 @@ class PaperController extends Controller
                 $query->whereHas('journal', fn($q) => $q->where('name', 'ilike', "%{$request->journal}%"));
             }
 
+            if ($request->filled('keyword')) {
+                $keywords = array_map('trim', explode(',', $request->keyword));
+                $query->whereHas('keywords', fn($q) => $q->whereIn('name', $keywords));
+            }
+
             if ($request->sort === 'citations') {
                 $query->orderByDesc('citations_count');
             } else {

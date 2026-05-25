@@ -34,6 +34,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout',  [AuthController::class, 'logout']);
     Route::get('/me',       [AuthController::class, 'me']);
 
+    // Settings
+    Route::get('/settings', [App\Http\Controllers\Api\SettingsController::class, 'show']);
+    Route::put('/settings', [App\Http\Controllers\Api\SettingsController::class, 'update']);
+
     // Dashboard
     Route::prefix('dashboard')->group(function () {
         Route::get('/stats',       [DashboardController::class, 'stats']);

@@ -9,11 +9,12 @@ class Notification extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['user_id', 'title', 'content', 'type', 'is_read', 'read_at'];
+    protected $fillable = ['user_id', 'title', 'content', 'type', 'is_read', 'read_at', 'data'];
 
     protected $casts = [
         'is_read' => 'boolean',
         'read_at' => 'datetime',
+        'data'    => 'array',
     ];
 
     public function user()
@@ -23,6 +24,6 @@ class Notification extends Model
 
     public function markAsRead(): void
     {
-        $this->update(['is_read' => true, 'read_at' => now()]);
+        $this->update(['is_read' => 'true', 'read_at' => now()]);
     }
 }

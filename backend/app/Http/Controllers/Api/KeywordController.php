@@ -10,12 +10,13 @@ class KeywordController extends Controller
     public function index()
     {
         $q = request('q');
+        $perPage = request('per_page', 30);
         $keywords = Keyword::withCount('papers')
             ->when($q, function ($query, $q) {
                 $query->where('name', 'like', "%{$q}%");
             })
             ->orderByDesc('papers_count')
-            ->paginate(30);
+            ->paginate($perPage);
 
         return response()->json($keywords);
     }

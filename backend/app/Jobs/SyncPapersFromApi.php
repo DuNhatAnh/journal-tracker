@@ -293,15 +293,12 @@ class SyncPapersFromApi implements ShouldQueue
         });
 
         // Send notifications outside the transaction to avoid blocking DB writes
-        foreach ($newPaperIds as $paperId) {
-            try {
-                $paper = ResearchPaper::find($paperId);
-                if ($paper) {
-                    app(\App\Services\NotificationService::class)->notifyUsersForPaper($paper);
-                }
-            } catch (\Throwable $e) {
-                Log::warning('Notification failed', ['id' => $paperId, 'error' => $e->getMessage()]);
+        try {
+            if (!empty($newPaperIds)) {
+                app(\App\Services\NotificationService::class)->notifyBatch($newPaperIds);
             }
+        } catch (\Throwable $e) {
+            Log::warning('Batch notification failed', ['error' => $e->getMessage()]);
         }
 
         // Update live count after batch

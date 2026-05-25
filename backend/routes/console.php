@@ -9,3 +9,6 @@ Schedule::command('papers:sync --keyword="natural language processing" --pages=2
 
 // Automatically recalculate trends daily after papers sync
 Schedule::command('trends:calculate')->dailyAt('01:00');
+
+// Send weekly trending notifications to users on Monday morning
+Schedule::command('papers:trending-notify')->weeklyOn(1, '08:00');

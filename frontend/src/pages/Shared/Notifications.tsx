@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { BellRing, CheckCircle2, History, Info, TrendingUp, BookOpenText, LibraryBig, ArrowRight } from "lucide-react";
+import { BellRing, CheckCircle2, History, Info, TrendingUp, BookOpenText, LibraryBig, ArrowRight, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { api } from "@/src/lib/api";
 
 type NotificationItem = {
@@ -88,19 +89,61 @@ function getDayLabel(dateStr: string) {
 export default function Notifications() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const navigate = useNavigate();
 
-  const loadNotifications = async () => {
-    setLoading(true);
+  const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
+
+  const handleNotificationClick = (notification: NotificationItem) => {
+    setSelectedNotification(notification);
+    if (!notification.is_read) {
+      api.patch(`/notifications/${notification.id}/read`).catch(console.error);
+      setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n));
+    }
+  };
+
+  const handleActionClick = (notification: NotificationItem) => {
+    const filterType = notification.data?.filter_type;
+    const filterValue = notification.data?.filter_value;
+
+    if (filterType && filterValue) {
+      if (filterType === "journals") {
+        navigate(`/search?journal=${Array.isArray(filterValue) ? filterValue.join(",") : filterValue}`);
+      } else if (filterType === "keywords") {
+        navigate(`/search?keyword=${Array.isArray(filterValue) ? filterValue.join(",") : filterValue}`);
+      } else if (filterType === "trending") {
+        navigate(`/search?sort=bookmarks_desc`);
+      }
+    }
+  };
+
+  const loadNotifications = async (pageNum = 1) => {
+    if (pageNum === 1) setLoading(true);
+    else setLoadingMore(true);
+    
     setError(null);
 
     try {
-      const response = await api.get<{ data: NotificationItem[] }>("/notifications");
-      setNotifications(response.data || []);
+      const response = await api.get<{ data: NotificationItem[], current_page: number, last_page: number }>(`/notifications?page=${pageNum}&per_page=5`);
+      const newData = response.data || [];
+      const isLastPage = (response.current_page || 1) >= (response.last_page || 1);
+      
+      if (pageNum === 1) {
+        setNotifications(newData);
+      } else {
+        setNotifications(prev => [...prev, ...newData]);
+      }
+      
+      setHasMore(!isLastPage && newData.length > 0);
+      setPage(pageNum);
     } catch (err: any) {
       setError(err.message || "Không thể tải thông báo.");
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -180,19 +223,20 @@ export default function Notifications() {
                 return (
                   <div
                     key={notification.id}
-                    className={`glass-panel rounded-2xl p-6 flex gap-6 relative overflow-hidden group transition-all ${unread ? "border border-tertiary/30 bg-tertiary/5" : "bg-surface"}`}
+                    onClick={() => handleNotificationClick(notification)}
+                    className={`glass-panel rounded-2xl p-6 flex gap-6 relative overflow-hidden group transition-all cursor-pointer hover:border-primary/50 ${unread ? "border border-tertiary/30 bg-tertiary/5" : "bg-surface"}`}
                   >
                     <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                       <SectionIcon className="w-7 h-7 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-1">
-                        <h3 className="text-xl font-bold text-on-surface leading-tight">{title}</h3>
+                        <h3 className="text-xl font-bold text-on-surface leading-tight group-hover:text-primary transition-colors">{title}</h3>
                         <span className="text-[10px] font-medium text-on-surface-variant whitespace-nowrap">{timeAgo}</span>
                       </div>
                       {description && <p className="text-sm text-on-surface-variant leading-relaxed">{description}</p>}
                       {unread && (
-                        <span className="mt-4 inline-flex px-2 py-1 rounded-full bg-primary/10 text-[10px] font-semibold uppercase tracking-widest text-primary">
+                        <span className="mt-4 inline-flex px-2 py-1 rounded-full bg-primary/10 text-[10px] font-semibold uppercase tracking-widest text-primary w-fit">
                           Chưa đọc
                         </span>
                       )}
@@ -203,6 +247,77 @@ export default function Notifications() {
             </div>
           </section>
         );})
+      )}
+
+      {hasMore && (
+        <div className="flex justify-center pt-8">
+          <button
+            onClick={() => loadNotifications(page + 1)}
+            disabled={loadingMore}
+            className="px-6 py-3 rounded-xl border border-white/10 bg-white/5 text-on-surface text-sm font-bold hover:bg-white/10 transition-all disabled:opacity-50"
+          >
+            {loadingMore ? "Đang tải..." : "Tải thêm thông báo"}
+          </button>
+        </div>
+      )}
+
+      {/* Quick Info Modal */}
+      {selectedNotification && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedNotification(null)}>
+          <div 
+            className="w-full max-w-lg bg-surface-container-high border border-white/10 rounded-3xl shadow-2xl p-6 sm:p-8 relative animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <button 
+              onClick={() => setSelectedNotification(null)}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-on-surface-variant transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <Info className="w-6 h-6" />
+              </div>
+              <h3 className="font-display text-2xl font-bold text-on-surface">Thông tin nhanh</h3>
+            </div>
+
+            <div className="space-y-4 mb-8">
+              <p className="text-lg font-semibold text-on-surface">{getNotificationTitle(selectedNotification)}</p>
+              <p className="text-on-surface-variant leading-relaxed">
+                {getNotificationDescription(selectedNotification)}
+              </p>
+              {selectedNotification.data?.filter_value && (
+                <div className="p-4 rounded-xl bg-surface-container border border-white/5 flex items-start gap-3">
+                  <ArrowRight className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-on-surface">Gợi ý hành động:</p>
+                    <p className="text-xs text-on-surface-variant mt-1">
+                      Hệ thống đã chuẩn bị sẵn bộ lọc cho "{Array.isArray(selectedNotification.data.filter_value) ? selectedNotification.data.filter_value.join(", ") : selectedNotification.data.filter_value}".
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setSelectedNotification(null)}
+                className="px-5 py-2.5 rounded-full font-bold text-sm text-on-surface hover:bg-white/5 transition-colors"
+              >
+                Đóng
+              </button>
+              {selectedNotification.data?.filter_type && (
+                <button 
+                  onClick={() => handleActionClick(selectedNotification)}
+                  className="px-5 py-2.5 rounded-full font-bold text-sm bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 flex items-center gap-2"
+                >
+                  Khám phá ngay <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

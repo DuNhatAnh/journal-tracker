@@ -9,10 +9,11 @@ class NotificationController extends Controller
 {
     public function index()
     {
+        $perPage = request('per_page', 5);
         $notifications = auth()->user()
             ->notifications()
             ->orderByDesc('created_at')
-            ->paginate(20);
+            ->paginate($perPage);
 
         return response()->json($notifications);
     }
@@ -32,8 +33,8 @@ class NotificationController extends Controller
     {
         auth()->user()
             ->notifications()
-            ->where('is_read', false)
-            ->update(['is_read' => true, 'read_at' => now()]);
+            ->where('is_read', 'false')
+            ->update(['is_read' => 'true', 'read_at' => now()]);
 
         return response()->json(['message' => 'Đã đọc tất cả.']);
     }

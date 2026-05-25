@@ -20,6 +20,7 @@ class User extends Authenticatable
         'password',
         'role',
         'avatar',
+        'settings',
     ];
 
     protected $hidden = [
@@ -30,6 +31,7 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password'          => 'hashed',
+        'settings'          => 'array',
     ];
 
     // ─── Role helpers ───────────────────────────────────────────────────────────

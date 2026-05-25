@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Filter, ChevronLeft, ChevronRight, Bookmark, BookmarkPlus, Lock, Quote, History, Info, Loader2, Search as SearchIcon, X, ExternalLink } from "lucide-react";
+import { Filter, ChevronLeft, ChevronRight, Bookmark, BookmarkPlus, Lock, Quote, History, Info, Loader2, Search as SearchIcon, X, ExternalLink, User, Book } from "lucide-react";
 import { cn, cleanTitle } from "@/src/lib/utils";
 import { api } from "@/src/lib/api";
 import toast from "react-hot-toast";
+import { AutocompleteInput } from "@/src/components/ui/AutocompleteInput";
 
 interface Author {
   id: number;
@@ -34,14 +35,20 @@ export default function Search() {
   const yearParam = searchParams.get("year");
   const authorParam = searchParams.get("author") || "";
   const journalParam = searchParams.get("journal") || "";
+  const keywordParam = searchParams.get("keyword") || "";
   const sortParam = searchParams.get("sort") || "relevance";
   const pageParam = parseInt(searchParams.get("page") || "1", 10);
 
   const [year, setYear] = useState<string>(yearParam || "");
   const [author, setAuthor] = useState<string>(authorParam);
   const [journal, setJournal] = useState<string>(journalParam);
+  const [keyword, setKeyword] = useState<string>(keywordParam);
+  const [keywordInput, setKeywordInput] = useState("");
   const [sort, setSort] = useState<string>(sortParam);
   const [history, setHistory] = useState<string[]>([]);
+  const [topKeywords, setTopKeywords] = useState<{ id: number, name: string, papers_count: number }[]>([]);
+  
+  const [searchInput, setSearchInput] = useState(q);
   
   const [data, setData] = useState<SearchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -90,6 +97,13 @@ export default function Search() {
         console.error("Lỗi lấy thông tin bookmark:", err);
       });
     loadFollowedKeywords();
+
+    // Fetch top 50 keywords
+    api.get<{ data: any[] }>("/keywords?per_page=50")
+      .then(res => {
+        if (res.data) setTopKeywords(res.data);
+      })
+      .catch(err => console.error(err));
   }, [loadFollowedKeywords]);
 
   const handleBookmark = async (paperId: number) => {
@@ -136,7 +150,38 @@ export default function Search() {
       setHistory(h);
       localStorage.setItem("search_history", JSON.stringify(h));
     }
+    setSearchInput(q);
   }, [q]);
+
+  // Quick Suggestions Fetchers
+  const fetchGlobalSuggestions = async (query: string) => {
+    try {
+      const [kwRes, auRes, joRes] = await Promise.all([
+        api.get<{ data: any[] }>(`/keywords?q=${encodeURIComponent(query)}&per_page=3`).then(r => r.data || []),
+        api.get<any[]>(`/following/search?type=author&q=${encodeURIComponent(query)}`).then(r => r.slice(0, 3)),
+        api.get<any[]>(`/following/search?type=journal&q=${encodeURIComponent(query)}`).then(r => r.slice(0, 3))
+      ]);
+      const results: any[] = [];
+      kwRes.forEach((k: any) => results.push({ ...k, _type: 'keyword' }));
+      auRes.forEach((a: any) => results.push({ ...a, _type: 'author' }));
+      joRes.forEach((j: any) => results.push({ ...j, _type: 'journal' }));
+      return results;
+    } catch {
+      return [];
+    }
+  };
+
+  const fetchAuthorSuggestions = async (query: string) => {
+    try {
+      return await api.get<any[]>(`/following/search?type=author&q=${encodeURIComponent(query)}`);
+    } catch { return []; }
+  };
+
+  const fetchJournalSuggestions = async (query: string) => {
+    try {
+      return await api.get<any[]>(`/following/search?type=journal&q=${encodeURIComponent(query)}`);
+    } catch { return []; }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -147,6 +192,7 @@ export default function Search() {
         if (yearParam) url += `&year=${yearParam}`;
         if (authorParam) url += `&author=${encodeURIComponent(authorParam)}`;
         if (journalParam) url += `&journal=${encodeURIComponent(journalParam)}`;
+        if (keywordParam) url += `&keyword=${encodeURIComponent(keywordParam)}`;
         if (sortParam) url += `&sort=${sortParam}`;
         
         const res = await api.get<SearchResponse>(url);
@@ -158,21 +204,21 @@ export default function Search() {
       }
     };
     fetchData();
-  }, [q, yearParam, authorParam, journalParam, sortParam, pageParam]);
+  }, [q, yearParam, authorParam, journalParam, keywordParam, sortParam, pageParam]);
 
   const handleApplyFilter = () => {
-    setSearchParams({ q, year, author, journal, sort, page: "1" });
+    setSearchParams({ q, year, author, journal, keyword, sort, page: "1" });
   };
 
   const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newSort = e.target.value;
     setSort(newSort);
-    setSearchParams({ q, year, author, journal, sort: newSort, page: "1" });
+    setSearchParams({ q, year, author, journal, keyword, sort: newSort, page: "1" });
   };
 
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || newPage > (data?.last_page || 1)) return;
-    setSearchParams({ q, year, author, journal, sort, page: newPage.toString() });
+    setSearchParams({ q, year, author, journal, keyword, sort, page: newPage.toString() });
   };
 
   return (
@@ -202,20 +248,110 @@ export default function Search() {
                 </select>
               </div>
             </div>
-            <div className="relative group w-full">
-              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline group-focus-within:text-primary transition-colors" />
-              <input 
-                type="text" 
-                defaultValue={q}
-                placeholder='Tìm kiếm (Hỗ trợ AND, OR, NOT, "cụm từ")'
+            <div className="w-full z-20">
+              <AutocompleteInput
+                value={searchInput}
+                onChange={setSearchInput}
+                icon={<SearchIcon className="w-4 h-4" />}
+                placeholder='Tìm kiếm (Hỗ trợ AND, OR, NOT, "cụm từ") hoặc nhập để tìm...'
+                fetchSuggestions={fetchGlobalSuggestions}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
-                    setSearchParams({ q: e.currentTarget.value, year, sort, page: "1" });
+                    setSearchParams({ q: searchInput, year, author, journal, keyword, sort, page: "1" });
                   }
                 }}
-                className="w-full bg-surface-container border border-white/5 rounded-full py-2.5 pl-10 pr-4 text-on-surface text-sm focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all placeholder:text-outline-variant"
+                onSelect={(item) => {
+                  if (item._type === 'keyword') {
+                    let currentKws = keyword.split(',').map(k => k.trim()).filter(Boolean);
+                    if (!currentKws.includes(item.name)) currentKws.push(item.name);
+                    const newKeyword = currentKws.join(',');
+                    setKeyword(newKeyword);
+                    setSearchParams({ q: searchInput, year, author, journal, keyword: newKeyword, sort, page: "1" });
+                  } else if (item._type === 'author') {
+                    setAuthor(item.name);
+                    setSearchParams({ q: searchInput, year, author: item.name, journal, keyword, sort, page: "1" });
+                  } else if (item._type === 'journal') {
+                    setJournal(item.name);
+                    setSearchParams({ q: searchInput, year, author, journal: item.name, keyword, sort, page: "1" });
+                  }
+                  setSearchInput("");
+                }}
+                renderSuggestion={(item) => {
+                  if (item._type === 'keyword') {
+                    return (
+                      <>
+                        <span className="font-medium text-on-surface flex items-center gap-2">
+                          <span className="text-secondary">#</span> {item.name}
+                        </span>
+                        <span className="text-xs text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full">Chủ đề</span>
+                      </>
+                    );
+                  }
+                  if (item._type === 'author') {
+                    return (
+                      <>
+                        <span className="font-medium text-on-surface flex items-center gap-2">
+                          <User className="w-3.5 h-3.5 text-primary" /> {item.name}
+                        </span>
+                        <span className="text-xs text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full">Tác giả</span>
+                      </>
+                    );
+                  }
+                  return (
+                    <>
+                      <span className="font-medium text-on-surface flex items-center gap-2">
+                        <Book className="w-3.5 h-3.5 text-tertiary" /> {item.name}
+                      </span>
+                      <span className="text-xs text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full">Tạp chí</span>
+                    </>
+                  );
+                }}
+                footer={
+                  <button
+                    onClick={() => {
+                      setSearchParams({ q: searchInput, year, author, journal, keyword, sort, page: "1" });
+                    }}
+                    className="w-full text-left px-4 py-2.5 hover:bg-white/5 text-sm flex items-center gap-2 text-primary font-medium"
+                  >
+                    <SearchIcon className="w-4 h-4" /> Tìm kiếm "{searchInput}" trong toàn bộ dữ liệu
+                  </button>
+                }
               />
             </div>
+            
+            {/* Quick Suggestions for Topics */}
+            {topKeywords.length > 0 && (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mr-2">GỢI Ý NHANH:</span>
+                {topKeywords.slice(0, 5).map(kw => {
+                  const isSelected = keyword.split(',').map(k => k.trim()).includes(kw.name);
+                  return (
+                    <button
+                      key={kw.id}
+                      onClick={() => {
+                        let currentKws = keyword.split(',').map(k => k.trim()).filter(Boolean);
+                        if (isSelected) {
+                          currentKws = currentKws.filter(k => k !== kw.name);
+                        } else {
+                          currentKws.push(kw.name);
+                        }
+                        const newKeyword = currentKws.join(',');
+                        setKeyword(newKeyword);
+                        setSearchParams({ q, year, author, journal, keyword: newKeyword, sort, page: "1" });
+                      }}
+                      className={cn(
+                        "text-xs px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5",
+                        isSelected
+                          ? "bg-primary/20 border-primary text-primary"
+                          : "bg-surface-container border-white/10 hover:border-primary/50 hover:text-primary text-on-surface-variant"
+                      )}
+                    >
+                      #{kw.name} <span className="opacity-50">({kw.papers_count})</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </header>
 
           {isLoading ? (
@@ -327,7 +463,7 @@ export default function Search() {
              <div className="flex justify-between items-center">
                <h3 className="font-display font-bold text-lg flex items-center gap-2"><Filter className="w-4 h-4 text-primary" /> BỘ LỌC</h3>
                <button 
-                 onClick={() => { setYear(""); setAuthor(""); setJournal(""); setSort("relevance"); setSearchParams({ q, page: "1" }); }}
+                 onClick={() => { setYear(""); setAuthor(""); setJournal(""); setKeyword(""); setSort("relevance"); setSearchParams({ q, page: "1" }); }}
                  className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant hover:text-primary transition-colors"
                >
                  ĐẶT LẠI
@@ -351,25 +487,84 @@ export default function Search() {
 
                <div>
                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">TÁC GIẢ</h4>
-                 <input 
-                   type="text"
-                   value={author}
-                   onChange={(e) => setAuthor(e.target.value)}
-                   className="w-full bg-surface-container-high border border-white/10 rounded-full p-2.5 px-4 text-sm outline-none focus:border-primary/50 placeholder:text-outline-variant text-on-surface"
-                 />
+                 <AutocompleteInput
+                    value={author}
+                    onChange={setAuthor}
+                    fetchSuggestions={fetchAuthorSuggestions}
+                    placeholder="Nhập tên tác giả..."
+                    inputClassName="pl-4 bg-surface-container-high"
+                    onSelect={(item) => {
+                      setAuthor(item.name);
+                    }}
+                    renderSuggestion={(item) => (
+                      <span className="font-medium text-on-surface flex items-center gap-2">
+                        <User className="w-3.5 h-3.5 text-primary" /> {item.name}
+                      </span>
+                    )}
+                  />
                </div>
 
                <div>
-                 <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">TẠP CHÍ</h4>
-                 <input 
-                   type="text"
-                   value={journal}
-                   onChange={(e) => setJournal(e.target.value)}
-                   className="w-full bg-surface-container-high border border-white/10 rounded-full p-2.5 px-4 text-sm outline-none focus:border-primary/50 placeholder:text-outline-variant text-on-surface"
-                 />
-               </div>
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">TẠP CHÍ</h4>
+                  <AutocompleteInput
+                    value={journal}
+                    onChange={setJournal}
+                    fetchSuggestions={fetchJournalSuggestions}
+                    placeholder="Nhập tên tạp chí..."
+                    inputClassName="pl-4 bg-surface-container-high"
+                    onSelect={(item) => {
+                      setJournal(item.name);
+                    }}
+                    renderSuggestion={(item) => (
+                      <span className="font-medium text-on-surface flex items-center gap-2">
+                        <Book className="w-3.5 h-3.5 text-tertiary" /> {item.name}
+                      </span>
+                    )}
+                  />
+                </div>
 
-               <button onClick={handleApplyFilter} className="w-full py-2.5 bg-primary text-white text-xs font-bold rounded-full hover:bg-primary/90 transition shadow-[0_0_15px_rgba(37,99,235,0.3)]">ÁP DỤNG LỌC</button>
+                <div>
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-3">CHỦ ĐỀ TỪ KHÓA</h4>
+                  <AutocompleteInput
+                    value={keywordInput}
+                    onChange={setKeywordInput}
+                    fetchSuggestions={async (query) => {
+                      const res = await api.get<{ data: any[] }>(`/keywords?q=${encodeURIComponent(query)}&per_page=5`);
+                      return res.data || [];
+                    }}
+                    placeholder="Tìm và thêm chủ đề..."
+                    inputClassName="pl-4 bg-surface-container-high mb-3"
+                    onSelect={(item) => {
+                      let currentKws = keyword.split(',').map(k => k.trim()).filter(Boolean);
+                      if (!currentKws.includes(item.name)) currentKws.push(item.name);
+                      setKeyword(currentKws.join(','));
+                      setKeywordInput("");
+                    }}
+                    renderSuggestion={(item) => (
+                      <span className="font-medium text-on-surface flex items-center justify-between w-full">
+                        <span><span className="text-secondary">#</span> {item.name}</span>
+                        <span className="text-xs text-on-surface-variant">{item.papers_count}</span>
+                      </span>
+                    )}
+                  />
+                  <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+                    {keyword.split(',').map(k => k.trim()).filter(Boolean).map(kwName => (
+                      <button
+                        key={kwName}
+                        onClick={() => {
+                          let currentKws = keyword.split(',').map(k => k.trim()).filter(Boolean);
+                          currentKws = currentKws.filter(k => k !== kwName);
+                          setKeyword(currentKws.join(','));
+                        }}
+                        className="text-xs px-2.5 py-1.5 rounded-lg border bg-primary/20 border-primary text-primary transition-all text-left flex items-center gap-1.5 group"
+                      >
+                        {kwName} <X className="w-3 h-3 group-hover:text-error" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button onClick={handleApplyFilter} className="w-full py-2.5 bg-primary text-white text-xs font-bold rounded-full hover:bg-primary/90 transition shadow-[0_0_15px_rgba(37,99,235,0.3)]">ÁP DỤNG LỌC</button>
              </div>
              
              <div className="space-y-4 pt-4 border-t border-white/5">
