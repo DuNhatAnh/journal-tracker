@@ -20,6 +20,13 @@ class User extends Authenticatable
         'password',
         'role',
         'avatar',
+        'academic_title',
+        'dob',
+        'phone',
+        'gender',
+        'institution',
+        'bio',
+        'website',
         'settings',
     ];
 

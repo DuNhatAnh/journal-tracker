@@ -21,7 +21,7 @@ class BookmarkController extends Controller
                 ->bookmarks()
                 ->with(['paper.journal', 'paper.keywords', 'paper.authors'])
                 ->latest()
-                ->paginate(20);
+                ->paginate(request('per_page', 6));
         });
 
         return response()->json($bookmarks);

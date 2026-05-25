@@ -52,10 +52,10 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
 export const api = {
   get: <T>(url: string, options?: RequestInit) => request<T>(url, { ...options, method: "GET" }),
   post: <T>(url: string, body?: any, options?: RequestInit) =>
-    request<T>(url, { ...options, method: "POST", body: body ? JSON.stringify(body) : undefined }),
+    request<T>(url, { ...options, method: "POST", body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined) }),
   put: <T>(url: string, body?: any, options?: RequestInit) =>
-    request<T>(url, { ...options, method: "PUT", body: body ? JSON.stringify(body) : undefined }),
+    request<T>(url, { ...options, method: "PUT", body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined) }),
   patch: <T>(url: string, body?: any, options?: RequestInit) =>
-    request<T>(url, { ...options, method: "PATCH", body: body ? JSON.stringify(body) : undefined }),
+    request<T>(url, { ...options, method: "PATCH", body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined) }),
   delete: <T>(url: string, options?: RequestInit) => request<T>(url, { ...options, method: "DELETE" }),
 };

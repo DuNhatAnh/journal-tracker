@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { BookmarkX, ArrowRight, ExternalLink, Loader2, Edit3, Save, X, Download } from "lucide-react";
+import { BookmarkX, ArrowRight, ExternalLink, Loader2, Edit3, Save, X, Download, ChevronLeft, ChevronRight } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn, cleanTitle } from "@/src/lib/utils";
 import { api } from "@/src/lib/api";
@@ -33,7 +33,8 @@ export default function Bookmarks() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editNote, setEditNote] = useState("");
   
-  const [data, setData] = useState<Bookmark[]>([]);
+  const [data, setData] = useState<any>(null);
+  const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -77,17 +78,17 @@ export default function Bookmarks() {
     }
   };
 
-  const fetchBookmarks = useCallback(async () => {
+  const fetchBookmarks = useCallback(async (pageNum: number = page) => {
     setIsLoading(true);
     try {
-      const res = await api.get<{ data: Bookmark[] }>("/bookmarks");
-      setData(res.data || []);
+      const res = await api.get<any>(`/bookmarks?page=${pageNum}`);
+      setData(res);
     } catch (err) {
       console.error(err);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [page]);
 
   const fetchFollowedData = useCallback(async () => {
     setIsKeywordsLoading(true);
@@ -104,11 +105,11 @@ export default function Bookmarks() {
 
   useEffect(() => {
     if (activeTab === "papers") {
-      fetchBookmarks();
+      fetchBookmarks(page);
     } else {
       fetchFollowedData();
     }
-  }, [activeTab, fetchBookmarks, fetchFollowedData]);
+  }, [activeTab, page, fetchBookmarks, fetchFollowedData]);
 
   const deleteKeyword = async (id: number, name: string) => {
     try {
@@ -176,7 +177,14 @@ export default function Bookmarks() {
     <div className="space-y-12 pb-20">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
-          <h2 className="font-display text-4xl font-bold text-on-surface">Đã lưu</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="font-display text-4xl font-bold text-on-surface">Đã lưu</h2>
+            {activeTab === "papers" && data?.total !== undefined && (
+              <span className="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-sm font-bold">
+                {data.total} bài báo
+              </span>
+            )}
+          </div>
           <p className="text-on-surface-variant mt-2">Quản lý các bài báo học thuật đã lưu và ghi chú cá nhân.</p>
         </div>
         <div className="flex items-center gap-3">
@@ -227,9 +235,10 @@ export default function Bookmarks() {
           <div className="flex justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
-        ) : data?.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in duration-300">
-            {data.map((bookmark: Bookmark) => (
+        ) : data?.data && data.data.length > 0 ? (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in duration-300">
+              {data.data.map((bookmark: Bookmark) => (
               <div key={bookmark.id} className="glass-panel p-8 rounded-2xl relative group hover:-translate-y-1 transition-all duration-300 flex flex-col h-full border-t border-white/5">
                 <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 
@@ -303,6 +312,29 @@ export default function Bookmarks() {
                 </div>
               </div>
             ))}
+            </div>
+            
+            {data?.last_page && data.last_page > 1 && (
+              <div className="flex justify-center items-center gap-2 pt-8">
+                 <button 
+                   onClick={() => setPage(page - 1)}
+                   disabled={page === 1}
+                   className="p-2 rounded border border-white/10 hover:bg-white/5 disabled:opacity-50"
+                 >
+                   <ChevronLeft className="w-4 h-4" />
+                 </button>
+                 <span className="text-xs font-bold text-on-surface-variant px-4">
+                   Trang {page} / {data.last_page}
+                 </span>
+                 <button 
+                   onClick={() => setPage(page + 1)}
+                   disabled={page === data.last_page}
+                   className="p-2 rounded border border-white/10 hover:bg-white/5 disabled:opacity-50"
+                 >
+                   <ChevronRight className="w-4 h-4" />
+                 </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center py-20 text-on-surface-variant">

@@ -34,9 +34,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout',  [AuthController::class, 'logout']);
     Route::get('/me',       [AuthController::class, 'me']);
 
-    // Settings
+    // Settings & Profile
     Route::get('/settings', [App\Http\Controllers\Api\SettingsController::class, 'show']);
     Route::put('/settings', [App\Http\Controllers\Api\SettingsController::class, 'update']);
+    Route::post('/profile', [App\Http\Controllers\Api\Auth\AuthController::class, 'updateProfile']);
+    Route::post('/password', [App\Http\Controllers\Api\Auth\AuthController::class, 'changePassword']);
 
     // Dashboard
     Route::prefix('dashboard')->group(function () {
