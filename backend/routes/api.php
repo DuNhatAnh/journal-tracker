@@ -79,6 +79,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/',           [TrendController::class, 'index']);
         Route::get('/trending',   [TrendController::class, 'trending']);
         Route::get('/{keyword}',  [TrendController::class, 'show']);
+        Route::get('/{keyword}/history',  [TrendController::class, 'history']);
+        Route::get('/{keyword}/network',  [TrendController::class, 'network']);
+        Route::get('/{keyword}/journals', [TrendController::class, 'journals']);
+        Route::get('/{keyword}/papers',   [TrendController::class, 'papers']);
     });
 
     // Bookmarks
