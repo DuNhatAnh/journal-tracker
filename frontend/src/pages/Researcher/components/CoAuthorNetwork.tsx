@@ -20,25 +20,38 @@ export interface CoAuthorLink {
   weight: number;
 }
 
-interface CoAuthorNetworkProps {
-  keywordId: number | null;
+interface SelectedEntity {
+  id: number;
+  name: string;
+  type: "keyword" | "author";
 }
 
-export function CoAuthorNetwork({ keywordId }: CoAuthorNetworkProps) {
+interface CoAuthorNetworkProps {
+  selectedEntity: SelectedEntity | null;
+  onSelectAuthor?: (authorId: number, name?: string) => void;
+}
+
+export function CoAuthorNetwork({ selectedEntity, onSelectAuthor }: CoAuthorNetworkProps) {
   const [networkNodes, setNetworkNodes] = useState<AuthorNode[]>([]);
   const [networkLinks, setNetworkLinks] = useState<CoAuthorLink[]>([]);
   const [hoveredNode, setHoveredNode] = useState<AuthorNode | null>(null);
   const [selectedAuthor, setSelectedAuthor] = useState<AuthorNode | null>(null);
 
+  const networkUrl = selectedEntity
+    ? (selectedEntity.type === "author"
+        ? `/trends/author/${selectedEntity.id}/network`
+        : `/trends/${selectedEntity.id}/network`)
+    : "";
+
   // useApiQuery for network data
   const { data, loading } = useApiQuery<any>(
-    keywordId ? `/trends/${keywordId}/network` : "",
-    { enabled: !!keywordId }
+    networkUrl,
+    { enabled: !!networkUrl }
   );
 
   // Run simulation layout when network data loads or changes
   useEffect(() => {
-    if (!keywordId || !data) {
+    if (!selectedEntity || !data) {
       setNetworkNodes([]);
       setNetworkLinks([]);
       setSelectedAuthor(null);
@@ -137,7 +150,7 @@ export function CoAuthorNetwork({ keywordId }: CoAuthorNetworkProps) {
     setNetworkNodes(simulationNodes);
     setNetworkLinks(links);
     setSelectedAuthor(null);
-  }, [keywordId, data]);
+  }, [selectedEntity, data]);
 
   const isConnected = (id1: number, id2: number) => {
     if (id1 === id2) return true;
@@ -363,7 +376,7 @@ export function CoAuthorNetwork({ keywordId }: CoAuthorNetworkProps) {
             </p>
             <div className="space-y-1.5 text-[9px] text-on-surface-variant font-mono uppercase tracking-wider">
               <div className="flex justify-between gap-4">
-                <span>Ấn phẩm chủ đề:</span>
+                <span>{selectedEntity?.type === "author" ? "Số bài viết:" : "Ấn phẩm chủ đề:"}</span>
                 <span className="text-primary font-bold">{hoveredNode.papers_count} bài</span>
               </div>
               <div className="flex justify-between gap-4">
@@ -389,7 +402,9 @@ export function CoAuthorNetwork({ keywordId }: CoAuthorNetworkProps) {
           </h4>
           <div className="grid grid-cols-2 gap-4 text-xs font-mono mb-3">
             <div className="bg-surface-container/30 p-2.5 rounded border border-white/5">
-              <span className="text-[10px] text-on-surface-variant uppercase tracking-widest block mb-0.5">Ấn phẩm chủ đề</span>
+              <span className="text-[10px] text-on-surface-variant uppercase tracking-widest block mb-0.5">
+                {selectedEntity?.type === "author" ? "Số bài viết" : "Ấn phẩm chủ đề"}
+              </span>
               <span className="text-primary font-bold text-sm">{selectedAuthor.papers_count} bài viết</span>
             </div>
             <div className="bg-surface-container/30 p-2.5 rounded border border-white/5">
@@ -419,6 +434,18 @@ export function CoAuthorNetwork({ keywordId }: CoAuthorNetworkProps) {
               )}
             </div>
           </div>
+          
+          {onSelectAuthor && (
+            <button
+              onClick={() => {
+                onSelectAuthor(selectedAuthor.id, selectedAuthor.name);
+                setSelectedAuthor(null);
+              }}
+              className="mt-4 w-full py-2 bg-primary hover:bg-primary/95 text-on-primary rounded-xl text-xs font-bold uppercase tracking-widest transition-all cursor-pointer text-center"
+            >
+              Phân tích xu hướng tác giả
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -78,6 +78,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('trends')->middleware('role:researcher,admin')->group(function () {
         Route::get('/',           [TrendController::class, 'index']);
         Route::get('/trending',   [TrendController::class, 'trending']);
+        Route::get('/author/{author}/history',  [TrendController::class, 'authorHistory']);
+        Route::get('/author/{author}/network',  [TrendController::class, 'authorNetwork']);
+        Route::get('/author/{author}/journals', [TrendController::class, 'authorJournals']);
+        Route::get('/author/{author}/papers',   [TrendController::class, 'authorPapers']);
         Route::get('/{keyword}',  [TrendController::class, 'show']);
         Route::get('/{keyword}/history',  [TrendController::class, 'history']);
         Route::get('/{keyword}/network',  [TrendController::class, 'network']);

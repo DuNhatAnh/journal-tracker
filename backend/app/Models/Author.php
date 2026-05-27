@@ -13,7 +13,7 @@ class Author extends Model
 
     public function papers()
     {
-        return $this->belongsToMany(ResearchPaper::class, 'paper_author');
+        return $this->belongsToMany(ResearchPaper::class, 'paper_author', 'author_id', 'paper_id');
     }
 
     public function followers()

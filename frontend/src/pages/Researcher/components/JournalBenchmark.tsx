@@ -12,25 +12,37 @@ interface JournalRecord {
   papers_count: number;
 }
 
+interface SelectedEntity {
+  id: number;
+  name: string;
+  type: "keyword" | "author";
+}
+
 interface JournalBenchmarkProps {
-  keywordId: number | null;
+  selectedEntity: SelectedEntity | null;
   followedJournalIds: Set<number>;
   followingJournalLoadingIds: Set<number>;
   onToggleFollow: (journalId: number) => void;
 }
 
 export function JournalBenchmark({
-  keywordId,
+  selectedEntity,
   followedJournalIds,
   followingJournalLoadingIds,
   onToggleFollow
 }: JournalBenchmarkProps) {
   const [isComparing, setIsComparing] = useState(false);
 
+  const journalsUrl = selectedEntity
+    ? (selectedEntity.type === "author"
+        ? `/trends/author/${selectedEntity.id}/journals`
+        : `/trends/${selectedEntity.id}/journals`)
+    : "";
+
   // useApiQuery for journals
   const { data: journalsData, loading } = useApiQuery<JournalRecord[]>(
-    keywordId ? `/trends/${keywordId}/journals` : "",
-    { enabled: !!keywordId }
+    journalsUrl,
+    { enabled: !!journalsUrl }
   );
 
   const journals = journalsData || [];
@@ -44,7 +56,7 @@ export function JournalBenchmark({
         data: journals.map(j => j.h_index)
       },
       {
-        name: "Số bài viết chủ đề",
+        name: selectedEntity?.type === "author" ? "Số bài viết của tác giả" : "Số bài viết chủ đề",
         data: journals.map(j => j.papers_count)
       }
     ];
@@ -56,7 +68,9 @@ export function JournalBenchmark({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Award className="w-5 h-5 text-tertiary" />
-          <h3 className="font-display text-xl font-bold">Tạp chí khuyên dùng tối ưu</h3>
+          <h3 className="font-display text-xl font-bold">
+            {selectedEntity?.type === "author" ? "Tạp chí công bố thường xuyên" : "Tạp chí khuyên dùng tối ưu"}
+          </h3>
         </div>
         <button 
           onClick={() => setIsComparing(!isComparing)}
@@ -74,7 +88,11 @@ export function JournalBenchmark({
         </div>
       ) : isComparing ? (
         <div className="glass-panel p-6 rounded-2xl">
-          <h4 className="font-display text-sm font-bold text-on-surface mb-4">So sánh H-Index & Số bài viết tạp chí gợi ý</h4>
+          <h4 className="font-display text-sm font-bold text-on-surface mb-4">
+            {selectedEntity?.type === "author"
+              ? "So sánh H-Index & Số bài viết của tác giả tại các tạp chí"
+              : "So sánh H-Index & Số bài viết tạp chí gợi ý"}
+          </h4>
           <Chart
             options={{
               chart: { id: "journal-comparison-chart", toolbar: { show: false }, background: 'transparent' },
@@ -110,18 +128,20 @@ export function JournalBenchmark({
                       <span className="bg-tertiary/10 text-tertiary text-[9px] font-bold px-2 py-0.5 rounded border border-tertiary/20 uppercase tracking-wider shrink-0">
                         H-Index: {journal.h_index}
                       </span>
-                      <button 
-                        onClick={() => onToggleFollow(journal.id)}
-                        disabled={isBtnLoading}
-                        className={cn(
-                          "px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider transition-all border shrink-0",
-                          isFollowing 
-                            ? "bg-success/15 border-success/30 text-success" 
-                            : "bg-primary/10 border-primary/20 text-primary hover:bg-primary/20"
-                        )}
-                      >
-                        {isBtnLoading ? "..." : isFollowing ? "Đang theo dõi" : "Theo dõi"}
-                      </button>
+                      {journal.id > 0 && (
+                        <button 
+                          onClick={() => onToggleFollow(journal.id)}
+                          disabled={isBtnLoading}
+                          className={cn(
+                            "px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider transition-all border shrink-0",
+                            isFollowing 
+                              ? "bg-success/15 border-success/30 text-success" 
+                              : "bg-primary/10 border-primary/20 text-primary hover:bg-primary/20"
+                          )}
+                        >
+                          {isBtnLoading ? "..." : isFollowing ? "Đang theo dõi" : "Theo dõi"}
+                        </button>
+                      )}
                     </div>
                     <h4 className="font-display font-bold text-on-surface text-sm line-clamp-2 leading-tight">
                       {journal.name}
@@ -135,7 +155,11 @@ export function JournalBenchmark({
               );
             })
           ) : (
-            <p className="text-xs text-on-surface-variant col-span-3 text-center py-6 font-mono border border-dashed border-outline-variant/30 rounded-xl bg-white/5">Chưa có tạp chí gợi ý cho từ khóa này.</p>
+            <p className="text-xs text-on-surface-variant col-span-3 text-center py-6 font-mono border border-dashed border-outline-variant/30 rounded-xl bg-white/5">
+              {selectedEntity?.type === "author"
+                ? "Chưa có dữ liệu tạp chí của tác giả này."
+                : "Chưa có tạp chí gợi ý cho từ khóa này."}
+            </p>
           )}
         </div>
       )}

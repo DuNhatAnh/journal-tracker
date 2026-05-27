@@ -3,23 +3,35 @@ import { BookOpen, ArrowUp, Loader2 } from "lucide-react";
 import { cleanTitle } from "@/src/lib/utils";
 import { useApiQuery } from "../../../hooks/useApiQuery";
 
+interface SelectedEntity {
+  id: number;
+  name: string;
+  type: "keyword" | "author";
+}
+
 interface RepresentativePublicationsProps {
-  keywordId: number | null;
+  selectedEntity: SelectedEntity | null;
   onSelectPaper: (paper: any) => void;
   startYear: number;
   endYear: number;
 }
 
 export function RepresentativePublications({
-  keywordId,
+  selectedEntity,
   onSelectPaper,
   startYear,
   endYear
 }: RepresentativePublicationsProps) {
+  const papersUrl = selectedEntity
+    ? (selectedEntity.type === "author"
+        ? `/trends/author/${selectedEntity.id}/papers`
+        : `/trends/${selectedEntity.id}/papers`)
+    : "";
+
   // useApiQuery for representative papers
   const { data: rawPapersData, loading } = useApiQuery<any[]>(
-    keywordId ? `/trends/${keywordId}/papers` : "",
-    { enabled: !!keywordId }
+    papersUrl,
+    { enabled: !!papersUrl }
   );
 
   const rawPapers = rawPapersData || [];

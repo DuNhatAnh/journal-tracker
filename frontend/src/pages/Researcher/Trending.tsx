@@ -7,6 +7,7 @@ import { useApiQuery, queryCache } from "../../hooks/useApiQuery";
 import { TrendStatsGrid } from "./components/TrendStatsGrid";
 import { AiInsightCard } from "./components/AiInsightCard";
 import { PublicationVelocity } from "./components/PublicationVelocity";
+import { TopicDistribution } from "./components/TopicDistribution";
 import { CoAuthorNetwork } from "./components/CoAuthorNetwork";
 import { JournalBenchmark } from "./components/JournalBenchmark";
 import { RepresentativePublications } from "./components/RepresentativePublications";
@@ -19,6 +20,12 @@ interface TrendRecord {
   paper_count: number;
   citation_count: number;
   growth_rate: number;
+}
+
+interface SelectedEntity {
+  id: number;
+  name: string;
+  type: "keyword" | "author";
 }
 
 interface KeywordDetail {
@@ -44,12 +51,14 @@ export default function Trending() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // selected keyword ID state
-  const [selectedKeywordId, setSelectedKeywordId] = useState<number | null>(null);
+  // selected entity state
+  const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
 
   // useApiQuery for initial top trending topics list
   const { data: trendingData, loading: isTrendingLoading } = useApiQuery<any>("/trends/trending");
   const trendingList = trendingData?.trending || [];
+  const trendingAuthors = trendingData?.trendingAuthors || [];
+  const trendingPapers = trendingData?.trendingPapers || [];
 
   // useApiQuery for following status (journals)
   const { data: statusData, refetch: refetchStatus } = useApiQuery<any>("/following/status", { persist: true });
@@ -67,11 +76,17 @@ export default function Trending() {
     return new Set<number>(bookmarksData.bookmarked_paper_ids);
   }, [bookmarksData]);
 
-  // Set default selected keyword and seed cache for details if present
+  // Set default selected entity and seed cache for details if present
   useEffect(() => {
-    if (trendingData?.trending && trendingData.trending.length > 0 && selectedKeywordId === null) {
+    if (trendingData?.trending && trendingData.trending.length > 0 && selectedEntity === null) {
+      const firstKeyword = trendingData.trending[0].keyword;
       const firstKeywordId = trendingData.trending[0].keyword_id;
-      setSelectedKeywordId(firstKeywordId);
+      const firstKeywordName = firstKeyword?.name || "Chủ đề";
+      setSelectedEntity({
+        id: firstKeywordId,
+        name: firstKeywordName,
+        type: "keyword"
+      });
 
       // Seed detail data if returned directly by /trends/trending
       if (trendingData.details) {
@@ -81,12 +96,19 @@ export default function Trending() {
         }
       }
     }
-  }, [trendingData, selectedKeywordId]);
+  }, [trendingData, selectedEntity]);
 
-  // useApiQuery for history of selected keyword
-  const { data: selectedDetail, loading: loadingDetail } = useApiQuery<KeywordDetail>(
-    selectedKeywordId ? `/trends/${selectedKeywordId}/history` : "",
-    { enabled: !!selectedKeywordId }
+  const historyUrl = useMemo(() => {
+    if (!selectedEntity) return "";
+    return selectedEntity.type === "author"
+      ? `/trends/author/${selectedEntity.id}/history`
+      : `/trends/${selectedEntity.id}/history`;
+  }, [selectedEntity]);
+
+  // useApiQuery for history of selected entity
+  const { data: selectedDetail, loading: loadingDetail } = useApiQuery<any>(
+    historyUrl,
+    { enabled: !!historyUrl }
   );
 
   // loading state
@@ -104,15 +126,38 @@ export default function Trending() {
   // Update year range dynamically when details change
   useEffect(() => {
     if (selectedDetail?.trends && selectedDetail.trends.length > 0) {
-      const years = selectedDetail.trends.map(t => t.year);
+      const years = selectedDetail.trends.map((t: any) => t.year);
       setStartYear(Math.min(...years));
       setEndYear(Math.max(...years));
     }
   }, [selectedDetail]);
 
-  const handleSelectKeyword = (keywordId: number) => {
-    if (keywordId === selectedKeywordId) return;
-    setSelectedKeywordId(keywordId);
+  const handleSelectKeyword = (keywordId: number, name?: string) => {
+    if (selectedEntity?.type === "keyword" && selectedEntity.id === keywordId) return;
+    let kwName = name;
+    if (!kwName) {
+      const found = trendingList.find((item: any) => item.keyword_id === keywordId);
+      kwName = found?.keyword?.name || `Từ khóa #${keywordId}`;
+    }
+    setSelectedEntity({
+      id: keywordId,
+      name: kwName,
+      type: "keyword"
+    });
+  };
+
+  const handleSelectAuthor = (authorId: number, name?: string) => {
+    if (selectedEntity?.type === "author" && selectedEntity.id === authorId) return;
+    let authName = name;
+    if (!authName) {
+      const found = trendingAuthors.find((item: any) => item.id === authorId);
+      authName = found?.name || `Tác giả #${authorId}`;
+    }
+    setSelectedEntity({
+      id: authorId,
+      name: authName,
+      type: "author"
+    });
   };
 
   // Toggle follow/unfollow recommended journal
@@ -180,7 +225,18 @@ export default function Trending() {
 
   const activeStats = useMemo(() => {
     if (filteredTrends.length === 0) {
-      return { growth: "+0%", total: "0", impact: "0.0" };
+      return { 
+        growth: "+0%", 
+        total: "0", 
+        impact: "0.0", 
+        citations: "0",
+        hIndex: 0,
+        i10Index: 0,
+        coAuthorsCount: 0,
+        trendingPapersCount: 0,
+        topCollaborators: "",
+        papersCitations: []
+      };
     }
     const latest = filteredTrends[filteredTrends.length - 1];
     const growth = latest ? (latest.growth_rate >= 0 ? `+${latest.growth_rate}%` : `${latest.growth_rate}%`) : "+0%";
@@ -189,17 +245,46 @@ export default function Trending() {
     const impact = totalPapers > 0 
       ? (Math.round((totalCitations / totalPapers) * 10) / 10).toFixed(1)
       : "0.0";
-    return { growth, total: String(totalPapers), impact };
-  }, [filteredTrends]);
+    return { 
+      growth, 
+      total: String(totalPapers), 
+      impact, 
+      citations: String(totalCitations),
+      hIndex: selectedDetail?.h_index || 0,
+      i10Index: selectedDetail?.i10_index || 0,
+      coAuthorsCount: selectedDetail?.co_authors_count || 0,
+      trendingPapersCount: selectedDetail?.trending_papers_count || 0,
+      topCollaborators: selectedDetail?.top_collaborators?.join(", ") || "Không có",
+      papersCitations: selectedDetail?.papers_citations || []
+    };
+  }, [filteredTrends, selectedDetail]);
 
   const velocityChartData = useMemo(() => {
     const categories = filteredTrends.map(t => String(t.year));
-    const series = [{
-      name: "Số lượng công bố",
-      data: filteredTrends.map(t => t.paper_count)
-    }];
-    return { categories, series };
-  }, [filteredTrends]);
+    
+    if (selectedEntity?.type === "author") {
+      const series = [
+        {
+          name: "Số lượng bài báo",
+          type: "column",
+          data: filteredTrends.map(t => t.paper_count)
+        },
+        {
+          name: "Số lượt trích dẫn",
+          type: "line",
+          data: filteredTrends.map(t => t.citation_count)
+        }
+      ];
+      return { categories, series };
+    } else {
+      const series = [{
+        name: "Số lượng công bố",
+        type: "area",
+        data: filteredTrends.map(t => t.paper_count)
+      }];
+      return { categories, series };
+    }
+  }, [filteredTrends, selectedEntity]);
 
   const researchGapInsight = useMemo(() => {
     if (filteredTrends.length === 0) return null;
@@ -214,36 +299,63 @@ export default function Trending() {
     let color = "text-on-surface";
     let bg = "bg-surface-container/30 border border-white/5";
 
-    if (growth > 15 && ratio > 8 && totalPapers < 25) {
-      level = "Khoảng trống Vàng (Đại dương xanh)";
-      message = `Chủ đề "${selectedDetail?.keyword?.name}" đang có tốc độ tăng trưởng cao (${growth}%) và chỉ số trích dẫn ấn tượng (trung bình ${ratio.toFixed(1)} trích dẫn/bài), trong khi số lượng công bố trong giai đoạn này còn hạn chế (${totalPapers} bài). Đây là khoảng trống nghiên cứu cực kỳ tiềm năng để triển khai đề tài mới mà ít bị cạnh tranh.`;
-      color = "text-emerald-400";
-      bg = "bg-emerald-500/10 border border-emerald-500/20";
-    } else if (ratio > 12) {
-      level = "Tác động cao (Ngách chất lượng)";
-      message = `Chủ đề này có chất lượng trích dẫn rất cao (trung bình ${ratio.toFixed(1)} trích dẫn/bài). Các nghiên cứu ở đây tập trung vào chiều sâu và có sức ảnh hưởng học thuật lớn. Gợi ý tập trung vào cải tiến chất lượng hơn là số lượng công bố.`;
-      color = "text-cyan-400";
-      bg = "bg-cyan-500/10 border border-cyan-500/20";
-    } else if (growth > 20) {
-      level = "Xu hướng bùng nổ (Hot Trend)";
-      message = `Chủ đề đang tăng trưởng rất nhanh ở mức ${growth}%. Số lượng ấn phẩm đang tăng mạnh. Thích hợp cho các nghiên cứu ứng dụng thực tiễn nhanh để bắt kịp làn sóng công nghệ mới.`;
-      color = "text-amber-400";
-      bg = "bg-amber-500/10 border border-amber-500/20";
+    const isAuthor = selectedEntity?.type === "author";
+    const displayName = selectedEntity?.name || "";
+
+    if (isAuthor) {
+      if (ratio > 15 && totalPapers > 5) {
+        level = "Nhà nghiên cứu có tầm ảnh hưởng cực lớn";
+        message = `Tác giả "${displayName}" có số lượng trích dẫn trung bình cực kỳ cao (${ratio.toFixed(1)} trích dẫn/bài) trên tổng số ${totalPapers} bài công bố. Các nghiên cứu của tác giả này có sức ảnh hưởng học thuật rất sâu rộng, là địa chỉ uy tín để tham khảo và hợp tác nghiên cứu.`;
+        color = "text-emerald-400";
+        bg = "bg-emerald-500/10 border border-emerald-500/20";
+      } else if (growth > 30) {
+        level = "Nhà nghiên cứu đang bùng nổ (Hot Emerging)";
+        message = `Tác giả "${displayName}" đang có tốc độ tăng trưởng công bố vượt bậc (${growth}%) trong các năm gần đây. Tần suất xuất hiện và đóng góp khoa học của tác giả này đang tăng nhanh chóng, cho thấy năng lực nghiên cứu rất năng động.`;
+        color = "text-amber-400";
+        bg = "bg-amber-500/10 border border-amber-500/20";
+      } else {
+        level = "Hoạt động khoa học bền bỉ";
+        message = `Tác giả "${displayName}" duy trì tần suất công bố và lượt trích dẫn ổn định trong giai đoạn qua (trung bình ${ratio.toFixed(1)} trích dẫn/bài). Các công trình tập trung vào tính hệ thống khoa học vững chắc.`;
+        color = "text-on-surface-variant";
+        bg = "bg-surface-container/30 border border-white/5";
+      }
     } else {
-      level = "Phát triển ổn định";
-      message = `Lĩnh vực này đã đi vào giai đoạn ổn định về cả số lượng công bố và lượt trích dẫn. Phù hợp cho các nghiên cứu mang tính hệ thống hóa hoặc tích hợp liên ngành để tạo đột phá mới.`;
-      color = "text-on-surface-variant";
-      bg = "bg-surface-container/30 border border-white/5";
+      if (growth > 15 && ratio > 8 && totalPapers < 25) {
+        level = "Khoảng trống Vàng (Đại dương xanh)";
+        message = `Chủ đề "${displayName}" đang có tốc độ tăng trưởng cao (${growth}%) và chỉ số trích dẫn ấn tượng (trung bình ${ratio.toFixed(1)} trích dẫn/bài), trong khi số lượng công bố trong giai đoạn này còn hạn chế (${totalPapers} bài). Đây là khoảng trống nghiên cứu cực kỳ tiềm năng để triển khai đề tài mới mà ít bị cạnh tranh.`;
+        color = "text-emerald-400";
+        bg = "bg-emerald-500/10 border border-emerald-500/20";
+      } else if (ratio > 12) {
+        level = "Tác động cao (Ngách chất lượng)";
+        message = `Chủ đề này có chất lượng trích dẫn rất cao (trung bình ${ratio.toFixed(1)} trích dẫn/bài). Các nghiên cứu ở đây tập trung vào chiều sâu và có sức ảnh hưởng học thuật lớn. Gợi ý tập trung vào cải tiến chất lượng hơn là số lượng công bố.`;
+        color = "text-cyan-400";
+        bg = "bg-cyan-500/10 border border-cyan-500/20";
+      } else if (growth > 20) {
+        level = "Xu hướng bùng nổ (Hot Trend)";
+        message = `Chủ đề đang tăng trưởng rất nhanh ở mức ${growth}%. Số lượng ấn phẩm đang tăng mạnh. Thích hợp cho các nghiên cứu ứng dụng thực tiễn nhanh để bắt kịp làn sóng công nghệ mới.`;
+        color = "text-amber-400";
+        bg = "bg-amber-500/10 border border-amber-500/20";
+      } else {
+        level = "Phát triển ổn định";
+        message = `Lĩnh vực này đã đi vào giai đoạn ổn định về cả số lượng công bố và lượt trích dẫn. Phù hợp cho các nghiên cứu mang tính hệ thống hóa hoặc tích hợp liên ngành để tạo đột phá mới.`;
+        color = "text-on-surface-variant";
+        bg = "bg-surface-container/30 border border-white/5";
+      }
     }
 
     return { level, message, color, bg };
-  }, [filteredTrends, selectedDetail]);
+  }, [filteredTrends, selectedEntity, selectedDetail]);
 
   const coOccurringKeywords = useMemo(() => {
     return selectedDetail?.coOccurring || [];
   }, [selectedDetail]);
 
-  const topicName = selectedDetail?.keyword?.name || (loading ? "Đang tải chủ đề..." : "Chưa chọn chủ đề");
+  const topicName = useMemo(() => {
+    if (selectedDetail) {
+      return selectedDetail.keyword?.name || selectedDetail.author?.name || "Chưa rõ";
+    }
+    return loading ? "Đang tải..." : "Chưa chọn thực thể";
+  }, [selectedDetail, loading]);
 
   return (
     <div className="space-y-8 pb-20 relative animate-fade-in text-left">
@@ -251,12 +363,25 @@ export default function Trending() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <span className="px-2.5 py-1 rounded-full bg-tertiary/10 border border-tertiary/20 text-tertiary font-mono text-[10px] uppercase tracking-widest">Phân tích xu hướng</span>
+            <span className="px-2.5 py-1 rounded-full bg-tertiary/10 border border-tertiary/20 text-tertiary font-mono text-[10px] uppercase tracking-widest">
+              Phân tích xu hướng
+            </span>
+            {selectedEntity?.type === "author" ? (
+              <span className="px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary font-mono text-[10px] uppercase tracking-widest animate-pulse">
+                Nhà nghiên cứu mới nổi
+              </span>
+            ) : (
+              <span className="px-2.5 py-1 rounded-full bg-secondary/10 border border-secondary/20 text-secondary font-mono text-[10px] uppercase tracking-widest">
+                Từ khóa chủ đề
+              </span>
+            )}
             <span className="text-on-surface-variant text-[10px] uppercase tracking-widest">• Lịch sử xuất bản</span>
           </div>
           <h2 className="font-display text-4xl font-bold text-on-surface">{topicName}</h2>
           <p className="text-on-surface-variant mt-1 max-w-2xl text-sm">
-            Phân tích tốc độ xuất bản, gợi ý tạp chí tối ưu, và trực quan hóa mạng lưới đồng tác giả cùng chỉ số H-index.
+            {selectedEntity?.type === "author"
+              ? "Phân tích hiệu suất công bố, tầm ảnh hưởng trích dẫn, mạng lưới cộng tác và tạp chí mục tiêu của nhà khoa học."
+              : "Phân tích tốc độ xuất bản, gợi ý tạp chí tối ưu, và trực quan hóa mạng lưới đồng tác giả cùng chỉ số H-index."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -304,24 +429,41 @@ export default function Trending() {
         {/* Left Column (Main detailed contents) */}
         <div className="lg:col-span-8 space-y-8 relative">
           {/* Stats Grid */}
-          <TrendStatsGrid activeStats={activeStats} loading={loadingDetail || loading} />
+          <TrendStatsGrid activeStats={activeStats} loading={loadingDetail || loading} selectedEntity={selectedEntity} />
 
           {/* AI Research Gap Insight Card */}
           <AiInsightCard insight={researchGapInsight} loading={loadingDetail || loading} />
 
-          {/* Publication Velocity Chart */}
-          <PublicationVelocity 
-            categories={velocityChartData.categories}
-            series={velocityChartData.series}
-            loading={loadingDetail || loading}
-          />
+          {/* Publication Velocity Chart (Full-width for Keywords, Side-by-side for Authors) */}
+          {selectedEntity?.type === "author" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <PublicationVelocity 
+                categories={velocityChartData.categories}
+                series={velocityChartData.series}
+                loading={loadingDetail || loading}
+                selectedEntity={selectedEntity}
+              />
+              <TopicDistribution 
+                keywords={coOccurringKeywords}
+                loading={loadingDetail || loading}
+                type="author"
+              />
+            </div>
+          ) : (
+            <PublicationVelocity 
+              categories={velocityChartData.categories}
+              series={velocityChartData.series}
+              loading={loadingDetail || loading}
+              selectedEntity={selectedEntity}
+            />
+          )}
 
           {/* Co-authorship Network Graph */}
-          <CoAuthorNetwork keywordId={selectedKeywordId} />
+          <CoAuthorNetwork selectedEntity={selectedEntity} onSelectAuthor={handleSelectAuthor} />
 
           {/* Recommended Journals */}
           <JournalBenchmark 
-            keywordId={selectedKeywordId}
+            selectedEntity={selectedEntity}
             followedJournalIds={followedJournalIds}
             followingJournalLoadingIds={followingJournalLoadingIds}
             onToggleFollow={handleToggleFollowJournal}
@@ -329,7 +471,7 @@ export default function Trending() {
 
           {/* Representative Publications */}
           <RepresentativePublications 
-            keywordId={selectedKeywordId}
+            selectedEntity={selectedEntity}
             onSelectPaper={setSelectedPaper}
             startYear={startYear}
             endYear={endYear}
@@ -339,8 +481,12 @@ export default function Trending() {
         {/* Right Column (Emerging Entities selection sidebar) */}
         <TrendsSidebar 
           trendingList={trendingList}
-          selectedKeywordId={selectedKeywordId}
+          trendingAuthors={trendingAuthors}
+          trendingPapers={trendingPapers}
+          selectedEntity={selectedEntity}
           onSelectKeyword={handleSelectKeyword}
+          onSelectAuthor={handleSelectAuthor}
+          onSelectPaper={setSelectedPaper}
           coOccurringKeywords={coOccurringKeywords}
           loading={loading}
         />
