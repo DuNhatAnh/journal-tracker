@@ -10,11 +10,20 @@ class KeywordController extends Controller
     public function index()
     {
         $q = request('q');
-        $perPage = request('per_page', 30);
+        $perPage = (int) request('per_page', 30);
+
+        if (empty($q)) {
+            $cacheKey = "keywords.index.per_page.{$perPage}";
+            $keywords = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($perPage) {
+                return Keyword::withCount('papers')
+                    ->orderByDesc('papers_count')
+                    ->paginate($perPage);
+            });
+            return response()->json($keywords);
+        }
+
         $keywords = Keyword::withCount('papers')
-            ->when($q, function ($query, $q) {
-                $query->where('name', 'like', "%{$q}%");
-            })
+            ->where('name', 'like', "%{$q}%")
             ->orderByDesc('papers_count')
             ->paginate($perPage);
 

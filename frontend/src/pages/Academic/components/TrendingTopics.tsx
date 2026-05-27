@@ -1,34 +1,30 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Chart from "react-apexcharts";
 import { ArrowRight, TrendingUp } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { DashboardData } from "../types";
-import { api } from "@/src/lib/api";
+import { useApiQuery } from "../../../hooks/useApiQuery";
 
 interface TrendingTopicsProps {
   isResearcher: boolean;
 }
 
 export function TrendingTopics({ isResearcher }: TrendingTopicsProps) {
-  const [data, setData] = useState<{topics: DashboardData['trendingTopics'], latestYear: number, updatedAt: string} | null>(null);
+  const { data: apiData, loading } = useApiQuery<{trending_topics: any[], latest_year: number, trending_topics_updated_at: string}>('/dashboard/trending');
 
-  useEffect(() => {
-    api.get<{trending_topics: any[], latest_year: number, trending_topics_updated_at: string}>('/dashboard/trending')
-      .then(res => {
-        const mapped = (res.trending_topics || []).map(t => ({
-          id: t.id,
-          name: t.keyword?.name || "Chủ đề",
-          papers: `${t.paper_count ?? 0}`,
-          change: (t.growth_rate ?? 0) >= 0 ? `+${t.growth_rate}%` : `${t.growth_rate}%`,
-          data: t.chart_data || [0, 0, 0, 0, 0, 0, 0]
-        }));
-        setData({ topics: mapped, latestYear: res.latest_year, updatedAt: res.trending_topics_updated_at });
-      })
-      .catch(err => console.error(err));
-  }, []);
+  const data = apiData ? {
+    topics: (apiData.trending_topics || []).map(t => ({
+      id: t.id,
+      name: t.keyword?.name || "Chủ đề",
+      papers: `${t.paper_count ?? 0}`,
+      change: (t.growth_rate ?? 0) >= 0 ? `+${t.growth_rate}%` : `${t.growth_rate}%`,
+      data: t.chart_data || [0, 0, 0, 0, 0, 0, 0]
+    })),
+    latestYear: apiData.latest_year,
+    updatedAt: apiData.trending_topics_updated_at
+  } : null;
 
-  if (!data) return (
+  if (loading || !data) return (
     <>
       <header className="flex justify-between items-end mb-6">
         <div>

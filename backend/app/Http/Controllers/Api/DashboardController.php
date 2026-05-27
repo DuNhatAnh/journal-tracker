@@ -34,12 +34,18 @@ class DashboardController extends Controller
         $generalStats = Cache::remember('dash.stats_v4', self::TTL_STATS, function () {
             $yesterday = now()->subDay();
 
-            $total_papers = ResearchPaper::count();
+            $total_papers = \App\Models\SystemCounter::getValue('total_papers');
+            if ($total_papers === 0) {
+                $total_papers = ResearchPaper::count();
+            }
             $papers_new = ResearchPaper::where('created_at', '>=', $yesterday)->count();
             $papers_prev = max(1, $total_papers - $papers_new);
             $papers_percent = $papers_new > 0 ? round(($papers_new / $papers_prev) * 100, 1) : 0;
 
-            $total_keywords = Keyword::count();
+            $total_keywords = \App\Models\SystemCounter::getValue('total_keywords');
+            if ($total_keywords === 0) {
+                $total_keywords = Keyword::count();
+            }
             $keywords_new = Keyword::where('created_at', '>=', $yesterday)->count();
             $keywords_prev = max(1, $total_keywords - $keywords_new);
             $keywords_percent = $keywords_new > 0 ? round(($keywords_new / $keywords_prev) * 100, 1) : 0;

@@ -17,11 +17,17 @@ class FollowingController extends Controller
     public function index()
     {
         $user = auth()->user();
-        return response()->json([
-            'keywords' => $user->followedKeywords()->get(),
-            'journals' => $user->followedJournals()->get(),
-            'authors'  => $user->followedAuthors()->get(),
-        ]);
+        $cacheKey = "user.{$user->id}.following_status";
+
+        $status = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($user) {
+            return [
+                'keywords' => $user->followedKeywords()->get(),
+                'journals' => $user->followedJournals()->get(),
+                'authors'  => $user->followedAuthors()->get(),
+            ];
+        });
+
+        return response()->json($status);
     }
 
     /**
@@ -76,6 +82,7 @@ class FollowingController extends Controller
     {
         $request->validate(['keyword_id' => 'required|exists:keywords,id']);
         auth()->user()->followedKeywords()->syncWithoutDetaching([$request->keyword_id]);
+        \Illuminate\Support\Facades\Cache::forget("user." . auth()->id() . ".following_status");
         return response()->json(['message' => 'Đã theo dõi từ khóa thành công.']);
     }
 
@@ -85,6 +92,7 @@ class FollowingController extends Controller
     public function unfollowKeyword(Keyword $keyword)
     {
         auth()->user()->followedKeywords()->detach($keyword->id);
+        \Illuminate\Support\Facades\Cache::forget("user." . auth()->id() . ".following_status");
         return response()->json(['message' => 'Đã hủy theo dõi từ khóa.']);
     }
 
@@ -95,6 +103,7 @@ class FollowingController extends Controller
     {
         $request->validate(['journal_id' => 'required|exists:journals,id']);
         auth()->user()->followedJournals()->syncWithoutDetaching([$request->journal_id]);
+        \Illuminate\Support\Facades\Cache::forget("user." . auth()->id() . ".following_status");
         return response()->json(['message' => 'Đã theo dõi tạp chí thành công.']);
     }
 
@@ -104,6 +113,7 @@ class FollowingController extends Controller
     public function unfollowJournal(Journal $journal)
     {
         auth()->user()->followedJournals()->detach($journal->id);
+        \Illuminate\Support\Facades\Cache::forget("user." . auth()->id() . ".following_status");
         return response()->json(['message' => 'Đã hủy theo dõi tạp chí.']);
     }
 
@@ -114,6 +124,7 @@ class FollowingController extends Controller
     {
         $request->validate(['author_id' => 'required|exists:authors,id']);
         auth()->user()->followedAuthors()->syncWithoutDetaching([$request->author_id]);
+        \Illuminate\Support\Facades\Cache::forget("user." . auth()->id() . ".following_status");
         return response()->json(['message' => 'Đã theo dõi tác giả thành công.']);
     }
 
@@ -123,6 +134,7 @@ class FollowingController extends Controller
     public function unfollowAuthor(Author $author)
     {
         auth()->user()->followedAuthors()->detach($author->id);
+        \Illuminate\Support\Facades\Cache::forget("user." . auth()->id() . ".following_status");
         return response()->json(['message' => 'Đã hủy theo dõi tác giả.']);
     }
 

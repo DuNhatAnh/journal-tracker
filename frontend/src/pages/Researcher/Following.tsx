@@ -109,7 +109,7 @@ export default function Following() {
   useEffect(() => {
     fetchStatus();
     fetchFeed(1);
-    api.get<any>("/dashboard")
+    api.get<any>("/dashboard/bookmarks")
       .then(res => {
         if (res.bookmarked_paper_ids) {
           setBookmarkedIds(new Set(res.bookmarked_paper_ids));

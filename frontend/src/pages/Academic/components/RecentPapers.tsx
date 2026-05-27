@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
 import { DashboardData, PaperDetail } from "../types";
 import { BookmarkButton } from "./BookmarkButton";
-import { api } from "@/src/lib/api";
+import { useApiQuery } from "../../../hooks/useApiQuery";
 
 interface RecentPapersProps {
   readPaperIds: Set<number>;
@@ -18,29 +17,25 @@ export function RecentPapers({
   loadingIds,
   bookmark
 }: RecentPapersProps) {
-  const [data, setData] = useState<{papers: DashboardData['recentPapers'], updatedAt: string} | null>(null);
+  const { data: apiData, loading } = useApiQuery<{recent_papers: any[], recent_papers_updated_at: string}>('/dashboard/recent');
 
-  useEffect(() => {
-    api.get<{recent_papers: any[], recent_papers_updated_at: string}>('/dashboard/recent')
-      .then(res => {
-        const mapped = (res.recent_papers || []).map(p => ({
-          id: p.id,
-          title: p.title,
-          journal: p.journal?.name || "Khác",
-          authors: p.authors?.map((a: any) => a.name).join(", ") || "Chưa rõ tác giả",
-          time: `${p.published_year ?? ""}`,
-          impact: p.citations_count ? Math.round((p.citations_count / 10) * 10) / 10 : 0,
-          citations: p.citations_count ?? 0,
-          doi: p.doi ?? null,
-          abstract: p.abstract ?? null,
-          keywords: (p.keywords || []).map((k: any) => ({ id: k.id, name: k.name })),
-        }));
-        setData({ papers: mapped, updatedAt: res.recent_papers_updated_at });
-      })
-      .catch(err => console.error(err));
-  }, []);
+  const data = apiData ? {
+    papers: (apiData.recent_papers || []).map(p => ({
+      id: p.id,
+      title: p.title,
+      journal: p.journal?.name || "Khác",
+      authors: p.authors?.map((a: any) => a.name).join(", ") || "Chưa rõ tác giả",
+      time: `${p.published_year ?? ""}`,
+      impact: p.citations_count ? Math.round((p.citations_count / 10) * 10) / 10 : 0,
+      citations: p.citations_count ?? 0,
+      doi: p.doi ?? null,
+      abstract: p.abstract ?? null,
+      keywords: (p.keywords || []).map((k: any) => ({ id: k.id, name: k.name })),
+    })),
+    updatedAt: apiData.recent_papers_updated_at
+  } : null;
 
-  if (!data) return (
+  if (loading || !data) return (
     <section className="pt-4">
       <header className="flex justify-between items-end mb-6">
         <div>

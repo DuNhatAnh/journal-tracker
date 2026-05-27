@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { DashboardData } from "../types";
 import { api } from "@/src/lib/api";
 
@@ -33,9 +34,13 @@ export function HeroSection() {
           <>
             <span className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest mt-1">Xu hướng:</span>
             {trendingTopics.slice(0, 3).map(t => (
-              <button key={t.id} className="text-primary text-sm hover:text-tertiary transition-colors border-b border-primary/20 hover:border-tertiary/50">
+              <Link
+                key={t.id}
+                to={`/search?q=${encodeURIComponent(t.name)}`}
+                className="text-primary text-sm hover:text-tertiary transition-colors border-b border-primary/20 hover:border-tertiary/50"
+              >
                 {t.name}
-              </button>
+              </Link>
             ))}
           </>
         ) : (

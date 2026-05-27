@@ -160,3 +160,8 @@
 .gradient-btn {
   @apply bg-gradient-to-r from-primary to-primary-container transition-all hover:saturate-150 shadow-lg shadow-primary/20 hover:shadow-primary/40 active:scale-[0.98];
 }
+
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}

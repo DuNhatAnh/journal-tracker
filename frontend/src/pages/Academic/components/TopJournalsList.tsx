@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Info, Check } from "lucide-react";
 import { DashboardData } from "../types";
-import { api } from "@/src/lib/api";
+import { useApiQuery } from "../../../hooks/useApiQuery";
 
 interface TopJournalsListProps {
   isResearcher: boolean;
@@ -19,15 +18,14 @@ export function TopJournalsList({
   followingJournalIds,
   toggleFollowJournal
 }: TopJournalsListProps) {
-  const [data, setData] = useState<{journals: DashboardData['topJournals'], updatedAt: string} | null>(null);
+  const { data: apiData, loading } = useApiQuery<{top_journals: DashboardData['topJournals'], top_journals_updated_at: string}>('/dashboard/journals');
 
-  useEffect(() => {
-    api.get<{top_journals: DashboardData['topJournals'], top_journals_updated_at: string}>('/dashboard/journals')
-      .then(res => setData({ journals: res.top_journals, updatedAt: res.top_journals_updated_at }))
-      .catch(err => console.error(err));
-  }, []);
+  const data = apiData ? {
+    journals: apiData.top_journals,
+    updatedAt: apiData.top_journals_updated_at
+  } : null;
 
-  if (!data) return (
+  if (loading || !data) return (
     <section className="space-y-4">
       <header className="flex justify-between items-end px-2">
         <div>

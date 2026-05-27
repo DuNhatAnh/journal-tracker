@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BellRing, CheckCircle2, History, Info, TrendingUp, BookOpenText, LibraryBig, ArrowRight, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/src/lib/api";
+import { useApiQuery, queryCache } from "../../hooks/useApiQuery";
 
 type NotificationItem = {
   id: string;
@@ -88,7 +89,6 @@ function getDayLabel(dateStr: string) {
 
 export default function Notifications() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -97,11 +97,47 @@ export default function Notifications() {
 
   const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
 
+  // useApiQuery for the first page of notifications
+  const { 
+    data: firstPageData, 
+    loading: loading, 
+    setData: setFirstPageData, 
+    refetch: refetchFirstPage 
+  } = useApiQuery<{ data: NotificationItem[], current_page: number, last_page: number }>(
+    "/notifications?page=1&per_page=5",
+    { persist: true }
+  );
+
+  // Synchronize firstPageData with local notifications state
+  useEffect(() => {
+    if (firstPageData) {
+      const newData = firstPageData.data || [];
+      const isLastPage = (firstPageData.current_page || 1) >= (firstPageData.last_page || 1);
+      
+      if (page === 1) {
+        setNotifications(newData);
+        setHasMore(!isLastPage && newData.length > 0);
+      }
+    }
+  }, [firstPageData, page]);
+
   const handleNotificationClick = (notification: NotificationItem) => {
     setSelectedNotification(notification);
     if (!notification.is_read) {
       api.patch(`/notifications/${notification.id}/read`).catch(console.error);
+      
+      // Update local state instantly
       setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n));
+      
+      // Update firstPageData cache if notification is part of page 1
+      if (firstPageData) {
+        const updatedList = firstPageData.data.map((n: any) => 
+          n.id === notification.id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
+        );
+        const updatedData = { ...firstPageData, data: updatedList };
+        setFirstPageData(updatedData);
+        queryCache.set("/notifications?page=1&per_page=5", updatedData);
+      }
     }
   };
 
@@ -120,47 +156,49 @@ export default function Notifications() {
     }
   };
 
-  const loadNotifications = async (pageNum = 1) => {
-    if (pageNum === 1) setLoading(true);
-    else setLoadingMore(true);
-    
+  const loadMoreNotifications = async () => {
+    setLoadingMore(true);
     setError(null);
+    const nextPage = page + 1;
 
     try {
-      const response = await api.get<{ data: NotificationItem[], current_page: number, last_page: number }>(`/notifications?page=${pageNum}&per_page=5`);
+      const response = await api.get<{ data: NotificationItem[], current_page: number, last_page: number }>(
+        `/notifications?page=${nextPage}&per_page=5`
+      );
       const newData = response.data || [];
       const isLastPage = (response.current_page || 1) >= (response.last_page || 1);
       
-      if (pageNum === 1) {
-        setNotifications(newData);
-      } else {
-        setNotifications(prev => [...prev, ...newData]);
-      }
-      
+      setNotifications(prev => [...prev, ...newData]);
       setHasMore(!isLastPage && newData.length > 0);
-      setPage(pageNum);
+      setPage(nextPage);
     } catch (err: any) {
       setError(err.message || "Không thể tải thông báo.");
     } finally {
-      setLoading(false);
       setLoadingMore(false);
     }
   };
 
   const handleMarkAllRead = async () => {
     setError(null);
-
     try {
       await api.post("/notifications/read-all");
-      await loadNotifications();
+      // Update local state instantly
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() })));
+      
+      // Update firstPageData in cache
+      if (firstPageData) {
+        const updatedData = {
+          ...firstPageData,
+          data: firstPageData.data.map((n: any) => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
+        };
+        setFirstPageData(updatedData);
+        queryCache.set("/notifications?page=1&per_page=5", updatedData);
+      }
+      refetchFirstPage();
     } catch (err: any) {
       setError(err.message || "Không thể đánh dấu tất cả.");
     }
   };
-
-  useEffect(() => {
-    loadNotifications();
-  }, []);
 
   const groupedNotifications = notifications.reduce((groups: Record<string, NotificationItem[]>, notification: NotificationItem) => {
     const label = getDayLabel(notification.created_at);
@@ -252,7 +290,7 @@ export default function Notifications() {
       {hasMore && (
         <div className="flex justify-center pt-8">
           <button
-            onClick={() => loadNotifications(page + 1)}
+            onClick={loadMoreNotifications}
             disabled={loadingMore}
             className="px-6 py-3 rounded-xl border border-white/10 bg-white/5 text-on-surface text-sm font-bold hover:bg-white/10 transition-all disabled:opacity-50"
           >

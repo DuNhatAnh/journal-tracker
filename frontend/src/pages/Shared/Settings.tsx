@@ -1,4 +1,4 @@
-import { User, Bell, Palette, ShieldCheck, Mail, Lock, Smartphone, Github, Loader2 } from "lucide-react";
+import { User, Bell, Palette, ShieldCheck, Mail, Lock, Smartphone, Github, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { useState, useEffect } from "react";
 import { api } from "@/src/lib/api";
@@ -41,6 +41,7 @@ export default function Settings() {
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingAvatar, setDeletingAvatar] = useState(false);
 
   const tabs = [
     { icon: User, label: "Tài khoản" },
@@ -152,6 +153,29 @@ export default function Settings() {
     }
   };
 
+  const handleDeleteAvatar = async () => {
+    if (!profile.avatar && !avatarPreview) return;
+    // Nếu chưa lưu (chỉ preview mới chọn), chỉ xóa local
+    if (avatarPreview && !profile.avatar) {
+      setAvatarFile(null);
+      setAvatarPreview(null);
+      return;
+    }
+    try {
+      setDeletingAvatar(true);
+      const res = await api.delete<any>('/avatar');
+      setProfile(prev => ({ ...prev, avatar: '' }));
+      setAvatarFile(null);
+      setAvatarPreview(null);
+      localStorage.setItem('user', JSON.stringify(res));
+      toast.success('Đã xóa ảnh đại diện.', { position: 'top-center' });
+    } catch {
+      toast.error('Không thể xóa ảnh. Vui lòng thử lại.', { position: 'top-center' });
+    } finally {
+      setDeletingAvatar(false);
+    }
+  };
+
   const renderProfileTab = () => (
     <div className="space-y-8">
       <section className="glass-panel p-10 rounded-2xl space-y-10">
@@ -160,18 +184,36 @@ export default function Settings() {
         </header>
 
         <div className="flex flex-col md:flex-row gap-10">
-          <div className="w-32 h-32 rounded-2xl overflow-hidden border-2 border-white/10 group cursor-pointer relative flex-shrink-0 bg-surface-container">
-            <input type="file" accept="image/*" onChange={handleAvatarChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
-            {(avatarPreview || profile.avatar) ? (
-              <img src={avatarPreview || (profile.avatar.startsWith('http') ? profile.avatar : `http://localhost:8000${profile.avatar}`)} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-primary font-bold text-4xl bg-primary/10">
-                {profile.name ? profile.name.substring(0, 2).toUpperCase() : "U"}
+          {/* Avatar + nút xóa */}
+          <div className="flex flex-col items-center gap-3 flex-shrink-0">
+            <div className="w-32 h-32 rounded-2xl overflow-hidden border-2 border-white/10 group cursor-pointer relative bg-surface-container">
+              <input type="file" accept="image/*" onChange={handleAvatarChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+              {(avatarPreview || profile.avatar) ? (
+                <img
+                  src={avatarPreview || `/api/storage/${profile.avatar.replace(/^\/?(storage\/)?/, '')}`}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-primary font-bold text-4xl bg-primary/10">
+                  {profile.name ? profile.name.substring(0, 2).toUpperCase() : "U"}
+                </div>
+              )}
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
+                <Palette className="w-6 h-6 text-white" />
               </div>
-            )}
-            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
-              <Palette className="w-6 h-6 text-white" />
             </div>
+            {(avatarPreview || profile.avatar) && (
+              <button
+                type="button"
+                onClick={handleDeleteAvatar}
+                disabled={deletingAvatar}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-error border border-error/30 bg-error/5 hover:bg-error/15 transition-all disabled:opacity-50"
+              >
+                {deletingAvatar ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                Xóa ảnh
+              </button>
+            )}
           </div>
           
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 text-left">

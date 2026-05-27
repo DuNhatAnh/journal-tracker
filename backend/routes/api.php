@@ -38,6 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/settings', [App\Http\Controllers\Api\SettingsController::class, 'show']);
     Route::put('/settings', [App\Http\Controllers\Api\SettingsController::class, 'update']);
     Route::post('/profile', [App\Http\Controllers\Api\Auth\AuthController::class, 'updateProfile']);
+    Route::delete('/avatar', [App\Http\Controllers\Api\Auth\AuthController::class, 'deleteAvatar']);
     Route::post('/password', [App\Http\Controllers\Api\Auth\AuthController::class, 'changePassword']);
 
     // Dashboard

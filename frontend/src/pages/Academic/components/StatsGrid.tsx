@@ -1,39 +1,43 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { DashboardData } from "../types";
-import { api } from "@/src/lib/api";
+import { useApiQuery } from "../../../hooks/useApiQuery";
 import { cn } from "../../../lib/utils";
 
-export function StatsGrid() {
-  const [stats, setStats] = useState<DashboardData['stats'] | null>(null);
-  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+interface StatsApiResponse {
+  stats: {
+    total_papers: number;
+    papers_percent: string;
+    total_keywords: number;
+    keywords_percent: string;
+    papers_this_year: number;
+    papers_this_year_new: number;
+    total_bookmarks: number;
+    bookmarks_new: number;
+  };
+  stats_updated_at: string;
+}
 
-  useEffect(() => {
-    api.get<{
-      stats: {
-        total_papers: number;
-        papers_percent: string;
-        total_keywords: number;
-        keywords_percent: string;
-        papers_this_year: number;
-        papers_this_year_new: number;
-        total_bookmarks: number;
-        bookmarks_new: number;
-      },
-      stats_updated_at: string
-    }>('/dashboard/stats')
-      .then(res => {
-        const { stats: s, stats_updated_at } = res;
-        setStats([
-          { label: "Tổng số Bài báo", value: String(s.total_papers || 0), trend: s.papers_percent || "0%" },
-          { label: "Từ khóa / Chủ đề", value: String(s.total_keywords || 0), trend: s.keywords_percent || "0%" },
-          { label: "Năm nay", value: String(s.papers_this_year || 0), trend: `+${s.papers_this_year_new || 0} mới` },
-          { label: "Đã lưu", value: String(s.total_bookmarks || 0), trend: `+${s.bookmarks_new || 0} mới` }
-        ]);
-        setUpdatedAt(stats_updated_at);
-      })
-      .catch(err => console.error(err));
-  }, []);
+export function StatsGrid() {
+  const { data, loading } = useApiQuery<StatsApiResponse>('/dashboard/stats');
+
+  if (loading || !data) return (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-pulse">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="glass-panel p-6 rounded-xl">
+          <div className="h-3 w-24 bg-white/10 rounded mb-3" />
+          <div className="h-8 w-16 bg-white/20 rounded" />
+        </div>
+      ))}
+    </div>
+  );
+
+  const { stats: s, stats_updated_at: updatedAt } = data;
+  const stats = [
+    { label: "Tổng số Bài báo", value: String(s.total_papers || 0), trend: s.papers_percent || "0%" },
+    { label: "Từ khóa / Chủ đề", value: String(s.total_keywords || 0), trend: s.keywords_percent || "0%" },
+    { label: "Năm nay", value: String(s.papers_this_year || 0), trend: `+${s.papers_this_year_new || 0} mới` },
+    { label: "Đã lưu", value: String(s.total_bookmarks || 0), trend: `+${s.bookmarks_new || 0} mới` }
+  ];
 
   const currentUserStr = localStorage.getItem("user");
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;

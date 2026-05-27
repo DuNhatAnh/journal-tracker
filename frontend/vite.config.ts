@@ -19,6 +19,20 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {
         usePolling: true,
       },
+      proxy: {
+        // Proxy ảnh từ storage backend
+        '/api/storage': {
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+          rewrite: (p) => p.replace(/^\/api\/storage/, '/storage'),
+        },
+        // Proxy API calls
+        '/api': {
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+          rewrite: (p) => p.replace(/^\/api/, '/api'),
+        },
+      },
     },
   };
 });

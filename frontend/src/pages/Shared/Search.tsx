@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Filter, ChevronLeft, ChevronRight, Bookmark, BookmarkPlus, Lock, Quote, History, Info, Loader2, Search as SearchIcon, X, ExternalLink, User, Book } from "lucide-react";
+import { Filter, ChevronLeft, ChevronRight, Bookmark, BookmarkPlus, Lock, Quote, History, Info, Loader2, Search as SearchIcon, X, ExternalLink, User, Book, ChevronUp } from "lucide-react";
 import { cn, cleanTitle } from "@/src/lib/utils";
 import { api } from "@/src/lib/api";
 import toast from "react-hot-toast";
 import { AutocompleteInput } from "@/src/components/ui/AutocompleteInput";
+import { useApiQuery, queryCache } from "../../hooks/useApiQuery";
 
 interface Author {
   id: number;
@@ -46,26 +47,49 @@ export default function Search() {
   const [keywordInput, setKeywordInput] = useState("");
   const [sort, setSort] = useState<string>(sortParam);
   const [history, setHistory] = useState<string[]>([]);
-  const [topKeywords, setTopKeywords] = useState<{ id: number, name: string, papers_count: number }[]>([]);
-  
   const [searchInput, setSearchInput] = useState(q);
-  
-  const [data, setData] = useState<SearchResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<number>>(new Set());
   const [bookmarkLoadingIds, setBookmarkLoadingIds] = useState<Set<number>>(new Set());
   const [followedKeywordIds, setFollowedKeywordIds] = useState<Set<number>>(new Set());
   const [followingKeywordIds, setFollowingKeywordIds] = useState<Set<number>>(new Set());
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const papersScrollRef = useRef<HTMLDivElement>(null);
+  
+  // Dynamically build search URL
+  let searchUrl = `/papers/search?page=${pageParam}`;
+  if (q) searchUrl += `&q=${encodeURIComponent(q)}`;
+  if (yearParam) searchUrl += `&year=${yearParam}`;
+  if (authorParam) searchUrl += `&author=${encodeURIComponent(authorParam)}`;
+  if (journalParam) searchUrl += `&journal=${encodeURIComponent(journalParam)}`;
+  if (keywordParam) searchUrl += `&keyword=${encodeURIComponent(keywordParam)}`;
+  if (sortParam) searchUrl += `&sort=${sortParam}`;
 
-  // Fetch followed keyword IDs on mount
-  const loadFollowedKeywords = useCallback(async () => {
-    try {
-      const res = await api.get<{ keywords: { id: number }[] }>('/following/status');
-      const ids = new Set<number>(res.keywords?.map((k: any) => k.id) ?? []);
-      setFollowedKeywordIds(ids);
-    } catch { /* silent */ }
-  }, []);
+  // useApiQuery for search results
+  const { data, loading: isLoading } = useApiQuery<SearchResponse>(searchUrl);
+
+  // useApiQuery for top 50 keywords
+  const { data: keywordsData } = useApiQuery<{ data: any[] }>("/keywords?per_page=50");
+  const topKeywords = keywordsData?.data || [];
+
+  // useApiQuery for followed status
+  // useApiQuery for followed status
+  const { data: followingStatusData, setData: setFollowingStatusData } = useApiQuery<{ keywords: { id: number }[] }>('/following/status', { persist: true });
+  
+  useEffect(() => {
+    if (followingStatusData?.keywords) {
+      setFollowedKeywordIds(new Set(followingStatusData.keywords.map((k: any) => k.id)));
+    }
+  }, [followingStatusData]);
+
+  // useApiQuery for bookmarks
+  const { data: bookmarksData, setData: setBookmarksData } = useApiQuery<any>("/dashboard/bookmarks", { persist: true });
+  
+  useEffect(() => {
+    if (bookmarksData?.bookmarked_paper_ids) {
+      setBookmarkedIds(new Set(bookmarksData.bookmarked_paper_ids));
+    }
+  }, [bookmarksData]);
 
   const toggleFollowKeyword = async (keywordId: number, keywordName: string) => {
     if (followingKeywordIds.has(keywordId)) return;
@@ -74,37 +98,29 @@ export default function Search() {
     try {
       if (isFollowed) {
         await api.delete(`/following/keywords/${keywordId}`);
-        setFollowedKeywordIds(prev => { const s = new Set(prev); s.delete(keywordId); return s; });
+        const newIds = new Set(followedKeywordIds);
+        newIds.delete(keywordId);
+        setFollowedKeywordIds(newIds);
+        
+        const updatedData = { keywords: Array.from(newIds).map(id => ({ id })) };
+        setFollowingStatusData(updatedData);
+        queryCache.set("/following/status", updatedData);
+
         toast.success(`Đã hủy lưu từ khóa "${keywordName}"`);
       } else {
         await api.post(`/following/keywords`, { keyword_id: keywordId });
-        setFollowedKeywordIds(prev => { const s = new Set(prev).add(keywordId); return s; });
+        const newIds = new Set(followedKeywordIds).add(keywordId);
+        setFollowedKeywordIds(newIds);
+
+        const updatedData = { keywords: Array.from(newIds).map(id => ({ id })) };
+        setFollowingStatusData(updatedData);
+        queryCache.set("/following/status", updatedData);
+
         toast.success(`Đã lưu từ khóa "${keywordName}"!`);
       }
     } catch { toast.error('Không thể thực hiện thao tác này.'); }
     finally { setFollowingKeywordIds(prev => { const s = new Set(prev); s.delete(keywordId); return s; }); }
   };
-
-  // Fetch bookmarked paper IDs on mount
-  useEffect(() => {
-    api.get<any>("/dashboard")
-      .then(res => {
-        if (res.bookmarked_paper_ids) {
-          setBookmarkedIds(new Set(res.bookmarked_paper_ids));
-        }
-      })
-      .catch(err => {
-        console.error("Lỗi lấy thông tin bookmark:", err);
-      });
-    loadFollowedKeywords();
-
-    // Fetch top 50 keywords
-    api.get<{ data: any[] }>("/keywords?per_page=50")
-      .then(res => {
-        if (res.data) setTopKeywords(res.data);
-      })
-      .catch(err => console.error(err));
-  }, [loadFollowedKeywords]);
 
   const handleBookmark = async (paperId: number) => {
     if (bookmarkLoadingIds.has(paperId)) return;
@@ -113,15 +129,26 @@ export default function Search() {
     try {
       if (isBookmarked) {
         await api.delete(`/bookmarks/paper/${paperId}`);
-        setBookmarkedIds(prev => {
-          const s = new Set(prev);
-          s.delete(paperId);
-          return s;
-        });
+        
+        const newIds = new Set(bookmarkedIds);
+        newIds.delete(paperId);
+        setBookmarkedIds(newIds);
+        
+        const updatedData = { bookmarked_paper_ids: Array.from(newIds) };
+        setBookmarksData(updatedData);
+        queryCache.set("/dashboard/bookmarks", updatedData);
+
         toast.success("Đã hủy lưu bài báo!");
       } else {
         await api.post("/bookmarks", { paper_id: paperId });
-        setBookmarkedIds(prev => new Set(prev).add(paperId));
+        
+        const newIds = new Set(bookmarkedIds).add(paperId);
+        setBookmarkedIds(newIds);
+
+        const updatedData = { bookmarked_paper_ids: Array.from(newIds) };
+        setBookmarksData(updatedData);
+        queryCache.set("/dashboard/bookmarks", updatedData);
+
         toast.success("Lưu bài báo thành công!");
       }
     } catch (err) {
@@ -183,29 +210,6 @@ export default function Search() {
     } catch { return []; }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        let url = `/papers/search?page=${pageParam}`;
-        if (q) url += `&q=${encodeURIComponent(q)}`;
-        if (yearParam) url += `&year=${yearParam}`;
-        if (authorParam) url += `&author=${encodeURIComponent(authorParam)}`;
-        if (journalParam) url += `&journal=${encodeURIComponent(journalParam)}`;
-        if (keywordParam) url += `&keyword=${encodeURIComponent(keywordParam)}`;
-        if (sortParam) url += `&sort=${sortParam}`;
-        
-        const res = await api.get<SearchResponse>(url);
-        setData(res);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchData();
-  }, [q, yearParam, authorParam, journalParam, keywordParam, sortParam, pageParam]);
-
   const handleApplyFilter = () => {
     setSearchParams({ q, year, author, journal, keyword, sort, page: "1" });
   };
@@ -220,6 +224,14 @@ export default function Search() {
     if (newPage < 1 || newPage > (data?.last_page || 1)) return;
     setSearchParams({ q, year, author, journal, keyword, sort, page: newPage.toString() });
   };
+
+  // Cuộn về đầu danh sách khi chuyển trang — dùng useEffect để chắc chắn DOM đã render
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      papersScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [pageParam]);
 
   return (
     <div className="pb-20 space-y-6 pt-4">
@@ -355,14 +367,49 @@ export default function Search() {
           </header>
 
           {isLoading ? (
-            <div className="flex justify-center items-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="space-y-6">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="glass-panel p-8 rounded-2xl relative overflow-hidden animate-pulse">
+                  {/* Shimmer overlay */}
+                  <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[shimmer_1.5s_infinite]" style={{ animationDelay: `${i * 0.15}s` }} />
+                  {/* Title row */}
+                  <div className="flex justify-between items-start gap-4 mb-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="h-6 bg-white/10 rounded-lg w-4/5" />
+                      <div className="h-6 bg-white/8 rounded-lg w-3/5" />
+                    </div>
+                    <div className="w-8 h-8 bg-white/10 rounded-full flex-shrink-0" />
+                  </div>
+                  {/* Author / source row */}
+                  <div className="h-4 bg-white/8 rounded w-2/5 mb-5" />
+                  {/* Abstract lines */}
+                  <div className="space-y-2 mb-7">
+                    <div className="h-3.5 bg-white/8 rounded w-full" />
+                    <div className="h-3.5 bg-white/8 rounded w-full" />
+                    <div className="h-3.5 bg-white/8 rounded w-3/4" />
+                  </div>
+                  {/* Footer row */}
+                  <div className="flex items-center justify-between pt-6 border-t border-white/5">
+                    <div className="h-3 bg-white/8 rounded w-24" />
+                    <div className="flex gap-3">
+                      <div className="h-8 bg-white/8 rounded-full w-28" />
+                      <div className="h-8 bg-primary/20 rounded-full w-28" />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : data?.data && data.data.length > 0 ? (
             <div className="relative space-y-6">
               <div 
+                ref={papersScrollRef}
                 className="overflow-y-auto max-h-[700px] pr-2 space-y-6 scroll-smooth"
                 style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.15) transparent' }}
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  // Hiện nút khi đã cuộn xuống hơn 60% chiều cao nội dung
+                  setShowScrollTop(el.scrollTop > el.scrollHeight * 0.4);
+                }}
               >
                 {data.data.map((paper: Paper) => (
                   <article key={paper.id} className="glass-panel p-8 rounded-2xl relative overflow-hidden group hover:border-primary/30 transition-all">
@@ -454,6 +501,17 @@ export default function Search() {
                  <ChevronRight className="w-4 h-4" />
                </button>
             </div>
+          )}
+
+          {/* Nút cuộn lên đầu - chỉ hiện khi cuộn xuống gần cuối */}
+          {showScrollTop && (
+            <button
+              onClick={() => papersScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="fixed bottom-8 right-8 z-40 w-11 h-11 rounded-full bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center hover:bg-primary/90 hover:scale-110 active:scale-95 transition-all duration-200 animate-in fade-in slide-in-from-bottom-4"
+              title="Về bài báo đầu tiên"
+            >
+              <ChevronUp className="w-5 h-5" />
+            </button>
           )}
         </div>
 

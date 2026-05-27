@@ -4,24 +4,25 @@ import { Toaster } from "react-hot-toast";
 import { Layout } from "./components/shared/Layout";
 import { ThemeProvider } from "./lib/theme";
 
-// Lazy load pages
-const Landing = React.lazy(() => import("./pages/Shared/Landing"));
-const Dashboard = React.lazy(() => import("./pages/Academic/Dashboard"));
-const Login = React.lazy(() => import("./pages/Auth/Login"));
-const Register = React.lazy(() => import("./pages/Auth/Register"));
-const Search = React.lazy(() => import("./pages/Shared/Search"));
-const Trending = React.lazy(() => import("./pages/Researcher/Trending"));
-const Bookmarks = React.lazy(() => import("./pages/Academic/Bookmarks"));
-const Following = React.lazy(() => import("./pages/Researcher/Following"));
-const Notifications = React.lazy(() => import("./pages/Shared/Notifications"));
-const Profile = React.lazy(() => import("./pages/Shared/Profile"));
-const AllPapers = React.lazy(() => import("./pages/Shared/AllPapers"));
-const Settings = React.lazy(() => import("./pages/Shared/Settings"));
-const About = React.lazy(() => import("./pages/Shared/About"));
-const Guide = React.lazy(() => import("./pages/Shared/Guide"));
-const AdminDashboard = React.lazy(() => import("./pages/Admin/AdminDashboard"));
-const AdminUsers = React.lazy(() => import("./pages/Admin/Users"));
-const AdminSync = React.lazy(() => import("./pages/Admin/Sync"));
+// Import pages statically to avoid connection-starving lazy chunk requests on navigation
+import Landing from "./pages/Shared/Landing";
+import Dashboard from "./pages/Academic/Dashboard";
+import Login from "./pages/Auth/Login";
+import Register from "./pages/Auth/Register";
+import Search from "./pages/Shared/Search";
+import Trending from "./pages/Researcher/Trending";
+import Bookmarks from "./pages/Academic/Bookmarks";
+import Following from "./pages/Researcher/Following";
+import Notifications from "./pages/Shared/Notifications";
+import Profile from "./pages/Shared/Profile";
+import AllPapers from "./pages/Shared/AllPapers";
+import Settings from "./pages/Shared/Settings";
+import About from "./pages/Shared/About";
+import Guide from "./pages/Shared/Guide";
+import AdminDashboard from "./pages/Admin/AdminDashboard";
+import AdminUsers from "./pages/Admin/Users";
+import AdminSync from "./pages/Admin/Sync";
+
 
 const LoadingScreen = () => (
   <div className="flex h-screen w-full items-center justify-center bg-surface">

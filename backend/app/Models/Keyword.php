@@ -11,6 +11,17 @@ class Keyword extends Model
 
     protected $fillable = ['name', 'slug'];
 
+    protected static function booted()
+    {
+        static::created(function ($keyword) {
+            \App\Models\SystemCounter::incrementKey('total_keywords');
+        });
+
+        static::deleted(function ($keyword) {
+            \App\Models\SystemCounter::decrementKey('total_keywords');
+        });
+    }
+
     public function papers()
     {
         return $this->belongsToMany(ResearchPaper::class, 'keyword_paper', 'keyword_id', 'paper_id');

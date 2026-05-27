@@ -136,7 +136,7 @@ export default function Trending() {
       });
 
     // Load bookmarked papers
-    api.get<any>("/dashboard")
+    api.get<any>("/dashboard/bookmarks")
       .then(res => {
         if (res.bookmarked_paper_ids) {
           setBookmarkedIds(new Set(res.bookmarked_paper_ids));

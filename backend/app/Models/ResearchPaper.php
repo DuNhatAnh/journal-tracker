@@ -26,6 +26,17 @@ class ResearchPaper extends Model
         'published_year'  => 'integer',
     ];
 
+    protected static function booted()
+    {
+        static::created(function ($paper) {
+            \App\Models\SystemCounter::incrementKey('total_papers');
+        });
+
+        static::deleted(function ($paper) {
+            \App\Models\SystemCounter::decrementKey('total_papers');
+        });
+    }
+
     // ─── Relationships ──────────────────────────────────────────────────────────
 
     public function journal()

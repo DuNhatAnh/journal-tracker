@@ -151,7 +151,7 @@ export function Sidebar() {
           <div className="pt-4 border-t border-white/5 px-2 flex items-center gap-3">
             <div className="w-8 h-8 rounded-full border border-white/10 overflow-hidden bg-primary/10 flex items-center justify-center font-bold text-xs text-primary flex-shrink-0">
               {user?.avatar ? (
-                <img src={user.avatar.startsWith('http') ? user.avatar : `http://localhost:8000${user.avatar}`} alt="Avatar" className="w-full h-full object-cover" />
+                <img src={user.avatar.startsWith('http') ? user.avatar : `/api/storage/${user.avatar.replace('/storage/', '').replace(/^\//, '')}`} alt="Avatar" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               ) : (
                 user?.name ? user.name.substring(0, 2).toUpperCase() : "U"
               )}

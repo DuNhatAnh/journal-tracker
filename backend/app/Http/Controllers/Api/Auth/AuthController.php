@@ -120,6 +120,24 @@ class AuthController extends Controller
     }
 
     /**
+     * DELETE /api/avatar
+     */
+    public function deleteAvatar(Request $request)
+    {
+        $user = $request->user();
+
+        // Xóa file khỏi storage nếu tồn tại
+        if ($user->avatar) {
+            $relativePath = ltrim(str_replace('/storage/', '', $user->avatar), '/');
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($relativePath);
+        }
+
+        $user->update(['avatar' => null]);
+
+        return response()->json($user);
+    }
+
+    /**
      * POST /api/password
      */
     public function changePassword(Request $request)

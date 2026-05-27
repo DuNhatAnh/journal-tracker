@@ -12,3 +12,7 @@ Schedule::command('trends:calculate')->dailyAt('01:00');
 
 // Send weekly trending notifications to users on Monday morning
 Schedule::command('papers:trending-notify')->weeklyOn(1, '08:00');
+
+// Warm general dashboard stats cache every 30 minutes
+Schedule::command('dashboard:warm-stats')->everyThirtyMinutes();
+

@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { BookmarkX, ArrowRight, ExternalLink, Loader2, Edit3, Save, X, Download, ChevronLeft, ChevronRight } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn, cleanTitle } from "@/src/lib/utils";
 import { api } from "@/src/lib/api";
+import { useApiQuery, queryCache } from "../../hooks/useApiQuery";
 
 interface Bookmark {
   id: number;
@@ -33,17 +34,45 @@ export default function Bookmarks() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editNote, setEditNote] = useState("");
   
-  const [data, setData] = useState<any>(null);
   const [page, setPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
-
   const [activeTab, setActiveTab] = useState<"papers" | "keywords" | "journals">("papers");
-  const [followedKeywords, setFollowedKeywords] = useState<Keyword[]>([]);
-  const [followedJournals, setFollowedJournals] = useState<any[]>([]);
-  const [isKeywordsLoading, setIsKeywordsLoading] = useState(false);
   const [selectedPaper, setSelectedPaper] = useState<any | null>(null);
   const [bookmarkLoadingIds, setBookmarkLoadingIds] = useState<Set<number>>(new Set());
+  const bookmarksTopRef = useRef<HTMLDivElement>(null);
+
+  // Cuộn về đầu trang khi chuyển trang — đợi DOM cập nhật xong mới cuộn
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      bookmarksTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [page]);
+
+  // useApiQuery for bookmarks papers
+  const { 
+    data: apiBookmarksData, 
+    loading: isBookmarksLoading, 
+    setData: setApiBookmarksData,
+    refetch: refetchBookmarks 
+  } = useApiQuery<any>(
+    `/bookmarks?page=${page}`,
+    { enabled: activeTab === "papers", persist: true }
+  );
+
+  // useApiQuery for followed status (keywords and journals)
+  const { 
+    data: apiFollowedData, 
+    loading: isFollowedLoading, 
+    setData: setApiFollowedData,
+    refetch: refetchFollowedData 
+  } = useApiQuery<any>(
+    "/following/status",
+    { enabled: activeTab !== "papers", persist: true }
+  );
+
+  const followedKeywords = apiFollowedData?.keywords || [];
+  const followedJournals = apiFollowedData?.journals || [];
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -78,44 +107,17 @@ export default function Bookmarks() {
     }
   };
 
-  const fetchBookmarks = useCallback(async (pageNum: number = page) => {
-    setIsLoading(true);
-    try {
-      const res = await api.get<any>(`/bookmarks?page=${pageNum}`);
-      setData(res);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [page]);
-
-  const fetchFollowedData = useCallback(async () => {
-    setIsKeywordsLoading(true);
-    try {
-      const res = await api.get<{ keywords: Keyword[], journals: any[] }>("/following/status");
-      setFollowedKeywords(res.keywords || []);
-      setFollowedJournals(res.journals || []);
-    } catch (err) {
-      console.error("Lỗi khi tải dữ liệu theo dõi:", err);
-    } finally {
-      setIsKeywordsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === "papers") {
-      fetchBookmarks(page);
-    } else {
-      fetchFollowedData();
-    }
-  }, [activeTab, page, fetchBookmarks, fetchFollowedData]);
-
   const deleteKeyword = async (id: number, name: string) => {
     try {
       await api.delete(`/following/keywords/${id}`);
-      fetchFollowedData();
+      if (apiFollowedData) {
+        const updatedKeywords = followedKeywords.filter((kw: any) => kw.id !== id);
+        const updatedData = { ...apiFollowedData, keywords: updatedKeywords };
+        setApiFollowedData(updatedData);
+        queryCache.set("/following/status", updatedData);
+      }
       toast.success(`Đã hủy lưu từ khóa "${name}"!`);
+      refetchFollowedData();
     } catch (err) {
       console.error(err);
       toast.error("Lỗi khi hủy lưu từ khóa. Vui lòng thử lại.");
@@ -125,8 +127,14 @@ export default function Bookmarks() {
   const deleteJournal = async (id: number, name: string) => {
     try {
       await api.delete(`/following/journals/${id}`);
-      fetchFollowedData();
+      if (apiFollowedData) {
+        const updatedJournals = followedJournals.filter((j: any) => j.id !== id);
+        const updatedData = { ...apiFollowedData, journals: updatedJournals };
+        setApiFollowedData(updatedData);
+        queryCache.set("/following/status", updatedData);
+      }
       toast.success(`Đã hủy theo dõi tạp chí "${name}"!`);
+      refetchFollowedData();
     } catch (err) {
       console.error(err);
       toast.error("Lỗi khi hủy theo dõi tạp chí. Vui lòng thử lại.");
@@ -136,8 +144,18 @@ export default function Bookmarks() {
   const deleteBookmark = async (id: number) => {
     try {
       await api.delete(`/bookmarks/${id}`);
-      fetchBookmarks();
+      if (apiBookmarksData) {
+        const updatedList = apiBookmarksData.data.filter((b: any) => b.id !== id);
+        const updatedData = {
+          ...apiBookmarksData,
+          data: updatedList,
+          total: Math.max(0, apiBookmarksData.total - 1)
+        };
+        setApiBookmarksData(updatedData);
+        queryCache.set(`/bookmarks?page=${page}`, updatedData);
+      }
       toast.success("Đã xóa bài báo khỏi danh sách lưu!");
+      refetchBookmarks();
     } catch (err) {
       console.error(err);
       toast.error("Lỗi khi xóa bài báo. Vui lòng thử lại.");
@@ -148,7 +166,15 @@ export default function Bookmarks() {
     try {
       await api.put(`/bookmarks/${id}`, { note });
       setEditingId(null);
-      fetchBookmarks();
+      if (apiBookmarksData) {
+        const updatedList = apiBookmarksData.data.map((b: any) => 
+          b.id === id ? { ...b, note } : b
+        );
+        const updatedData = { ...apiBookmarksData, data: updatedList };
+        setApiBookmarksData(updatedData);
+        queryCache.set(`/bookmarks?page=${page}`, updatedData);
+      }
+      refetchBookmarks();
     } catch (err) {
       console.error(err);
     }
@@ -161,7 +187,17 @@ export default function Bookmarks() {
       await api.delete(`/bookmarks/paper/${paperId}`);
       toast.success("Đã hủy lưu bài báo!");
       setSelectedPaper(null);
-      fetchBookmarks();
+      if (apiBookmarksData) {
+        const updatedList = apiBookmarksData.data.filter((b: any) => b.paper.id !== paperId);
+        const updatedData = {
+          ...apiBookmarksData,
+          data: updatedList,
+          total: Math.max(0, apiBookmarksData.total - 1)
+        };
+        setApiBookmarksData(updatedData);
+        queryCache.set(`/bookmarks?page=${page}`, updatedData);
+      }
+      refetchBookmarks();
     } catch (err) {
       toast.error("Thao tác thất bại. Vui lòng thử lại.");
     } finally {
@@ -174,14 +210,14 @@ export default function Bookmarks() {
   };
 
   return (
-    <div className="space-y-12 pb-20">
+    <div ref={bookmarksTopRef} className="space-y-12 pb-20">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
           <div className="flex items-center gap-4">
             <h2 className="font-display text-4xl font-bold text-on-surface">Đã lưu</h2>
-            {activeTab === "papers" && data?.total !== undefined && (
+            {activeTab === "papers" && apiBookmarksData?.total !== undefined && (
               <span className="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-sm font-bold">
-                {data.total} bài báo
+                {apiBookmarksData.total} bài báo
               </span>
             )}
           </div>
@@ -231,14 +267,14 @@ export default function Bookmarks() {
       </header>
 
       {activeTab === "papers" ? (
-        isLoading ? (
+        isBookmarksLoading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
-        ) : data?.data && data.data.length > 0 ? (
+        ) : apiBookmarksData?.data && apiBookmarksData.data.length > 0 ? (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in duration-300">
-              {data.data.map((bookmark: Bookmark) => (
+              {apiBookmarksData.data.map((bookmark: Bookmark) => (
               <div key={bookmark.id} className="glass-panel p-8 rounded-2xl relative group hover:-translate-y-1 transition-all duration-300 flex flex-col h-full border-t border-white/5">
                 <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 
@@ -314,7 +350,7 @@ export default function Bookmarks() {
             ))}
             </div>
             
-            {data?.last_page && data.last_page > 1 && (
+            {apiBookmarksData?.last_page && apiBookmarksData.last_page > 1 && (
               <div className="flex justify-center items-center gap-2 pt-8">
                  <button 
                    onClick={() => setPage(page - 1)}
@@ -324,11 +360,11 @@ export default function Bookmarks() {
                    <ChevronLeft className="w-4 h-4" />
                  </button>
                  <span className="text-xs font-bold text-on-surface-variant px-4">
-                   Trang {page} / {data.last_page}
+                   Trang {page} / {apiBookmarksData.last_page}
                  </span>
                  <button 
                    onClick={() => setPage(page + 1)}
-                   disabled={page === data.last_page}
+                   disabled={page === apiBookmarksData.last_page}
                    className="p-2 rounded border border-white/10 hover:bg-white/5 disabled:opacity-50"
                  >
                    <ChevronRight className="w-4 h-4" />
@@ -342,7 +378,7 @@ export default function Bookmarks() {
           </div>
         )
       ) : activeTab === "keywords" ? (
-        isKeywordsLoading ? (
+        isFollowedLoading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
@@ -372,7 +408,7 @@ export default function Bookmarks() {
           </div>
         )
       ) : (
-        isKeywordsLoading ? (
+        isFollowedLoading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
