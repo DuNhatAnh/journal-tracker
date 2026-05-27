@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 
 interface AutocompleteInputProps<T> {
@@ -91,11 +91,24 @@ export function AutocompleteInput<T>({
         }}
         placeholder={placeholder}
         className={cn(
-          "w-full bg-surface-container border border-white/5 rounded-full py-2.5 pr-4 text-on-surface text-sm focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all placeholder:text-outline-variant",
+          "w-full bg-surface-container border border-white/5 rounded-full py-2.5 text-on-surface text-sm focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all placeholder:text-outline-variant",
           icon ? "pl-10" : "pl-4",
+          value ? "pr-10" : "pr-4",
           inputClassName
         )}
       />
+      {value && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange("");
+          }}
+          className="absolute right-4 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-on-surface-variant hover:text-on-surface hover:bg-on-surface/10 transition-all cursor-pointer"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
 
       {showDropdown && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-surface-container-high border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-2 animate-in fade-in slide-in-from-top-2 duration-200">

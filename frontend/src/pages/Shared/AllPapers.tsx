@@ -20,6 +20,7 @@ interface Paper {
   doi?: string;
   authors: Author[];
   keywords?: { id: number; name: string }[];
+  journal?: { id: number; name: string };
 }
 
 interface PaginatedResponse {
@@ -146,9 +147,11 @@ export default function AllPapers() {
         <div className="lg:col-span-9 space-y-8 order-1">
           <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-8">
             <div>
-              <p className="text-[10px] font-mono text-on-surface-variant uppercase tracking-widest mb-2">
-                {viewParam === "topics" ? `TỔNG CỘNG: ${topicsData?.total || 0} CHỦ ĐỀ` : `KIẾN THỨC: ${data?.total || 0} BÀI BÁO`}
-              </p>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary mb-2">
+                {viewParam === "topics" 
+                  ? `Tổng số: ${(topicsData?.total || 0).toLocaleString()} chủ đề` 
+                  : `Tìm thấy ${(data?.total || 0).toLocaleString()} bài báo khoa học`}
+              </div>
               <h2 className="font-display text-3xl sm:text-4xl font-bold">
                 {viewParam === "topics" ? "Thư viện Chủ đề" : yearParam ? `Ấn phẩm năm ${yearParam}` : "Tất cả bài báo nghiên cứu"}
               </h2>
@@ -229,7 +232,7 @@ export default function AllPapers() {
                     </div>
                   </div>
                   <p className="text-sm text-secondary font-medium mb-4">
-                    {paper.authors?.map(a => a.name).join(", ")} • <span className="text-on-surface">{paper.source} | {paper.published_year}</span>
+                    {paper.authors?.map(a => a.name).join(", ")} • <span className="text-on-surface">{paper.journal?.name || paper.source} | {paper.published_year}</span>
                   </p>
                   <p className="text-on-surface-variant text-sm line-clamp-3 mb-6 leading-relaxed">{paper.abstract}</p>
                   
@@ -362,7 +365,7 @@ export default function AllPapers() {
             <div className="space-y-6">
               <div>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary mb-3">
-                  {selectedPaper.source.toUpperCase()}
+                  {(selectedPaper.journal?.name || selectedPaper.source).toUpperCase()}
                 </span>
                 <h2 className="font-display text-2xl sm:text-3xl font-bold leading-tight text-on-surface">{cleanTitle(selectedPaper.title)}</h2>
               </div>
@@ -372,7 +375,7 @@ export default function AllPapers() {
                   <span className="font-bold text-on-surface">Tác giả:</span> {selectedPaper.authors?.map(a => a.name).join(", ") || "N/A"}
                 </div>
                 <div>
-                  <span className="font-bold text-on-surface">Tạp chí:</span> {selectedPaper.source || "N/A"}
+                  <span className="font-bold text-on-surface">Tạp chí:</span> {selectedPaper.journal?.name || selectedPaper.source || "N/A"}
                 </div>
                 <div>
                   <span className="font-bold text-on-surface">Năm xuất bản:</span> {selectedPaper.published_year}

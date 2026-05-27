@@ -94,6 +94,15 @@ export function useApiQuery<T>(url: string, options?: UseApiQueryOptions) {
   const [error, setError] = useState<Error | null>(null);
   const [trigger, setTrigger] = useState(0);
 
+  const [prevUrl, setPrevUrl] = useState(url);
+  if (url !== prevUrl) {
+    setPrevUrl(url);
+    const initial = getInitialData();
+    setData(initial);
+    setLoading(!initial);
+    setError(null);
+  }
+
   useEffect(() => {
     if (options?.enabled === false) return;
 
@@ -166,6 +175,7 @@ export function useApiQuery<T>(url: string, options?: UseApiQueryOptions) {
         console.error("Error evicting from localStorage during refetch:", err);
       }
     }
+    setLoading(true);
     setTrigger(prev => prev + 1);
   };
 
