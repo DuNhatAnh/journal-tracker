@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Users, Loader2 } from "lucide-react";
-import { api } from "@/src/lib/api";
+import { useApiQuery } from "../../../hooks/useApiQuery";
 
 export interface AuthorNode {
   id: number;
@@ -29,119 +29,115 @@ export function CoAuthorNetwork({ keywordId }: CoAuthorNetworkProps) {
   const [networkLinks, setNetworkLinks] = useState<CoAuthorLink[]>([]);
   const [hoveredNode, setHoveredNode] = useState<AuthorNode | null>(null);
   const [selectedAuthor, setSelectedAuthor] = useState<AuthorNode | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  // Fetch network data asynchronously
+  // useApiQuery for network data
+  const { data, loading } = useApiQuery<any>(
+    keywordId ? `/trends/${keywordId}/network` : "",
+    { enabled: !!keywordId }
+  );
+
+  // Run simulation layout when network data loads or changes
   useEffect(() => {
-    if (!keywordId) {
+    if (!keywordId || !data) {
       setNetworkNodes([]);
       setNetworkLinks([]);
       setSelectedAuthor(null);
       return;
     }
 
-    setLoading(true);
-    api.get<any>(`/trends/${keywordId}/network`)
-      .then(res => {
-        const nodes = res.nodes || [];
-        const links = res.links || [];
-        
-        // Copy nodes to avoid mutating state
-        const simulationNodes: AuthorNode[] = nodes.map((n: any, idx: number) => ({
-          ...n,
-          cluster: idx % 4,
-          x: 250 + Math.cos((idx / nodes.length) * 2 * Math.PI) * 120,
-          y: 200 + Math.sin((idx / nodes.length) * 2 * Math.PI) * 120,
-          vx: 0,
-          vy: 0,
-        }));
+    const nodes = data.nodes || [];
+    const links = data.links || [];
+    
+    // Copy nodes to avoid mutating state
+    const simulationNodes: AuthorNode[] = nodes.map((n: any, idx: number) => ({
+      ...n,
+      cluster: idx % 4,
+      x: 250 + Math.cos((idx / nodes.length) * 2 * Math.PI) * 120,
+      y: 200 + Math.sin((idx / nodes.length) * 2 * Math.PI) * 120,
+      vx: 0,
+      vy: 0,
+    }));
 
-        const width = 500;
-        const height = 400;
+    const width = 500;
+    const height = 400;
 
-        // Run force-directed layout simulation for 220 ticks for better convergence
-        for (let tick = 0; tick < 220; tick++) {
-          // 1. Repulsion between nodes & Collision avoidance
-          for (let i = 0; i < simulationNodes.length; i++) {
-            for (let j = i + 1; j < simulationNodes.length; j++) {
-              const n1 = simulationNodes[i];
-              const n2 = simulationNodes[j];
-              const dx = n2.x! - n1.x!;
-              const dy = n2.y! - n1.y!;
-              const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-              
-              const r1 = 8 + Math.min(10, n1.papers_count * 1.5);
-              const r2 = 8 + Math.min(10, n2.papers_count * 1.5);
-              const minDist = r1 + r2 + 40; // Avoid overlap and leave room for labels
-              
-              if (dist < minDist) {
-                // Strong push if overlapping
-                const force = (minDist - dist) / dist * 0.55;
-                n1.vx! -= dx * force;
-                n1.vy! -= dy * force;
-                n2.vx! += dx * force;
-                n2.vy! += dy * force;
-              } else if (dist < 140) {
-                // Gentle general repulsion to spread nodes out across the canvas
-                const force = (140 - dist) / dist * 0.15;
-                n1.vx! -= dx * force;
-                n1.vy! -= dy * force;
-                n2.vx! += dx * force;
-                n2.vy! += dy * force;
-              }
-            }
+    // Run force-directed layout simulation for 220 ticks for better convergence
+    for (let tick = 0; tick < 220; tick++) {
+      // 1. Repulsion between nodes & Collision avoidance
+      for (let i = 0; i < simulationNodes.length; i++) {
+        for (let j = i + 1; j < simulationNodes.length; j++) {
+          const n1 = simulationNodes[i];
+          const n2 = simulationNodes[j];
+          const dx = n2.x! - n1.x!;
+          const dy = n2.y! - n1.y!;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          
+          const r1 = 8 + Math.min(10, n1.papers_count * 1.5);
+          const r2 = 8 + Math.min(10, n2.papers_count * 1.5);
+          const minDist = r1 + r2 + 40; // Avoid overlap and leave room for labels
+          
+          if (dist < minDist) {
+            // Strong push if overlapping
+            const force = (minDist - dist) / dist * 0.55;
+            n1.vx! -= dx * force;
+            n1.vy! -= dy * force;
+            n2.vx! += dx * force;
+            n2.vy! += dy * force;
+          } else if (dist < 140) {
+            // Gentle general repulsion to spread nodes out across the canvas
+            const force = (140 - dist) / dist * 0.15;
+            n1.vx! -= dx * force;
+            n1.vy! -= dy * force;
+            n2.vx! += dx * force;
+            n2.vy! += dy * force;
           }
-
-          // 2. Attraction along links
-          links.forEach((link: any) => {
-            const sourceNode = simulationNodes.find(n => n.id === link.source);
-            const targetNode = simulationNodes.find(n => n.id === link.target);
-            if (sourceNode && targetNode) {
-              const dx = targetNode.x! - sourceNode.x!;
-              const dy = targetNode.y! - sourceNode.y!;
-              const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-              const desiredDist = 120; // Increased distance between linked nodes
-              const force = (dist - desiredDist) / dist * 0.055; // Gentler attraction force
-              sourceNode.vx! += dx * force;
-              sourceNode.vy! += dy * force;
-              targetNode.vx! -= dx * force;
-              targetNode.vy! -= dy * force;
-            }
-          });
-
-          // 3. Gentle gravity towards center (avoids clustering at the absolute center)
-          simulationNodes.forEach(node => {
-            const dx = width / 2 - node.x!;
-            const dy = height / 2 - node.y!;
-            node.vx! += dx * 0.007; // Gentler central force
-            node.vy! += dy * 0.007;
-
-            node.x! += node.vx!;
-            node.y! += node.vy!;
-
-            // Apply friction
-            node.vx! *= 0.75;
-            node.vy! *= 0.75;
-
-            // Boundary constraint (keep nodes fully inside the 500x400 SVG container)
-            const r = 8 + Math.min(10, node.papers_count * 1.5);
-            if (node.x! < r + 20) { node.x! = r + 20; node.vx! = 0; }
-            if (node.x! > width - r - 20) { node.x! = width - r - 20; node.vx! = 0; }
-            if (node.y! < r + 20) { node.y! = r + 20; node.vy! = 0; }
-            if (node.y! > height - r - 35) { node.y! = height - r - 35; node.vy! = 0; } // Extra padding for text label
-          });
         }
+      }
 
-        setNetworkNodes(simulationNodes);
-        setNetworkLinks(links);
-        setSelectedAuthor(null);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("Lỗi lấy dữ liệu mạng lưới đồng tác giả:", err);
-        setLoading(false);
+      // 2. Attraction along links
+      links.forEach((link: any) => {
+        const sourceNode = simulationNodes.find(n => n.id === link.source);
+        const targetNode = simulationNodes.find(n => n.id === link.target);
+        if (sourceNode && targetNode) {
+          const dx = targetNode.x! - sourceNode.x!;
+          const dy = targetNode.y! - sourceNode.y!;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const desiredDist = 120; // Increased distance between linked nodes
+          const force = (dist - desiredDist) / dist * 0.055; // Gentler attraction force
+          sourceNode.vx! += dx * force;
+          sourceNode.vy! += dy * force;
+          targetNode.vx! -= dx * force;
+          targetNode.vy! -= dy * force;
+        }
       });
-  }, [keywordId]);
+
+      // 3. Gentle gravity towards center (avoids clustering at the absolute center)
+      simulationNodes.forEach(node => {
+        const dx = width / 2 - node.x!;
+        const dy = height / 2 - node.y!;
+        node.vx! += dx * 0.007; // Gentle central force
+        node.vy! += dy * 0.007;
+
+        node.x! += node.vx!;
+        node.y! += node.vy!;
+
+        // Apply friction
+        node.vx! *= 0.75;
+        node.vy! *= 0.75;
+
+        // Boundary constraint (keep nodes fully inside the 500x400 SVG container)
+        const r = 8 + Math.min(10, node.papers_count * 1.5);
+        if (node.x! < r + 20) { node.x! = r + 20; node.vx! = 0; }
+        if (node.x! > width - r - 20) { node.x! = width - r - 20; node.vx! = 0; }
+        if (node.y! < r + 20) { node.y! = r + 20; node.vy! = 0; }
+        if (node.y! > height - r - 35) { node.y! = height - r - 35; node.vy! = 0; } // Extra padding for text label
+      });
+    }
+
+    setNetworkNodes(simulationNodes);
+    setNetworkLinks(links);
+    setSelectedAuthor(null);
+  }, [keywordId, data]);
 
   const isConnected = (id1: number, id2: number) => {
     if (id1 === id2) return true;

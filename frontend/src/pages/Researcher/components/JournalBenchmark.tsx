@@ -1,8 +1,8 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import Chart from "react-apexcharts";
 import { Award, Loader2 } from "lucide-react";
 import { cn } from "@/src/lib/utils";
-import { api } from "@/src/lib/api";
+import { useApiQuery } from "../../../hooks/useApiQuery";
 
 interface JournalRecord {
   id: number;
@@ -26,26 +26,14 @@ export function JournalBenchmark({
   onToggleFollow
 }: JournalBenchmarkProps) {
   const [isComparing, setIsComparing] = useState(false);
-  const [journals, setJournals] = useState<JournalRecord[]>([]);
-  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!keywordId) {
-      setJournals([]);
-      return;
-    }
+  // useApiQuery for journals
+  const { data: journalsData, loading } = useApiQuery<JournalRecord[]>(
+    keywordId ? `/trends/${keywordId}/journals` : "",
+    { enabled: !!keywordId }
+  );
 
-    setLoading(true);
-    api.get<JournalRecord[]>(`/trends/${keywordId}/journals`)
-      .then(res => {
-        setJournals(res || []);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("Lỗi lấy dữ liệu tạp chí gợi ý:", err);
-        setLoading(false);
-      });
-  }, [keywordId]);
+  const journals = journalsData || [];
 
   const journalChartData = useMemo(() => {
     if (!journals) return { categories: [], series: [] };

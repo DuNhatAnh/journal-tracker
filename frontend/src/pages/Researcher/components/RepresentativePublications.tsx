@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { BookOpen, ArrowUp, Loader2 } from "lucide-react";
 import { cleanTitle } from "@/src/lib/utils";
-import { api } from "@/src/lib/api";
+import { useApiQuery } from "../../../hooks/useApiQuery";
 
 interface RepresentativePublicationsProps {
   keywordId: number | null;
@@ -16,26 +16,13 @@ export function RepresentativePublications({
   startYear,
   endYear
 }: RepresentativePublicationsProps) {
-  const [rawPapers, setRawPapers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  // useApiQuery for representative papers
+  const { data: rawPapersData, loading } = useApiQuery<any[]>(
+    keywordId ? `/trends/${keywordId}/papers` : "",
+    { enabled: !!keywordId }
+  );
 
-  useEffect(() => {
-    if (!keywordId) {
-      setRawPapers([]);
-      return;
-    }
-
-    setLoading(true);
-    api.get<any[]>(`/trends/${keywordId}/papers`)
-      .then(res => {
-        setRawPapers(res || []);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("Lỗi lấy dữ liệu ấn phẩm tiêu biểu:", err);
-        setLoading(false);
-      });
-  }, [keywordId]);
+  const rawPapers = rawPapersData || [];
 
   const filteredPapers = useMemo(() => {
     return rawPapers.filter(p => p.published_year >= startYear && p.published_year <= endYear);

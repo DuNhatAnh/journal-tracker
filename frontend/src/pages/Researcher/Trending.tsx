@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Download, Bell } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { api } from "@/src/lib/api";
+import { useApiQuery, queryCache } from "../../hooks/useApiQuery";
 
 import { TrendStatsGrid } from "./components/TrendStatsGrid";
 import { AiInsightCard } from "./components/AiInsightCard";
@@ -43,71 +44,62 @@ export default function Trending() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const [trendingList, setTrendingList] = useState<TrendingTopic[]>([]);
+  // selected keyword ID state
   const [selectedKeywordId, setSelectedKeywordId] = useState<number | null>(null);
-  const [selectedDetail, setSelectedDetail] = useState<KeywordDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadingDetail, setLoadingDetail] = useState(false);
 
-  // Bookmarks state
-  const [bookmarkedIds, setBookmarkedIds] = useState<Set<number>>(new Set());
+  // useApiQuery for initial top trending topics list
+  const { data: trendingData, loading: isTrendingLoading } = useApiQuery<any>("/trends/trending");
+  const trendingList = trendingData?.trending || [];
+
+  // useApiQuery for following status (journals)
+  const { data: statusData, refetch: refetchStatus } = useApiQuery<any>("/following/status", { persist: true });
+
+  const followedJournalIds = useMemo(() => {
+    if (!statusData?.journals) return new Set<number>();
+    return new Set<number>(statusData.journals.map((j: any) => j.id));
+  }, [statusData]);
+
+  // useApiQuery for bookmarks status
+  const { data: bookmarksData, setData: setBookmarksData } = useApiQuery<any>("/dashboard/bookmarks", { persist: true });
+
+  const bookmarkedIds = useMemo(() => {
+    if (!bookmarksData?.bookmarked_paper_ids) return new Set<number>();
+    return new Set<number>(bookmarksData.bookmarked_paper_ids);
+  }, [bookmarksData]);
+
+  // Set default selected keyword and seed cache for details if present
+  useEffect(() => {
+    if (trendingData?.trending && trendingData.trending.length > 0 && selectedKeywordId === null) {
+      const firstKeywordId = trendingData.trending[0].keyword_id;
+      setSelectedKeywordId(firstKeywordId);
+
+      // Seed detail data if returned directly by /trends/trending
+      if (trendingData.details) {
+        const historyUrl = `/trends/${firstKeywordId}/history`;
+        if (!queryCache.has(historyUrl)) {
+          queryCache.set(historyUrl, trendingData.details);
+        }
+      }
+    }
+  }, [trendingData, selectedKeywordId]);
+
+  // useApiQuery for history of selected keyword
+  const { data: selectedDetail, loading: loadingDetail } = useApiQuery<KeywordDetail>(
+    selectedKeywordId ? `/trends/${selectedKeywordId}/history` : "",
+    { enabled: !!selectedKeywordId }
+  );
+
+  // loading state
+  const loading = isTrendingLoading;
+
+  // Bookmarks details state
   const [bookmarkLoadingIds, setBookmarkLoadingIds] = useState<Set<number>>(new Set());
-  const [selectedPaper, setSelectedPaper] = useState<any | null>(null);
-
-  // Followed journals state
-  const [followedJournalIds, setFollowedJournalIds] = useState<Set<number>>(new Set());
   const [followingJournalLoadingIds, setFollowingJournalLoadingIds] = useState<Set<number>>(new Set());
+  const [selectedPaper, setSelectedPaper] = useState<any | null>(null);
 
   // Time slider filter state
   const [startYear, setStartYear] = useState(2020);
   const [endYear, setEndYear] = useState(2026);
-
-  // Fetch initial top trending topics list
-  useEffect(() => {
-    api.get<any>("/trends/trending")
-      .then(res => {
-        const list = res.trending || [];
-        setTrendingList(list);
-        
-        if (list.length > 0) {
-          const firstTopic = list[0];
-          setSelectedKeywordId(firstTopic.keyword_id);
-          
-          if (res.details) {
-            setSelectedDetail(res.details);
-          } else {
-            fetchDetail(firstTopic.keyword_id);
-          }
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("Lỗi tải danh mục xu hướng", err);
-        setLoading(false);
-      });
-
-    // Load following status for journals
-    api.get<any>("/following/status")
-      .then(res => {
-        if (res.journals) {
-          setFollowedJournalIds(new Set(res.journals.map((j: any) => j.id)));
-        }
-      })
-      .catch(err => {
-        console.error("Lỗi lấy thông tin follow journals:", err);
-      });
-
-    // Load bookmarked papers
-    api.get<any>("/dashboard/bookmarks")
-      .then(res => {
-        if (res.bookmarked_paper_ids) {
-          setBookmarkedIds(new Set(res.bookmarked_paper_ids));
-        }
-      })
-      .catch(err => {
-        console.error("Lỗi lấy thông tin bookmark:", err);
-      });
-  }, []);
 
   // Update year range dynamically when details change
   useEffect(() => {
@@ -118,23 +110,9 @@ export default function Trending() {
     }
   }, [selectedDetail]);
 
-  const fetchDetail = (keywordId: number) => {
-    setLoadingDetail(true);
-    api.get<any>(`/trends/${keywordId}/history`)
-      .then(res => {
-        setSelectedDetail(res);
-        setLoadingDetail(false);
-      })
-      .catch(err => {
-        console.error("Lỗi tải chi tiết xu hướng chủ đề", err);
-        setLoadingDetail(false);
-      });
-  };
-
   const handleSelectKeyword = (keywordId: number) => {
     if (keywordId === selectedKeywordId) return;
     setSelectedKeywordId(keywordId);
-    fetchDetail(keywordId);
   };
 
   // Toggle follow/unfollow recommended journal
@@ -145,14 +123,14 @@ export default function Trending() {
     try {
       if (isFollowing) {
         await api.delete(`/following/journals/${journalId}`);
-        setFollowedJournalIds(prev => {
-          const s = new Set(prev);
-          s.delete(journalId);
-          return s;
-        });
+        // Evict following status cache
+        queryCache.delete("/following/status");
+        refetchStatus();
       } else {
         await api.post("/following/journals", { journal_id: journalId });
-        setFollowedJournalIds(prev => new Set(prev).add(journalId));
+        // Evict following status cache
+        queryCache.delete("/following/status");
+        refetchStatus();
       }
     } catch (err: any) {
       console.error(err);
@@ -173,14 +151,15 @@ export default function Trending() {
     try {
       if (isBookmarked) {
         await api.delete(`/bookmarks/paper/${paperId}`);
-        setBookmarkedIds(prev => {
-          const s = new Set(prev);
-          s.delete(paperId);
-          return s;
-        });
+        const nextIds = new Set(bookmarkedIds);
+        nextIds.delete(paperId);
+        const updatedData = { bookmarked_paper_ids: Array.from(nextIds) };
+        setBookmarksData(updatedData);
       } else {
         await api.post("/bookmarks", { paper_id: paperId });
-        setBookmarkedIds(prev => new Set(prev).add(paperId));
+        const nextIds = new Set(bookmarkedIds).add(paperId);
+        const updatedData = { bookmarked_paper_ids: Array.from(nextIds) };
+        setBookmarksData(updatedData);
       }
     } catch (err: any) {
       console.error(err);
@@ -267,7 +246,7 @@ export default function Trending() {
   const topicName = selectedDetail?.keyword?.name || (loading ? "Đang tải chủ đề..." : "Chưa chọn chủ đề");
 
   return (
-    <div className="space-y-8 pb-20 relative animate-fade-in">
+    <div className="space-y-8 pb-20 relative animate-fade-in text-left">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
@@ -311,10 +290,10 @@ export default function Trending() {
             </select>
           </div>
 
-          <button className="flex items-center gap-2 px-4 py-2 glass-panel rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-white/5 transition-all">
+          <button className="flex items-center gap-2 px-4 py-2 glass-panel rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-white/5 transition-all cursor-pointer">
             <Download className="w-4 h-4" /> Xuất báo cáo
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 gradient-btn rounded-xl text-xs font-bold uppercase tracking-widest text-on-primary">
+          <button className="flex items-center gap-2 px-4 py-2 gradient-btn rounded-xl text-xs font-bold uppercase tracking-widest text-on-primary cursor-pointer">
             <Bell className="w-4 h-4 fill-current" /> Tạo cảnh báo
           </button>
         </div>

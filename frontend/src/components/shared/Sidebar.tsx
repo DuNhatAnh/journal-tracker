@@ -36,8 +36,8 @@ export function Sidebar() {
     {
       title: "THƯ VIỆN",
       items: [
-        { icon: Bookmark, label: "Đã lưu", path: "/bookmarks" },
         ...(role === "researcher" ? [{ icon: Users, label: "Đang theo dõi", path: "/following" }] : []),
+        { icon: Bookmark, label: "Đã lưu", path: "/bookmarks" },
         { icon: Bell, label: "Thông báo", path: "/notifications" },
       ]
     }
