@@ -40,6 +40,7 @@ export type SyncLog = {
   error_message: string | null;
   created_at: string;
   api_source?: ApiSource;
+  progress_details?: any;
 };
 
 export type PaginatedLogs = {

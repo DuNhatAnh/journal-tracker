@@ -27,14 +27,19 @@ class SyncPapersFromApi implements ShouldQueue
 
     protected int $syncedCount = 0;
     protected ?SyncLog $syncLog = null;
+    protected array $progressItems = [];
 
     public function __construct(
         protected string $query = '',
         protected string $source = 'openalex',
         protected int    $maxPages = 50,
         protected string $topicId = '',
-        protected string $years = ''
-    ) {}
+        protected string $years = '',
+        protected int    $startPage = 1,
+        ?SyncLog $syncLog = null
+    ) {
+        $this->syncLog = $syncLog;
+    }
 
     /**
      * Check if this sync has been cancelled by admin via DB flag.
@@ -57,20 +62,74 @@ class SyncPapersFromApi implements ShouldQueue
             'error_message' => $message,
             'papers_synced' => $this->syncedCount,
         ]);
+        $this->saveProgressDetails();
+    }
+
+    /**
+     * Save progress details list and stats to database.
+     */
+    protected function saveProgressDetails(): void
+    {
+        if (!$this->syncLog) return;
+
+        $success = 0;
+        $skipped = 0;
+        $failed = 0;
+
+        foreach ($this->progressItems as $item) {
+            if ($item['status'] === 'success') {
+                $success++;
+            } elseif ($item['status'] === 'skipped') {
+                $skipped++;
+            } elseif ($item['status'] === 'failed') {
+                $failed++;
+            }
+        }
+
+        $this->syncLog->update([
+            'progress_details' => [
+                'total_expected' => $this->maxPages,
+                'items' => array_values($this->progressItems),
+                'summary' => [
+                    'success' => $success,
+                    'skipped' => $skipped,
+                    'failed' => $failed,
+                ]
+            ]
+        ]);
     }
 
     public function handle(OpenAlexService $openAlex): void
     {
-        Log::info("SyncPapersFromApi started", ['query' => $this->query, 'source' => $this->source]);
+        Log::info("SyncPapersFromApi started", ['query' => $this->query, 'source' => $this->source, 'startPage' => $this->startPage]);
 
         $apiSource = ApiSource::whereRaw('LOWER(name) = ?', [strtolower($this->source)])->first();
-        $this->syncLog = SyncLog::create([
-            'api_source_id' => $apiSource?->id,
-            'status'        => 'running',
-            'papers_synced' => 0,
-        ]);
+        if (!$this->syncLog) {
+            $this->syncLog = SyncLog::create([
+                'api_source_id' => $apiSource?->id,
+                'status'        => 'running',
+                'papers_synced' => 0,
+                'progress_details' => [
+                    'total_expected' => $this->maxPages,
+                    'items' => [],
+                    'summary' => ['success' => 0, 'skipped' => 0, 'failed' => 0]
+                ]
+            ]);
+        } else {
+            // Update to running and reset fields
+            $this->syncLog->update([
+                'status'        => 'running',
+                'papers_synced' => 0,
+                'progress_details' => [
+                    'total_expected' => $this->maxPages,
+                    'items' => [],
+                    'summary' => ['success' => 0, 'skipped' => 0, 'failed' => 0]
+                ]
+            ]);
+        }
 
         $this->syncedCount = 0;
+        $this->progressItems = [];
 
         try {
             // Step 1: Analyse keywords / find concept ID
@@ -90,14 +149,15 @@ class SyncPapersFromApi implements ShouldQueue
 
             // Step 2: TOP CITED PAPERS
             $remainingToFetch = $limitEach;
-            for ($page = 1; $page <= $pagesEach; $page++) {
+            $endPage = $this->startPage + $pagesEach - 1;
+            for ($page = $this->startPage; $page <= $endPage; $page++) {
                 if ($this->isCancelled()) return;
                 
                 $currentPerPage = min(100, $remainingToFetch);
                 if ($currentPerPage <= 0) break;
 
                 $remainingToFetch -= $currentPerPage;
-                $eta = $pagesEach * 2; // rough estimate
+                $eta = ($endPage - $page + 1) * 2; // rough estimate
                 $this->updateProgress("Đang tải dữ liệu (Trích dẫn cao)... Ước tính còn ~{$eta}s");
 
                 $data = $openAlex->searchWorks(
@@ -117,14 +177,15 @@ class SyncPapersFromApi implements ShouldQueue
 
             // Step 3: RECENT PAPERS
             $remainingToFetch = $limitEach;
-            for ($page = 1; $page <= $pagesEach; $page++) {
+            $endPage = $this->startPage + $pagesEach - 1;
+            for ($page = $this->startPage; $page <= $endPage; $page++) {
                 if ($this->isCancelled()) return;
 
                 $currentPerPage = min(100, $remainingToFetch);
                 if ($currentPerPage <= 0) break;
 
                 $remainingToFetch -= $currentPerPage;
-                $eta = $pagesEach * 2;
+                $eta = ($endPage - $page + 1) * 2;
                 $this->updateProgress("Đang tải dữ liệu (Mới xuất bản)... Ước tính còn ~{$eta}s");
 
                 $data = $openAlex->searchWorks(
@@ -150,6 +211,7 @@ class SyncPapersFromApi implements ShouldQueue
                 'papers_synced' => $this->syncedCount,
                 'error_message' => null,
             ]);
+            $this->saveProgressDetails();
 
             if ($apiSource) {
                 $apiSource->update(['last_synced_at' => now()]);
@@ -169,6 +231,7 @@ class SyncPapersFromApi implements ShouldQueue
                         'papers_synced' => $this->syncedCount,
                         'error_message' => $e->getMessage(),
                     ]);
+                    $this->saveProgressDetails();
                 }
             }
 
@@ -239,31 +302,68 @@ class SyncPapersFromApi implements ShouldQueue
                 $existingKeywords = Keyword::whereIn('name', $keywordNames)->pluck('id', 'name')->toArray();
             }
 
+            // Load existing papers in this batch to compare and bypass database writes if identical
+            $sourceIds = array_filter(array_map(fn($item) => $item['id'] ?? null, $items));
+            $existingPapers = ResearchPaper::whereIn('source_id', $sourceIds)->get()->keyBy('source_id');
+
             foreach ($items as $item) {
+                if (empty($item['id'])) continue;
+
+                // Add to progress items list (initialized to pending if not present)
+                if (!isset($this->progressItems[$item['id']])) {
+                    $this->progressItems[$item['id']] = [
+                        'title' => $item['title'] ?? 'Untitled',
+                        'status' => 'pending',
+                        'reason' => null
+                    ];
+                }
+
                 try {
+                    $existing = $existingPapers->get($item['id']);
+                    
+                    if ($existing) {
+                        $citationsOnApi = $item['cited_by_count'] ?? 0;
+                        if ($existing->citations_count === $citationsOnApi) {
+                            // Perfect match - skip writing to database and pivot tables entirely
+                            $this->progressItems[$item['id']]['status'] = 'skipped';
+                            $this->progressItems[$item['id']]['reason'] = 'Dữ liệu đã trùng khớp hoàn toàn trong DB';
+                            $this->syncedCount++;
+                            continue;
+                        }
+
+                        // Citation count updated
+                        $existing->update(['citations_count' => $citationsOnApi]);
+                        $this->progressItems[$item['id']]['status'] = 'success';
+                        $this->progressItems[$item['id']]['reason'] = 'Cập nhật số lượt trích dẫn (' . $existing->getOriginal('citations_count') . ' -> ' . $citationsOnApi . ')';
+                        $this->syncedCount++;
+                        continue;
+                    }
+
+                    // New paper processing
                     $journalId = null;
                     if ($sourceName = data_get($item, 'primary_location.source.display_name')) {
                         $journalId = $existingJournals[$sourceName] ?? null;
                     }
 
-                    $abstract = OpenAlexService::decodeAbstract(data_get($item, 'abstract_inverted_index'));
+                    $abstractIndex = data_get($item, 'abstract_inverted_index');
+                    $abstract = is_array($abstractIndex) ? OpenAlexService::decodeAbstract($abstractIndex) : null;
 
-                    $paper = ResearchPaper::updateOrCreate(
-                        ['source_id' => $item['id']],
-                        [
-                            'title'           => $item['title'] ?? 'Untitled',
-                            'abstract'        => $abstract,
-                            'published_year'  => $item['publication_year'] ?? date('Y'),
-                            'journal_id'      => $journalId,
-                            'citations_count' => $item['cited_by_count'] ?? 0,
-                            'doi'             => $item['doi'] ?? null,
-                            'source'          => $this->source,
-                        ]
-                    );
+                    $paper = ResearchPaper::create([
+                        'source_id'       => $item['id'],
+                        'title'           => $item['title'] ?? 'Untitled',
+                        'abstract'        => $abstract,
+                        'published_year'  => $item['publication_year'] ?? date('Y'),
+                        'journal_id'      => $journalId,
+                        'citations_count' => $item['cited_by_count'] ?? 0,
+                        'doi'             => $item['doi'] ?? null,
+                        'source'          => $this->source,
+                    ]);
 
                     $authorIds = [];
                     foreach (data_get($item, 'authorships', []) as $authorship) {
                         if ($name = data_get($authorship, 'author.display_name')) {
+                            // Prevent string truncation error
+                            $name = Str::limit($name, 250);
                             if (isset($existingAuthors[$name])) $authorIds[] = $existingAuthors[$name];
                         }
                     }
@@ -278,16 +378,17 @@ class SyncPapersFromApi implements ShouldQueue
                     }
                     $paper->keywords()->sync($keywordIds);
 
-                    if ($paper->wasRecentlyCreated) {
-                        $newPaperIds[] = $paper->id;
-                    }
-
+                    $newPaperIds[] = $paper->id;
+                    $this->progressItems[$item['id']]['status'] = 'success';
+                    $this->progressItems[$item['id']]['reason'] = 'Thêm mới thành công';
                     $this->syncedCount++;
                 } catch (\Throwable $e) {
                     Log::warning('Failed to process work', [
                         'id'    => $item['id'] ?? 'unknown',
                         'error' => $e->getMessage(),
                     ]);
+                    $this->progressItems[$item['id']]['status'] = 'failed';
+                    $this->progressItems[$item['id']]['reason'] = $e->getMessage();
                 }
             }
         });
@@ -301,7 +402,7 @@ class SyncPapersFromApi implements ShouldQueue
             Log::warning('Batch notification failed', ['error' => $e->getMessage()]);
         }
 
-        // Update live count after batch
+        // Update live count and progress logs
         $this->updateProgress("Đã lưu {$this->syncedCount} bài báo...");
     }
 }

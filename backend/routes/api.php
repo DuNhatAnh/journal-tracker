@@ -140,5 +140,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('api-sources/{api_source}/sync', [ApiSourceController::class, 'sync']);
         Route::post('sync-logs/{sync_log}/cancel', [ApiSourceController::class, 'cancelSync']);
         Route::get('sync-logs', [ApiSourceController::class, 'syncLogs']);
+        Route::get('sync-logs/{sync_log}', [ApiSourceController::class, 'showSyncLog']);
     });
 });

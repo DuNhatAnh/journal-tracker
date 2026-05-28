@@ -73,12 +73,32 @@ class ApiSourceController extends Controller
         $field = $request->input('field', 'deep learning');
         $pages = (int) $request->input('pages', 1);
         $years = $request->input('years', '');
+        $startPage = (int) $request->input('start_page', 1);
 
-        \App\Jobs\SyncPapersFromApi::dispatch($field, strtolower($apiSource->name), $pages, '', $years);
+        // Pre-create the SyncLog
+        $syncLog = \App\Models\SyncLog::create([
+            'api_source_id' => $apiSource->id,
+            'status'        => 'running',
+            'papers_synced' => 0,
+            'progress_details' => [
+                'total_expected' => $pages,
+                'items' => [],
+                'summary' => ['success' => 0, 'skipped' => 0, 'failed' => 0]
+            ]
+        ]);
+
+        \App\Jobs\SyncPapersFromApi::dispatch($field, strtolower($apiSource->name), $pages, '', $years, $startPage, $syncLog);
 
         return response()->json([
-            'message' => "Bắt đầu đồng bộ nguồn {$apiSource->name} với từ khóa '{$field}' (Số trang: {$pages}) ngầm...",
+            'message' => "Bắt đầu đồng bộ nguồn {$apiSource->name} với từ khóa '{$field}' (Trang: {$startPage}, Hạn mức: {$pages}) ngầm...",
+            'sync_log' => $syncLog,
         ]);
+    }
+
+    public function showSyncLog($id)
+    {
+        $syncLog = \App\Models\SyncLog::with('apiSource')->findOrFail($id);
+        return response()->json($syncLog);
     }
 
     public function cancelSync($id)

@@ -6,6 +6,7 @@ import { ApiSource, SyncLog, PaginatedLogs } from "./types";
 import ApiSourcesList from "./components/Sync/ApiSourcesList";
 import SyncHistory from "./components/Sync/SyncHistory";
 import SourceModal from "./components/Sync/SourceModal";
+import SyncDetailModal from "./components/Sync/SyncDetailModal";
 
 export default function AdminSync() {
   const [sources, setSources] = useState<ApiSource[]>([]);
@@ -15,15 +16,20 @@ export default function AdminSync() {
   const [loadingLogs, setLoadingLogs] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [loadingSyncSourceId, setLoadingSyncSourceId] = useState<number | null>(null);
 
   // Sync Form State
-  const [syncParams, setSyncParams] = useState<Record<number, { domain: string; field: string; pages: number; yearFrom: string; yearTo: string }>>({});
+  const [syncParams, setSyncParams] = useState<Record<number, { domain: string; field: string; pages: number; yearFrom: string; yearTo: string; startPage: number }>>({});
 
   // Modal State for CRUD API Sources
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<"add" | "edit">("add");
   const [selectedSource, setSelectedSource] = useState<ApiSource | null>(null);
   const [formData, setFormData] = useState({ name: "", api_url: "" });
+
+  // Modal State for Sync Progress Detail Checklists
+  const [activeDetailLog, setActiveDetailLog] = useState<SyncLog | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   const currentUserStr = localStorage.getItem("user");
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
@@ -48,6 +54,28 @@ export default function AdminSync() {
     };
   }, [logs, logsPagination.current]);
 
+  // Auto-polling for active detail modal if the target log is running
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (isDetailModalOpen && activeDetailLog && activeDetailLog.status === "running") {
+      interval = setInterval(async () => {
+        try {
+          const response = await api.get<SyncLog>(`/admin/sync-logs/${activeDetailLog.id}`);
+          if (response) {
+            setActiveDetailLog(response);
+            // Sync with main list if active
+            setLogs((prev) => prev.map((l) => l.id === response.id ? response : l));
+          }
+        } catch (err) {
+          // Quietly ignore
+        }
+      }, 2000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isDetailModalOpen, activeDetailLog]);
+
   if (currentUser?.role !== "admin") {
     return <Navigate to="/dashboard" replace />;
   }
@@ -59,9 +87,9 @@ export default function AdminSync() {
       setSources(response || []);
       
       // Initialize sync params for each source
-      const params: Record<number, { domain: string; field: string; pages: number; yearFrom: string; yearTo: string }> = {};
+      const params: Record<number, { domain: string; field: string; pages: number; yearFrom: string; yearTo: string; startPage: number }> = {};
       (response || []).forEach((src) => {
-        params[src.id] = { domain: "Computer Science", field: "", pages: 50, yearFrom: "2023", yearTo: "2026" };
+        params[src.id] = { domain: "Computer Science", field: "", pages: 50, yearFrom: "2023", yearTo: "2026", startPage: 1 };
       });
       setSyncParams(params);
     } catch (err: any) {
@@ -93,7 +121,7 @@ export default function AdminSync() {
     setActionError(null);
     setActionSuccess(null);
     try {
-      const updated = await api.put<ApiSource>(`/admin/api-sources/${source.id}`, {
+      await api.put<ApiSource>(`/admin/api-sources/${source.id}`, {
         is_active: !source.is_active,
       });
       setActionSuccess(`Đã ${!source.is_active ? "kích hoạt" : "vô hiệu hóa"} nguồn ${source.name}.`);
@@ -168,7 +196,7 @@ export default function AdminSync() {
   const handleTriggerSync = async (sourceId: number, sourceName: string) => {
     setActionError(null);
     setActionSuccess(null);
-    const params = syncParams[sourceId] || { domain: "Computer Science", field: "", pages: 50, yearFrom: "2023", yearTo: "2026" };
+    const params = syncParams[sourceId] || { domain: "Computer Science", field: "", pages: 50, yearFrom: "2023", yearTo: "2026", startPage: 1 };
     const combinedQuery = params.domain ? `${params.domain} ${params.field}`.trim() : params.field;
     
     // Validate years
@@ -177,17 +205,24 @@ export default function AdminSync() {
       return;
     }
 
+    setLoadingSyncSourceId(sourceId);
+
     try {
-      const response = await api.post<{ message: string }>(`/admin/api-sources/${sourceId}/sync`, {
+      const response = await api.post<{ message: string; sync_log: SyncLog }>(`/admin/api-sources/${sourceId}/sync`, {
         field: combinedQuery,
         pages: params.pages,
         years: `${params.yearFrom}-${params.yearTo}`,
+        start_page: params.startPage,
       });
-      setActionSuccess(response.message || `Đã gửi yêu cầu đồng bộ nguồn ${sourceName}.`);
-      // Refresh logs after brief delay
-      setTimeout(() => loadLogs(1), 1000);
+      
+      if (response && response.sync_log) {
+        await loadLogs(1);
+        handleViewDetails(response.sync_log);
+      }
     } catch (err: any) {
       setActionError(err.message || "Lỗi khi kích hoạt đồng bộ.");
+    } finally {
+      setLoadingSyncSourceId(null);
     }
   };
 
@@ -197,10 +232,21 @@ export default function AdminSync() {
     try {
       const response = await api.post<{ message: string }>(`/admin/sync-logs/${logId}/cancel`);
       setActionSuccess(response.message || "Đã hủy tiến trình đồng bộ.");
-      setTimeout(() => loadLogs(logsPagination.current), 500);
+      setTimeout(() => {
+        loadLogs(logsPagination.current);
+        if (activeDetailLog && activeDetailLog.id === logId) {
+          // Update modal log status as well
+          setActiveDetailLog((prev) => prev ? { ...prev, status: "cancelled", error_message: "Đã bị hủy bởi quản trị viên." } : null);
+        }
+      }, 500);
     } catch (err: any) {
       setActionError(err.message || "Lỗi khi hủy tiến trình.");
     }
+  };
+
+  const handleViewDetails = (log: SyncLog) => {
+    setActiveDetailLog(log);
+    setIsDetailModalOpen(true);
   };
 
   return (
@@ -238,6 +284,7 @@ export default function AdminSync() {
           sources={sources}
           loadingSources={loadingSources}
           syncParams={syncParams}
+          loadingSyncSourceId={loadingSyncSourceId}
           handleParamChange={handleParamChange}
           handleOpenEditModal={handleOpenEditModal}
           handleDeleteSource={handleDeleteSource}
@@ -253,6 +300,7 @@ export default function AdminSync() {
           logsPagination={logsPagination}
           loadLogs={loadLogs}
           handleCancelSync={handleCancelSync}
+          handleViewDetails={handleViewDetails}
         />
       </div>
       
@@ -264,6 +312,17 @@ export default function AdminSync() {
         setFormData={setFormData}
         handleCloseModal={handleCloseModal}
         handleSubmitSource={handleSubmitSource}
+      />
+
+      {/* Detail Modal */}
+      <SyncDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setActiveDetailLog(null);
+        }}
+        log={activeDetailLog}
+        handleCancelSync={handleCancelSync}
       />
     </div>
   );

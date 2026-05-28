@@ -1,5 +1,5 @@
 import React from "react";
-import { Calendar, RotateCw, StopCircle, CheckCircle2, XCircle } from "lucide-react";
+import { Calendar, RotateCw, StopCircle, CheckCircle2, XCircle, Search } from "lucide-react";
 import { SyncLog } from "../../types";
 
 type SyncHistoryProps = {
@@ -8,6 +8,7 @@ type SyncHistoryProps = {
   logsPagination: { current: number; last: number };
   loadLogs: (page: number) => void;
   handleCancelSync: (logId: number) => void;
+  handleViewDetails: (log: SyncLog) => void;
 };
 
 export default function SyncHistory({
@@ -16,6 +17,7 @@ export default function SyncHistory({
   logsPagination,
   loadLogs,
   handleCancelSync,
+  handleViewDetails,
 }: SyncHistoryProps) {
   return (
     <div className="glass-panel p-6 rounded-2xl bg-surface space-y-6 h-full flex flex-col">
@@ -43,7 +45,7 @@ export default function SyncHistory({
           Chưa có dữ liệu đồng bộ nào.
         </div>
       ) : (
-        <div className="space-y-4 flex-1 overflow-y-auto max-h-[550px] pr-2">
+        <div className="space-y-4 flex-1 overflow-y-auto max-h-[550px] pr-2 custom-scrollbar">
           {logs.map((log) => (
             <div key={log.id} className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-2">
               <div className="flex items-center justify-between">
@@ -51,6 +53,14 @@ export default function SyncHistory({
                   {log.api_source?.name || `Nguồn #${log.api_source_id}`}
                 </span>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleViewDetails(log)}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-primary/10 text-primary hover:bg-primary/20 transition-all cursor-pointer"
+                    title="Xem chi tiết tiến trình"
+                  >
+                    Xem tiến trình
+                  </button>
+
                   {log.status === "running" && (
                     <button
                       onClick={() => handleCancelSync(log.id)}
@@ -60,6 +70,7 @@ export default function SyncHistory({
                       <StopCircle className="w-3 h-3" /> Hủy
                     </button>
                   )}
+                  
                   <span
                     className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
                       log.status === "completed" || log.status === "success"
@@ -84,10 +95,32 @@ export default function SyncHistory({
                 </div>
               </div>
 
-              <div className="flex justify-between items-center text-xs text-on-surface-variant font-medium">
-                <span>Đồng bộ: {log.papers_synced} bài báo</span>
-                <span>{new Date(log.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} - {new Date(log.created_at).toLocaleDateString("vi-VN")}</span>
-              </div>
+              {(() => {
+                const progressDetails = log.progress_details || {};
+                const totalExpected = progressDetails.total_expected || 0;
+                const summary = progressDetails.summary || { success: 0, skipped: 0, failed: 0 };
+                const successCount = summary.success || 0;
+                const skippedCount = summary.skipped || 0;
+                const failedCount = summary.failed || 0;
+                
+                return (
+                  <div className="flex justify-between items-center text-xs text-on-surface-variant font-medium">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span>Đồng bộ: {totalExpected || log.papers_synced} bài</span>
+                      {totalExpected > 0 && (
+                        <span className="text-[10px] text-on-surface-variant/80">
+                          (
+                          <span className="text-tertiary font-semibold">{successCount} thành công</span>
+                          {skippedCount > 0 && <span className="text-on-surface-variant/70 font-semibold">, {skippedCount} trùng</span>}
+                          {failedCount > 0 && <span className="text-error font-semibold">, {failedCount} lỗi</span>}
+                          )
+                        </span>
+                      )}
+                    </div>
+                    <span className="flex-shrink-0">{new Date(log.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} - {new Date(log.created_at).toLocaleDateString("vi-VN")}</span>
+                  </div>
+                );
+              })()}
 
               {log.error_message && log.status !== "running" && (
                 <p className="text-[10px] text-error bg-error-container/10 p-2 rounded border border-error/20 font-mono break-words mt-2">

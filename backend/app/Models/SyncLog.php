@@ -14,6 +14,11 @@ class SyncLog extends Model
         'status',
         'papers_synced',
         'error_message',
+        'progress_details',
+    ];
+
+    protected $casts = [
+        'progress_details' => 'array',
     ];
 
     public function apiSource()
