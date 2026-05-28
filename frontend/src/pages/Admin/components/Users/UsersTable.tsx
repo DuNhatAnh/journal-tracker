@@ -97,19 +97,27 @@ export default function UsersTable({
                   {new Date(user.created_at).toLocaleDateString("vi-VN")}
                 </td>
                 <td className="px-6 py-4 text-right space-x-2">
-                  <button
-                    onClick={() => handleOpenEditModal(user)}
-                    className="p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteUser(user.id)}
-                    disabled={user.id === currentUser.id}
-                    className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {user.role.toLowerCase() !== "admin" || currentUser.email === "admin@journaltracker.app" ? (
+                    <>
+                      <button
+                        onClick={() => handleOpenEditModal(user)}
+                        className="p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all"
+                        title="Chỉnh sửa người dùng"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(user.id)}
+                        disabled={user.id === currentUser.id}
+                        className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                        title={user.id === currentUser.id ? "Không thể tự xóa bản thân" : "Xóa người dùng"}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-[10px] uppercase font-bold text-on-surface-variant/50">Không thể sửa/xóa</span>
+                  )}
                 </td>
               </tr>
             ))}

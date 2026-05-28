@@ -14,6 +14,9 @@ export type NotificationItem = {
 interface NotificationItemCardProps {
   notification: NotificationItem;
   onClick: (notification: NotificationItem) => void;
+  selectable?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 const iconMap: Record<string, typeof BellRing> = {
@@ -75,7 +78,7 @@ function formatTimeAgo(dateStr: string) {
   return `${diffDays} ngày trước`;
 }
 
-export function NotificationItemCard({ notification, onClick }: NotificationItemCardProps) {
+export function NotificationItemCard({ notification, onClick, selectable, isSelected, onToggleSelect }: NotificationItemCardProps) {
   const SectionIcon = iconMap[getNotificationType(notification)] || BellRing;
   const title = getNotificationTitle(notification);
   const description = getNotificationDescription(notification);
@@ -85,12 +88,28 @@ export function NotificationItemCard({ notification, onClick }: NotificationItem
   return (
     <div
       onClick={() => onClick(notification)}
-      className={`glass-panel rounded-2xl p-6 flex gap-6 relative overflow-hidden group transition-all cursor-pointer hover:border-primary/50 ${
+      className={`glass-panel rounded-2xl p-4 sm:p-6 flex items-center gap-4 sm:gap-6 relative overflow-hidden group transition-all cursor-pointer hover:border-primary/50 ${
         unread ? "border border-tertiary/30 bg-tertiary/5" : "bg-surface"
       }`}
     >
-      <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-        <SectionIcon className="w-7 h-7 text-primary" />
+      {selectable && (
+        <div 
+          className="flex items-center flex-shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onToggleSelect) onToggleSelect();
+          }}
+        >
+          <input 
+            type="checkbox" 
+            checked={!!isSelected}
+            onChange={() => {}}
+            className="w-5 h-5 rounded border-white/20 bg-white/5 text-primary focus:ring-primary/50 cursor-pointer"
+          />
+        </div>
+      )}
+      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+        <SectionIcon className="w-6 h-6 sm:w-7 sm:h-7 text-primary" />
       </div>
       <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-1">

@@ -24,6 +24,10 @@ export default function AdminUsers() {
     password: "",
     role: "student",
   });
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [modalSuccess, setModalSuccess] = useState<string | null>(null);
 
   const currentUserStr = localStorage.getItem("user");
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
@@ -55,6 +59,9 @@ export default function AdminUsers() {
     setModalType("add");
     setSelectedUser(null);
     setFormData({ name: "", email: "", password: "", role: "student" });
+    setModalError(null);
+    setModalSuccess(null);
+    setIsSubmitting(false);
     setIsModalOpen(true);
   };
 
@@ -62,6 +69,9 @@ export default function AdminUsers() {
     setModalType("edit");
     setSelectedUser(user);
     setFormData({ name: user.name, email: user.email, password: "", role: user.role });
+    setModalError(null);
+    setModalSuccess(null);
+    setIsSubmitting(false);
     setIsModalOpen(true);
   };
 
@@ -76,11 +86,14 @@ export default function AdminUsers() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setModalError(null);
+    setModalSuccess(null);
+    setIsSubmitting(true);
 
     try {
       if (modalType === "add") {
         await api.post("/admin/users", formData);
+        setModalSuccess("Thêm người dùng mới thành công!");
       } else if (modalType === "edit" && selectedUser) {
         // Exclude password if empty during edit
         const payload: Record<string, any> = {
@@ -89,11 +102,30 @@ export default function AdminUsers() {
           role: formData.role,
         };
         await api.put(`/admin/users/${selectedUser.id}`, payload);
+        setModalSuccess("Cập nhật thông tin người dùng thành công!");
       }
-      setIsModalOpen(false);
-      await loadUsers();
+      
+      setTimeout(async () => {
+        setIsModalOpen(false);
+        setModalSuccess(null);
+        await loadUsers();
+      }, 1500);
     } catch (err: any) {
-      setError(err.message || "Lỗi khi lưu thông tin người dùng.");
+      let errMsg = "Có lỗi xảy ra khi lưu thông tin người dùng.";
+      if (err.response?.data?.errors) {
+        const validationErrors = err.response.data.errors;
+        const messages = Object.values(validationErrors).flat();
+        if (messages.length > 0) {
+          errMsg = messages.join(" ");
+        }
+      } else if (err.response?.data?.message) {
+        errMsg = err.response.data.message;
+      } else if (err.message) {
+        errMsg = err.message;
+      }
+      setModalError(errMsg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -201,6 +233,9 @@ export default function AdminUsers() {
         handleInputChange={handleInputChange}
         handleCloseModal={handleCloseModal}
         handleSubmit={handleSubmit}
+        isSubmitting={isSubmitting}
+        modalError={modalError}
+        modalSuccess={modalSuccess}
       />
     </div>
   );

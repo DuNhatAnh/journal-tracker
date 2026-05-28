@@ -10,7 +10,7 @@ class AdminUserController extends Controller
 {
     public function index()
     {
-        return response()->json(User::all());
+        return response()->json(User::where('email', '!=', 'admin@journaltracker.app')->get());
     }
 
     public function store(Request $request)
@@ -30,11 +30,22 @@ class AdminUserController extends Controller
 
     public function show(User $user)
     {
+        if ($user->email === 'admin@journaltracker.app') {
+            abort(403, 'Không được phép xem thông tin tài khoản này.');
+        }
         return response()->json($user);
     }
 
     public function update(Request $request, User $user)
     {
+        if ($user->email === 'admin@journaltracker.app') {
+            abort(403, 'Không thể thay đổi tài khoản quản trị tối cao.');
+        }
+
+        if (strtolower($user->role) === 'admin' && $request->user()->email !== 'admin@journaltracker.app') {
+            abort(403, 'Chỉ tài khoản admin gốc mới được phép chỉnh sửa Admin khác.');
+        }
+
         $validated = $request->validate([
             'name'  => 'sometimes|string|max:255',
             'email' => 'sometimes|string|email|max:255|unique:users,email,' . $user->id,
@@ -45,8 +56,16 @@ class AdminUserController extends Controller
         return response()->json($user);
     }
 
-    public function destroy(User $user)
+    public function destroy(Request $request, User $user)
     {
+        if ($user->email === 'admin@journaltracker.app') {
+            abort(403, 'Không thể xóa tài khoản quản trị tối cao.');
+        }
+
+        if (strtolower($user->role) === 'admin' && $request->user()->email !== 'admin@journaltracker.app') {
+            abort(403, 'Chỉ tài khoản admin gốc mới được phép xóa Admin khác.');
+        }
+
         $user->delete();
         return response()->json(null, 204);
     }

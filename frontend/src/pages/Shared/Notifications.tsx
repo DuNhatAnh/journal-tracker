@@ -36,9 +36,14 @@ export default function Notifications() {
 
   const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
 
+  // Selection states
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   // Confirmation dialog states
   const [confirmMarkAll, setConfirmMarkAll] = useState(false);
   const [confirmDeleteRead, setConfirmDeleteRead] = useState(false);
+  const [confirmDeleteSelected, setConfirmDeleteSelected] = useState(false);
 
   // useApiQuery for the first page of notifications (persist: false ensures loading skeleton shows on entry)
   const { 
@@ -171,6 +176,38 @@ export default function Notifications() {
     }
   };
 
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    setError(null);
+    try {
+      await api.post("/notifications/delete-multiple", { ids: Array.from(selectedIds) });
+      window.dispatchEvent(new CustomEvent("notifications-updated"));
+      
+      setNotifications(prev => prev.filter(n => !selectedIds.has(n.id)));
+      
+      if (firstPageData) {
+        const updatedList = firstPageData.data.filter((n: any) => !selectedIds.has(n.id));
+        const updatedData = { ...firstPageData, data: updatedList };
+        setFirstPageData(updatedData);
+        queryCache.set("/notifications?page=1&per_page=5", updatedData);
+      }
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      refetchFirstPage();
+    } catch (err: any) {
+      setError(err.message || "Không thể xóa các thông báo được chọn.");
+    }
+  };
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   // Local filtering logic
   const filteredNotifications = notifications.filter(notification => {
     // 1. Text Search Filter
@@ -222,6 +259,21 @@ export default function Notifications() {
         disableMarkAll={notifications.length === 0 || loading || !hasUnread} 
         onDeleteRead={() => setConfirmDeleteRead(true)}
         disableDeleteRead={notifications.length === 0 || loading || !hasRead}
+        selectionMode={selectionMode}
+        selectedCount={selectedIds.size}
+        onToggleSelectionMode={() => {
+          setSelectionMode(!selectionMode);
+          if (selectionMode) setSelectedIds(new Set());
+        }}
+        onDeleteSelected={() => setConfirmDeleteSelected(true)}
+        onSelectAll={() => {
+          const allIds = notifications.map(n => n.id);
+          if (selectedIds.size === allIds.length) {
+            setSelectedIds(new Set());
+          } else {
+            setSelectedIds(new Set(allIds));
+          }
+        }}
       />
 
       {/* Control Bar (Search & Filters) */}
@@ -361,7 +413,10 @@ export default function Notifications() {
                   <NotificationItemCard
                     key={notification.id}
                     notification={notification}
-                    onClick={handleNotificationClick}
+                    onClick={selectionMode ? () => handleToggleSelect(notification.id) : handleNotificationClick}
+                    selectable={selectionMode}
+                    isSelected={selectedIds.has(notification.id)}
+                    onToggleSelect={() => handleToggleSelect(notification.id)}
                   />
                 ))}
               </div>
@@ -448,6 +503,41 @@ export default function Notifications() {
                 onClick={() => {
                   setConfirmDeleteRead(false);
                   handleDeleteRead();
+                }}
+                className="px-6 py-2.5 rounded-full font-bold text-sm bg-error text-white hover:bg-error/95 transition-colors shadow-lg shadow-error/25"
+              >
+                Đồng ý xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Delete Selected Modal */}
+      {confirmDeleteSelected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setConfirmDeleteSelected(false)}>
+          <div className="w-full max-w-md bg-surface-container-high border border-white/10 rounded-3xl shadow-2xl p-6 sm:p-8 relative animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => setConfirmDeleteSelected(false)}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-on-surface-variant transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="font-display text-2xl font-bold text-on-surface mb-3 text-left">Xóa {selectedIds.size} thông báo</h3>
+            <p className="text-sm text-on-surface-variant leading-relaxed text-left mb-8">
+              Hành động này sẽ xóa vĩnh viễn {selectedIds.size} thông báo đã chọn khỏi hệ thống. Bạn có chắc chắn muốn thực hiện không?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmDeleteSelected(false)}
+                className="px-5 py-2.5 rounded-full font-bold text-sm text-on-surface hover:bg-white/5 transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmDeleteSelected(false);
+                  handleDeleteSelected();
                 }}
                 className="px-6 py-2.5 rounded-full font-bold text-sm bg-error text-white hover:bg-error/95 transition-colors shadow-lg shadow-error/25"
               >

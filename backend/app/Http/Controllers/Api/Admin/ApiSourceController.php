@@ -75,7 +75,6 @@ class ApiSourceController extends Controller
         $years = $request->input('years', '');
         $startPage = (int) $request->input('start_page', 1);
 
-        // Pre-create the SyncLog
         $syncLog = \App\Models\SyncLog::create([
             'api_source_id' => $apiSource->id,
             'status'        => 'running',
@@ -83,7 +82,12 @@ class ApiSourceController extends Controller
             'progress_details' => [
                 'total_expected' => $pages,
                 'items' => [],
-                'summary' => ['success' => 0, 'skipped' => 0, 'failed' => 0]
+                'summary' => ['success' => 0, 'skipped' => 0, 'failed' => 0],
+                'parameters' => [
+                    'keyword' => $field,
+                    'years' => $years,
+                    'domain' => $request->input('domain', 'Computer Science')
+                ]
             ]
         ]);
 
@@ -121,7 +125,7 @@ class ApiSourceController extends Controller
     {
         $logs = \App\Models\SyncLog::with('apiSource')
             ->orderByDesc('created_at')
-            ->paginate(20);
+            ->paginate(10);
 
         return response()->json($logs);
     }

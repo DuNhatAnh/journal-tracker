@@ -86,16 +86,25 @@ class SyncPapersFromApi implements ShouldQueue
             }
         }
 
-        $this->syncLog->update([
-            'progress_details' => [
-                'total_expected' => $this->maxPages,
-                'items' => array_values($this->progressItems),
-                'summary' => [
-                    'success' => $success,
-                    'skipped' => $skipped,
-                    'failed' => $failed,
-                ]
+        $existingDetails = $this->syncLog->progress_details ?? [];
+        $parameters = $existingDetails['parameters'] ?? null;
+
+        $newDetails = [
+            'total_expected' => $this->maxPages,
+            'items' => array_values($this->progressItems),
+            'summary' => [
+                'success' => $success,
+                'skipped' => $skipped,
+                'failed' => $failed,
             ]
+        ];
+
+        if ($parameters) {
+            $newDetails['parameters'] = $parameters;
+        }
+
+        $this->syncLog->update([
+            'progress_details' => $newDetails
         ]);
     }
 
@@ -117,14 +126,23 @@ class SyncPapersFromApi implements ShouldQueue
             ]);
         } else {
             // Update to running and reset fields
+            $existingDetails = $this->syncLog->progress_details ?? [];
+            $parameters = $existingDetails['parameters'] ?? null;
+            
+            $newDetails = [
+                'total_expected' => $this->maxPages,
+                'items' => [],
+                'summary' => ['success' => 0, 'skipped' => 0, 'failed' => 0]
+            ];
+            
+            if ($parameters) {
+                $newDetails['parameters'] = $parameters;
+            }
+
             $this->syncLog->update([
                 'status'        => 'running',
                 'papers_synced' => 0,
-                'progress_details' => [
-                    'total_expected' => $this->maxPages,
-                    'items' => [],
-                    'summary' => ['success' => 0, 'skipped' => 0, 'failed' => 0]
-                ]
+                'progress_details' => $newDetails
             ]);
         }
 
@@ -165,7 +183,7 @@ class SyncPapersFromApi implements ShouldQueue
                     page: $page,
                     perPage: $currentPerPage,
                     topicId: $this->topicId,
-                    years: '',
+                    years: $this->years,
                     sort: 'cited_by_count:desc',
                     conceptId: $conceptId
                 );

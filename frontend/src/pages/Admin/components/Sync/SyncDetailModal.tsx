@@ -133,6 +133,31 @@ export default function SyncDetailModal({
             </div>
           )}
 
+          {/* Sync Parameters */}
+          {progressDetails.parameters && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-white/5 border border-white/10 rounded-xl relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="relative">
+                <span className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                  <Search className="w-3 h-3 text-primary" /> Từ khóa
+                </span>
+                <span className="text-sm font-semibold text-on-surface bg-white/5 px-2 py-0.5 rounded inline-block">{progressDetails.parameters.keyword || "Không có (mặc định)"}</span>
+              </div>
+              <div className="relative">
+                <span className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                  <RefreshCw className="w-3 h-3 text-secondary" /> Thời gian
+                </span>
+                <span className="text-sm font-semibold text-on-surface bg-white/5 px-2 py-0.5 rounded inline-block">{progressDetails.parameters.years || "Không giới hạn"}</span>
+              </div>
+              <div className="relative">
+                <span className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                  <Zap className="w-3 h-3 text-emerald-400" /> Lĩnh vực
+                </span>
+                <span className="text-sm font-semibold text-on-surface bg-white/5 px-2 py-0.5 rounded inline-block">{progressDetails.parameters.domain || "Khoa học máy tính"}</span>
+              </div>
+            </div>
+          )}
+
           {/* Status and Progress Bar */}
           <div className="space-y-3">
             <div className="flex justify-between items-center text-sm font-semibold">

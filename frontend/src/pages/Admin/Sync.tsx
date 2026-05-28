@@ -11,7 +11,7 @@ import SyncDetailModal from "./components/Sync/SyncDetailModal";
 export default function AdminSync() {
   const [sources, setSources] = useState<ApiSource[]>([]);
   const [logs, setLogs] = useState<SyncLog[]>([]);
-  const [logsPagination, setLogsPagination] = useState({ current: 1, last: 1 });
+  const [logsPagination, setLogsPagination] = useState({ current: 1, last: 1, total: 0 });
   const [loadingSources, setLoadingSources] = useState(true);
   const [loadingLogs, setLoadingLogs] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -108,6 +108,7 @@ export default function AdminSync() {
         setLogsPagination({
           current: response.current_page,
           last: response.last_page,
+          total: response.total || 0,
         });
       }
     } catch (err: any) {
@@ -197,7 +198,6 @@ export default function AdminSync() {
     setActionError(null);
     setActionSuccess(null);
     const params = syncParams[sourceId] || { domain: "Computer Science", field: "", pages: 50, yearFrom: "2023", yearTo: "2026", startPage: 1 };
-    const combinedQuery = params.domain ? `${params.domain} ${params.field}`.trim() : params.field;
     
     // Validate years
     if (parseInt(params.yearFrom) > parseInt(params.yearTo)) {
@@ -209,7 +209,8 @@ export default function AdminSync() {
 
     try {
       const response = await api.post<{ message: string; sync_log: SyncLog }>(`/admin/api-sources/${sourceId}/sync`, {
-        field: combinedQuery,
+        domain: params.domain,
+        field: params.field.trim(),
         pages: params.pages,
         years: `${params.yearFrom}-${params.yearTo}`,
         start_page: params.startPage,

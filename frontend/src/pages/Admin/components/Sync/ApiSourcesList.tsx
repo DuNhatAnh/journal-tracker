@@ -151,11 +151,7 @@ export default function ApiSourcesList({
                         }}
                         onBlur={() => handleInputBlur(source.id)}
                         onChange={(e) => handleParamChange(source.id, "field", e.target.value)}
-                        className={`w-full px-3 py-2 text-xs rounded-lg bg-surface-container border text-on-surface outline-none focus:border-primary/50 ${
-                          touchedSources[source.id] && !params.field.trim()
-                            ? "border-error/50 focus:border-error"
-                            : "border-outline"
-                        }`}
+                        className="w-full px-3 py-2 text-xs rounded-lg bg-surface-container border border-outline text-on-surface outline-none focus:border-primary/50"
                         placeholder="Ví dụ: deep learning, machine learning..."
                       />
 
@@ -184,11 +180,11 @@ export default function ApiSourcesList({
                         </div>
                       )}
 
-                      {/* Validation message */}
-                      {touchedSources[source.id] && !params.field.trim() && (
-                        <span className="text-[10px] text-error font-medium block mt-1">
-                          Vui lòng nhập hoặc chọn một từ khóa.
-                        </span>
+                      {/* Note for empty field */}
+                      {!params.field.trim() && (
+                        <p className="text-[10px] text-on-surface-variant/80 mt-1.5 leading-relaxed bg-white/5 p-2.5 rounded-lg border border-white/5">
+                          💡 <span className="font-semibold text-primary">Lưu ý:</span> Nếu không chọn hoặc nhập từ khóa, hệ thống sẽ tải theo nguyên tắc: từ các khái niệm hàng đầu đến bài báo được trích dẫn nhiều nhất và các bài báo gần đây mà không cần lọc theo từ khóa.
+                        </p>
                       )}
                     </div>
 
@@ -251,13 +247,9 @@ export default function ApiSourcesList({
 
                   <button
                     onClick={() => {
-                      if (!params.field.trim()) {
-                        setTouchedSources(prev => ({ ...prev, [source.id]: true }));
-                        return;
-                      }
                       handleTriggerSync(source.id, source.name);
                     }}
-                    disabled={loadingSyncSourceId !== null || !params.field.trim()}
+                    disabled={loadingSyncSourceId !== null}
                     className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs uppercase tracking-widest hover:bg-primary-container transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loadingSyncSourceId === source.id ? (

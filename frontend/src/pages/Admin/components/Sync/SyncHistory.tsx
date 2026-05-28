@@ -5,7 +5,7 @@ import { SyncLog } from "../../types";
 type SyncHistoryProps = {
   logs: SyncLog[];
   loadingLogs: boolean;
-  logsPagination: { current: number; last: number };
+  logsPagination: { current: number; last: number; total?: number };
   loadLogs: (page: number) => void;
   handleCancelSync: (logId: number) => void;
   handleViewDetails: (log: SyncLog) => void;
@@ -24,6 +24,11 @@ export default function SyncHistory({
       <div className="flex items-center justify-between">
         <h3 className="font-display font-bold text-lg flex items-center gap-2">
           <Calendar className="w-5 h-5 text-secondary" /> Lịch sử đồng bộ
+          {logsPagination.total !== undefined && logsPagination.total > 0 && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-secondary/15 text-secondary">
+              {logsPagination.total}
+            </span>
+          )}
         </h3>
         <button
           onClick={() => loadLogs(1)}
