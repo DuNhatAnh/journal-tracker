@@ -100,6 +100,15 @@ export function StatsGrid() {
             );
           }
 
+          if (i === 3) {
+            return (
+              <Link key={i} to="/bookmarks" className="glass-panel p-6 rounded-xl relative group overflow-hidden hover:border-primary/40 transition-all cursor-pointer block">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                {content}
+              </Link>
+            );
+          }
+
           return (
             <div key={i} className="glass-panel p-6 rounded-xl hover:bg-white/5 transition-all group">
               {content}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { BookMarked, Search, ArrowRight, Lightbulb } from "lucide-react";
 import { DashboardData, PaperDetail } from "../types";
 import { api } from "@/src/lib/api";
@@ -106,9 +107,12 @@ export function SearchTipsWidget() {
           <span>Lưu các bài báo hay để hệ thống tự động học sở thích và gợi ý chuẩn xác hơn cho bạn.</span>
         </li>
       </ul>
-      <button className="w-full mt-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2">
+      <Link 
+        to="/search" 
+        className="w-full mt-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2 block text-center text-on-surface hover:text-primary"
+      >
         Đến trang Tìm kiếm <Search className="w-3 h-3" />
-      </button>
+      </Link>
     </section>
   );
 }

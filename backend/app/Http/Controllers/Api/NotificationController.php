@@ -18,6 +18,16 @@ class NotificationController extends Controller
         return response()->json($notifications);
     }
 
+    public function unreadCount()
+    {
+        $count = auth()->user()
+            ->notifications()
+            ->where('is_read', 'false')
+            ->count();
+
+        return response()->json(['count' => $count]);
+    }
+
     public function markRead(int $id)
     {
         $notification = auth()->user()
@@ -37,5 +47,15 @@ class NotificationController extends Controller
             ->update(['is_read' => 'true', 'read_at' => now()]);
 
         return response()->json(['message' => 'Đã đọc tất cả.']);
+    }
+
+    public function deleteRead()
+    {
+        auth()->user()
+            ->notifications()
+            ->where('is_read', 'true')
+            ->delete();
+
+        return response()->json(['message' => 'Đã xóa thông báo đã đọc.']);
     }
 }

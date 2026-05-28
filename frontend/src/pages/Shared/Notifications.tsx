@@ -1,78 +1,12 @@
 import { useEffect, useState } from "react";
-import { BellRing, CheckCircle2, History, Info, TrendingUp, BookOpenText, LibraryBig, ArrowRight, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Search, X } from "lucide-react";
 import { api } from "@/src/lib/api";
 import { useApiQuery, queryCache } from "../../hooks/useApiQuery";
-
-type NotificationItem = {
-  id: string;
-  type?: string;
-  title?: string;
-  content?: string;
-  data?: Record<string, any>;
-  created_at: string;
-  is_read?: boolean;
-  read_at?: string | null;
-};
-
-const iconMap: Record<string, typeof BellRing> = {
-  trend: TrendingUp,
-  publication: BookOpenText,
-  summary: LibraryBig,
-  alert: Info,
-  activity: History,
-};
-
-function getNotificationType(notification: NotificationItem) {
-  const type = notification.type || notification.data?.type || "";
-
-  if (typeof type === "string") {
-    if (type.toLowerCase().includes("trend") || type.toLowerCase().includes("xu hướng")) return "trend";
-    if (type.toLowerCase().includes("publication") || type.toLowerCase().includes("article") || type.toLowerCase().includes("paper")) return "publication";
-    if (type.toLowerCase().includes("summary") || type.toLowerCase().includes("tóm tắt")) return "summary";
-    if (type.toLowerCase().includes("alert") || type.toLowerCase().includes("warning") || type.toLowerCase().includes("cảnh báo")) return "alert";
-  }
-
-  return "activity";
-}
-
-function getNotificationTitle(notification: NotificationItem) {
-  return (
-    notification.title ||
-    notification.data?.title ||
-    notification.data?.subject ||
-    notification.data?.heading ||
-    notification.data?.message ||
-    "Thông báo mới"
-  );
-}
-
-function getNotificationDescription(notification: NotificationItem) {
-  return (
-    notification.content ||
-    notification.data?.description ||
-    notification.data?.body ||
-    notification.data?.message ||
-    ""
-  );
-}
-
-function formatTimeAgo(dateStr: string) {
-  const createdAt = new Date(dateStr).getTime();
-  const diffMinutes = Math.floor((Date.now() - createdAt) / 60000);
-
-  if (diffMinutes < 60) {
-    return `${diffMinutes} phút trước`;
-  }
-
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) {
-    return `${diffHours} giờ trước`;
-  }
-
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} ngày trước`;
-}
+import { NotificationHeader } from "./components/Notifications/NotificationHeader";
+import { NotificationItem, NotificationItemCard, getNotificationType } from "./components/Notifications/NotificationItemCard";
+import { NotificationDetailModal } from "./components/Notifications/NotificationDetailModal";
+import { NotificationSkeleton } from "./components/Notifications/NotificationSkeleton";
 
 function getDayLabel(dateStr: string) {
   const date = new Date(dateStr);
@@ -95,9 +29,18 @@ export default function Notifications() {
   const [hasMore, setHasMore] = useState(false);
   const navigate = useNavigate();
 
+  // Search & Filter States
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "unread" | "read">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "publication" | "trend" | "alert">("all");
+
   const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
 
-  // useApiQuery for the first page of notifications
+  // Confirmation dialog states
+  const [confirmMarkAll, setConfirmMarkAll] = useState(false);
+  const [confirmDeleteRead, setConfirmDeleteRead] = useState(false);
+
+  // useApiQuery for the first page of notifications (persist: false ensures loading skeleton shows on entry)
   const { 
     data: firstPageData, 
     loading: loading, 
@@ -105,7 +48,7 @@ export default function Notifications() {
     refetch: refetchFirstPage 
   } = useApiQuery<{ data: NotificationItem[], current_page: number, last_page: number }>(
     "/notifications?page=1&per_page=5",
-    { persist: true }
+    { persist: false }
   );
 
   // Synchronize firstPageData with local notifications state
@@ -125,6 +68,7 @@ export default function Notifications() {
     setSelectedNotification(notification);
     if (!notification.is_read) {
       api.patch(`/notifications/${notification.id}/read`).catch(console.error);
+      window.dispatchEvent(new CustomEvent("notifications-updated"));
       
       // Update local state instantly
       setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n));
@@ -150,10 +94,13 @@ export default function Notifications() {
         navigate(`/search?journal=${Array.isArray(filterValue) ? filterValue.join(",") : filterValue}`);
       } else if (filterType === "keywords") {
         navigate(`/search?keyword=${Array.isArray(filterValue) ? filterValue.join(",") : filterValue}`);
+      } else if (filterType === "authors") {
+        navigate(`/search?author=${Array.isArray(filterValue) ? filterValue.join(",") : filterValue}`);
       } else if (filterType === "trending") {
         navigate(`/search?sort=bookmarks_desc`);
       }
     }
+    setSelectedNotification(null);
   };
 
   const loadMoreNotifications = async () => {
@@ -182,6 +129,8 @@ export default function Notifications() {
     setError(null);
     try {
       await api.post("/notifications/read-all");
+      window.dispatchEvent(new CustomEvent("notifications-updated"));
+      
       // Update local state instantly
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() })));
       
@@ -200,45 +149,202 @@ export default function Notifications() {
     }
   };
 
-  const groupedNotifications = notifications.reduce((groups: Record<string, NotificationItem[]>, notification: NotificationItem) => {
+  const handleDeleteRead = async () => {
+    setError(null);
+    try {
+      await api.delete("/notifications/read");
+      window.dispatchEvent(new CustomEvent("notifications-updated"));
+      
+      // Update local state instantly by keeping only unread notifications
+      setNotifications(prev => prev.filter(n => !n.is_read && !n.read_at));
+      
+      // Update firstPageData in cache
+      if (firstPageData) {
+        const updatedList = firstPageData.data.filter((n: any) => !n.is_read && !n.read_at);
+        const updatedData = { ...firstPageData, data: updatedList };
+        setFirstPageData(updatedData);
+        queryCache.set("/notifications?page=1&per_page=5", updatedData);
+      }
+      refetchFirstPage();
+    } catch (err: any) {
+      setError(err.message || "Không thể xóa thông báo đã đọc.");
+    }
+  };
+
+  // Local filtering logic
+  const filteredNotifications = notifications.filter(notification => {
+    // 1. Text Search Filter
+    const title = (notification.title || "").toLowerCase();
+    const content = (notification.content || "").toLowerCase();
+    const matchesSearch = title.includes(searchTerm.toLowerCase()) || content.includes(searchTerm.toLowerCase());
+
+    // 2. Read/Unread Status Filter
+    const isUnread = !notification.is_read && !notification.read_at;
+    let matchesStatus = false;
+    if (statusFilter === "all") {
+      matchesStatus = true;
+    } else if (statusFilter === "unread") {
+      matchesStatus = isUnread;
+    } else if (statusFilter === "read") {
+      matchesStatus = !isUnread;
+    }
+
+    // 3. Category Type Filter
+    const type = getNotificationType(notification);
+    let matchesType = false;
+    if (typeFilter === "all") {
+      matchesType = true;
+    } else if (typeFilter === "publication") {
+      matchesType = type === "publication";
+    } else if (typeFilter === "trend") {
+      matchesType = type === "trend";
+    } else if (typeFilter === "alert") {
+      matchesType = type === "alert" || type === "activity";
+    }
+
+    return matchesSearch && matchesStatus && matchesType;
+  });
+
+  const groupedNotifications = filteredNotifications.reduce((groups: Record<string, NotificationItem[]>, notification: NotificationItem) => {
     const label = getDayLabel(notification.created_at);
     groups[label] = groups[label] || [];
     groups[label].push(notification);
     return groups;
   }, {} as Record<string, NotificationItem[]>);
 
+  const hasUnread = notifications.some(n => !n.is_read && !n.read_at);
+  const hasRead = notifications.some(n => n.is_read || n.read_at);
+
   return (
-    <div className="max-w-4xl mx-auto space-y-12 pb-20">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end border-b border-white/5 pb-8 gap-4">
-        <div>
-          <h2 className="font-display text-4xl font-bold text-on-surface">Thông báo</h2>
-          <p className="text-on-surface-variant mt-2 font-medium">Cập nhật các xu hướng nghiên cứu mới nhất và cảnh báo hệ thống.</p>
+    <div className="max-w-4xl mx-auto space-y-8 pb-20">
+      <NotificationHeader 
+        onMarkAllRead={() => setConfirmMarkAll(true)} 
+        disableMarkAll={notifications.length === 0 || loading || !hasUnread} 
+        onDeleteRead={() => setConfirmDeleteRead(true)}
+        disableDeleteRead={notifications.length === 0 || loading || !hasRead}
+      />
+
+      {/* Control Bar (Search & Filters) */}
+      {notifications.length > 0 && (
+        <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between bg-surface-container/40 p-4 rounded-3xl border border-white/5">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm trong thông báo..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-surface-container-low border border-white/10 rounded-2xl py-2.5 pl-11 pr-4 text-sm text-on-surface focus:outline-none focus:border-primary/50 transition-all placeholder:text-on-surface-variant/60"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full hover:bg-white/10 text-on-surface-variant"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Status Filters */}
+            <div className="flex bg-surface-container-low p-1 rounded-2xl border border-white/5">
+              <button
+                onClick={() => setStatusFilter("all")}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  statusFilter === "all"
+                    ? "bg-primary text-white shadow-lg shadow-primary/25"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                Tất cả
+              </button>
+              <button
+                onClick={() => setStatusFilter("unread")}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  statusFilter === "unread"
+                    ? "bg-primary text-white shadow-lg shadow-primary/25"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                Chưa đọc
+              </button>
+              <button
+                onClick={() => setStatusFilter("read")}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  statusFilter === "read"
+                    ? "bg-primary text-white shadow-lg shadow-primary/25"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                Đã đọc
+              </button>
+            </div>
+
+            {/* Type Filters */}
+            <div className="flex bg-surface-container-low p-1 rounded-2xl border border-white/5">
+              <button
+                onClick={() => setTypeFilter("all")}
+                className={`px-3 py-2 rounded-xl text-[11px] font-bold transition-all ${
+                  typeFilter === "all"
+                    ? "bg-secondary-container/40 text-on-secondary-container border border-primary/25"
+                    : "text-on-surface-variant hover:text-on-surface border border-transparent"
+                }`}
+              >
+                Tất cả loại
+              </button>
+              <button
+                onClick={() => setTypeFilter("publication")}
+                className={`px-3 py-2 rounded-xl text-[11px] font-bold transition-all ${
+                  typeFilter === "publication"
+                    ? "bg-secondary-container/40 text-on-secondary-container border border-primary/25"
+                    : "text-on-surface-variant hover:text-on-surface border border-transparent"
+                }`}
+              >
+                Bài viết mới
+              </button>
+              <button
+                onClick={() => setTypeFilter("trend")}
+                className={`px-3 py-2 rounded-xl text-[11px] font-bold transition-all ${
+                  typeFilter === "trend"
+                    ? "bg-secondary-container/40 text-on-secondary-container border border-primary/25"
+                    : "text-on-surface-variant hover:text-on-surface border border-transparent"
+                }`}
+              >
+                Xu hướng
+              </button>
+              <button
+                onClick={() => setTypeFilter("alert")}
+                className={`px-3 py-2 rounded-xl text-[11px] font-bold transition-all ${
+                  typeFilter === "alert"
+                    ? "bg-secondary-container/40 text-on-secondary-container border border-primary/25"
+                    : "text-on-surface-variant hover:text-on-surface border border-transparent"
+                }`}
+              >
+                Hệ thống
+              </button>
+            </div>
+          </div>
         </div>
-        <button
-          onClick={handleMarkAllRead}
-          disabled={notifications.length === 0 || loading}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-widest hover:bg-primary/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <CheckCircle2 className="w-4 h-4" /> Đánh dấu tất cả đã đọc
-        </button>
-      </header>
+      )}
 
       {error && (
-        <div className="p-4 rounded-2xl bg-error-container/20 border border-error/40 text-error text-sm font-medium">
+        <div className="p-4 rounded-2xl bg-error-container/20 border border-error/40 text-error text-sm font-medium text-left">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="space-y-4">
-          <div className="h-24 rounded-3xl bg-white/5 animate-pulse" />
-          <div className="h-24 rounded-3xl bg-white/5 animate-pulse" />
-          <div className="h-24 rounded-3xl bg-white/5 animate-pulse" />
-        </div>
+        <NotificationSkeleton />
       ) : notifications.length === 0 ? (
         <div className="rounded-3xl border border-white/10 bg-surface p-10 text-center text-on-surface-variant">
           <p className="text-lg font-semibold text-on-surface">Chưa có thông báo mới.</p>
           <p className="mt-2 text-sm">Hệ thống sẽ hiển thị khi có cảnh báo hoặc cập nhật từ dữ liệu của bạn.</p>
+        </div>
+      ) : filteredNotifications.length === 0 ? (
+        <div className="rounded-3xl border border-white/10 bg-surface p-10 text-center text-on-surface-variant">
+          <p className="text-lg font-semibold text-on-surface">Không tìm thấy thông báo phù hợp.</p>
+          <p className="mt-2 text-sm">Hãy thử thay đổi từ khóa tìm kiếm hoặc điều kiện bộ lọc của bạn.</p>
         </div>
       ) : (
         Object.entries(groupedNotifications).map(([label, items]) => {
@@ -251,40 +357,17 @@ export default function Notifications() {
               </div>
 
               <div className="space-y-4">
-                {notificationItems.map((notification: NotificationItem) => {
-                const SectionIcon = iconMap[getNotificationType(notification)] || BellRing;
-                const title = getNotificationTitle(notification);
-                const description = getNotificationDescription(notification);
-                const timeAgo = formatTimeAgo(notification.created_at);
-                const unread = !notification.is_read && !notification.read_at;
-
-                return (
-                  <div
+                {notificationItems.map((notification) => (
+                  <NotificationItemCard
                     key={notification.id}
-                    onClick={() => handleNotificationClick(notification)}
-                    className={`glass-panel rounded-2xl p-6 flex gap-6 relative overflow-hidden group transition-all cursor-pointer hover:border-primary/50 ${unread ? "border border-tertiary/30 bg-tertiary/5" : "bg-surface"}`}
-                  >
-                    <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                      <SectionIcon className="w-7 h-7 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0 flex flex-col justify-center">
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-1">
-                        <h3 className="text-xl font-bold text-on-surface leading-tight group-hover:text-primary transition-colors">{title}</h3>
-                        <span className="text-[10px] font-medium text-on-surface-variant whitespace-nowrap">{timeAgo}</span>
-                      </div>
-                      {description && <p className="text-sm text-on-surface-variant leading-relaxed">{description}</p>}
-                      {unread && (
-                        <span className="mt-4 inline-flex px-2 py-1 rounded-full bg-primary/10 text-[10px] font-semibold uppercase tracking-widest text-primary w-fit">
-                          Chưa đọc
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        );})
+                    notification={notification}
+                    onClick={handleNotificationClick}
+                  />
+                ))}
+              </div>
+            </section>
+          );
+        })
       )}
 
       {hasMore && (
@@ -299,60 +382,77 @@ export default function Notifications() {
         </div>
       )}
 
-      {/* Quick Info Modal */}
-      {selectedNotification && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedNotification(null)}>
-          <div 
-            className="w-full max-w-lg bg-surface-container-high border border-white/10 rounded-3xl shadow-2xl p-6 sm:p-8 relative animate-in zoom-in-95 duration-200"
-            onClick={e => e.stopPropagation()}
-          >
+      <NotificationDetailModal
+        notification={selectedNotification}
+        onClose={() => setSelectedNotification(null)}
+        onActionClick={handleActionClick}
+      />
+
+      {/* Confirm Mark All Read Modal */}
+      {confirmMarkAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setConfirmMarkAll(false)}>
+          <div className="w-full max-w-md bg-surface-container-high border border-white/10 rounded-3xl shadow-2xl p-6 sm:p-8 relative animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
             <button 
-              onClick={() => setSelectedNotification(null)}
+              onClick={() => setConfirmMarkAll(false)}
               className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-on-surface-variant transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
-            
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                <Info className="w-6 h-6" />
-              </div>
-              <h3 className="font-display text-2xl font-bold text-on-surface">Thông tin nhanh</h3>
-            </div>
-
-            <div className="space-y-4 mb-8">
-              <p className="text-lg font-semibold text-on-surface">{getNotificationTitle(selectedNotification)}</p>
-              <p className="text-on-surface-variant leading-relaxed">
-                {getNotificationDescription(selectedNotification)}
-              </p>
-              {selectedNotification.data?.filter_value && (
-                <div className="p-4 rounded-xl bg-surface-container border border-white/5 flex items-start gap-3">
-                  <ArrowRight className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-on-surface">Gợi ý hành động:</p>
-                    <p className="text-xs text-on-surface-variant mt-1">
-                      Hệ thống đã chuẩn bị sẵn bộ lọc cho "{Array.isArray(selectedNotification.data.filter_value) ? selectedNotification.data.filter_value.join(", ") : selectedNotification.data.filter_value}".
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
+            <h3 className="font-display text-2xl font-bold text-on-surface mb-3 text-left">Đọc tất cả</h3>
+            <p className="text-sm text-on-surface-variant leading-relaxed text-left mb-8">
+              Bạn có chắc chắn muốn đánh dấu toàn bộ thông báo chưa đọc là đã đọc không?
+            </p>
             <div className="flex justify-end gap-3">
-              <button 
-                onClick={() => setSelectedNotification(null)}
+              <button
+                onClick={() => setConfirmMarkAll(false)}
                 className="px-5 py-2.5 rounded-full font-bold text-sm text-on-surface hover:bg-white/5 transition-colors"
               >
-                Đóng
+                Hủy bỏ
               </button>
-              {selectedNotification.data?.filter_type && (
-                <button 
-                  onClick={() => handleActionClick(selectedNotification)}
-                  className="px-5 py-2.5 rounded-full font-bold text-sm bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 flex items-center gap-2"
-                >
-                  Khám phá ngay <ArrowRight className="w-4 h-4" />
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  setConfirmMarkAll(false);
+                  handleMarkAllRead();
+                }}
+                className="px-6 py-2.5 rounded-full font-bold text-sm bg-primary text-white hover:bg-primary/95 transition-colors shadow-lg shadow-primary/25"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Delete Read Modal */}
+      {confirmDeleteRead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setConfirmDeleteRead(false)}>
+          <div className="w-full max-w-md bg-surface-container-high border border-white/10 rounded-3xl shadow-2xl p-6 sm:p-8 relative animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => setConfirmDeleteRead(false)}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-on-surface-variant transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="font-display text-2xl font-bold text-on-surface mb-3 text-left">Xóa thông báo đã đọc</h3>
+            <p className="text-sm text-on-surface-variant leading-relaxed text-left mb-8">
+              Hành động này sẽ xóa vĩnh viễn toàn bộ các thông báo đã đọc khỏi hệ thống của bạn. Bạn có chắc chắn muốn thực hiện không?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmDeleteRead(false)}
+                className="px-5 py-2.5 rounded-full font-bold text-sm text-on-surface hover:bg-white/5 transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmDeleteRead(false);
+                  handleDeleteRead();
+                }}
+                className="px-6 py-2.5 rounded-full font-bold text-sm bg-error text-white hover:bg-error/95 transition-colors shadow-lg shadow-error/25"
+              >
+                Đồng ý xóa
+              </button>
             </div>
           </div>
         </div>

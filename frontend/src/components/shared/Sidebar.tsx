@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/src/lib/utils";
 import { Logo } from "@/src/components/shared/Logo";
 import { ThemeToggle } from "@/src/components/shared/ThemeToggle";
+import { useEffect } from "react";
+import { useApiQuery } from "../../hooks/useApiQuery";
 
 
 export function Sidebar() {
@@ -12,6 +14,20 @@ export function Sidebar() {
   const userStr = localStorage.getItem("user");
   const user = userStr ? JSON.parse(userStr) : null;
   const role = user?.role || "student";
+
+  const { data: countData, refetch } = useApiQuery<{ count: number }>("/notifications/unread-count", {
+    enabled: !!localStorage.getItem("token"),
+  });
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      refetch();
+    };
+    window.addEventListener("notifications-updated", handleUpdate);
+    return () => {
+      window.removeEventListener("notifications-updated", handleUpdate);
+    };
+  }, [refetch]);
 
   const adminSections = [
     {
@@ -84,6 +100,7 @@ export function Sidebar() {
             </h3>
             {section.items.map((item) => {
               const isActive = location.pathname === item.path;
+              const hasBadge = item.label === "Thông báo" && countData && countData.count > 0;
               return (
                 <Link
                   key={item.path}
@@ -96,7 +113,12 @@ export function Sidebar() {
                   )}
                 >
                   <item.icon className={cn("w-4 h-4", isActive ? "text-tertiary" : "group-hover:text-primary")} />
-                  <span className="font-display text-sm font-medium tracking-wide">{item.label}</span>
+                  <span className="font-display text-sm font-medium tracking-wide flex-1 text-left">{item.label}</span>
+                  {hasBadge && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-error text-white font-bold text-[9px] min-w-5 h-5 flex items-center justify-center shadow-lg shadow-error/20 animate-pulse">
+                      {countData.count > 99 ? "99+" : countData.count}
+                    </span>
+                  )}
                 </Link>
               );
             })}

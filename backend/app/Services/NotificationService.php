@@ -16,7 +16,7 @@ class NotificationService
         if (empty($paperIds)) return;
 
         // Fetch papers with their relationships
-        $papers = ResearchPaper::with(['keywords', 'journal'])
+        $papers = ResearchPaper::with(['keywords', 'journal', 'authors'])
             ->whereIn('id', $paperIds)
             ->get();
 
@@ -24,6 +24,7 @@ class NotificationService
 
         $journalIds = [];
         $keywordIds = [];
+        $authorIds = [];
         
         foreach ($papers as $paper) {
             if ($paper->journal_id) {
@@ -32,15 +33,19 @@ class NotificationService
             foreach ($paper->keywords as $keyword) {
                 $keywordIds[] = $keyword->id;
             }
+            foreach ($paper->authors as $author) {
+                $authorIds[] = $author->id;
+            }
         }
 
         $journalIds = array_unique($journalIds);
         $keywordIds = array_unique($keywordIds);
+        $authorIds = array_unique($authorIds);
 
-        // Fetch users who are interested in these journals or keywords,
+        // Fetch users who are interested in these journals, keywords, or authors,
         // and who have not disabled these notifications.
-        $users = User::with(['followedJournals', 'followedKeywords'])
-            ->where(function ($query) use ($journalIds, $keywordIds) {
+        $users = User::with(['followedJournals', 'followedKeywords', 'followedAuthors'])
+            ->where(function ($query) use ($journalIds, $keywordIds, $authorIds) {
                 if (!empty($journalIds)) {
                     $query->orWhereHas('followedJournals', function ($q) use ($journalIds) {
                         $q->whereIn('journals.id', $journalIds);
@@ -51,6 +56,11 @@ class NotificationService
                         $q->whereIn('keywords.id', $keywordIds);
                     });
                 }
+                if (!empty($authorIds)) {
+                    $query->orWhereHas('followedAuthors', function ($q) use ($authorIds) {
+                        $q->whereIn('authors.id', $authorIds);
+                    });
+                }
             })
             ->get();
 
@@ -58,6 +68,7 @@ class NotificationService
             $settings = $user->settings ?? [];
             $notifyJournal = $settings['notify_journal'] ?? true;
             $notifyKeyword = $settings['notify_keyword'] ?? true;
+            $notifyAuthor = $settings['notify_author'] ?? true;
 
             // 1. Process Journals
             if ($notifyJournal && !empty($journalIds)) {
@@ -111,6 +122,38 @@ class NotificationService
                             'data'    => [
                                 'filter_type'  => 'keywords',
                                 'filter_value' => $keywordNames
+                            ]
+                        ]);
+                    }
+                }
+            }
+
+            // 3. Process Authors
+            if ($notifyAuthor && !empty($authorIds)) {
+                $userFollowedAuthorIds = $user->followedAuthors->pluck('id')->toArray();
+                $matchedAuthorIds = array_intersect($authorIds, $userFollowedAuthorIds);
+                
+                if (!empty($matchedAuthorIds)) {
+                    $matchedPapersCount = 0;
+                    foreach ($papers as $paper) {
+                        $paperAuthorIds = $paper->authors->pluck('id')->toArray();
+                        if (!empty(array_intersect($paperAuthorIds, $matchedAuthorIds))) {
+                            $matchedPapersCount++;
+                        }
+                    }
+
+                    if ($matchedPapersCount > 0) {
+                        $authorNames = $user->followedAuthors->whereIn('id', $matchedAuthorIds)->pluck('name')->toArray();
+                        $authorNamesStr = implode(', ', $authorNames);
+                        
+                        Notification::create([
+                            'user_id' => $user->id,
+                            'title'   => 'Bài báo mới từ tác giả bạn quan tâm',
+                            'content' => "Tác giả {$authorNamesStr} vừa có {$matchedPapersCount} bài báo mới được cập nhật.",
+                            'type'    => 'publication',
+                            'data'    => [
+                                'filter_type'  => 'authors',
+                                'filter_value' => $authorNames
                             ]
                         ]);
                     }

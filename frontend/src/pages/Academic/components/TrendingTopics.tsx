@@ -72,7 +72,11 @@ export function TrendingTopics({ isResearcher }: TrendingTopicsProps) {
           const categories = Array.from({ length: 7 }, (_, i) => latestYear - 6 + i);
 
           return (
-            <div key={topic.id} className="glass-panel p-6 rounded-xl relative group overflow-hidden hover:border-primary/40 transition-all cursor-pointer">
+            <Link 
+              key={topic.id} 
+              to={`/search?q=${encodeURIComponent(topic.name)}`} 
+              className="glass-panel p-6 rounded-xl relative group overflow-hidden hover:border-primary/40 transition-all cursor-pointer block text-left"
+            >
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="flex flex-col items-start gap-2 mb-4">
                 <h4 className="font-display text-lg font-bold leading-tight group-hover:text-primary transition-colors line-clamp-2">{topic.name}</h4>
@@ -109,7 +113,7 @@ export function TrendingTopics({ isResearcher }: TrendingTopicsProps) {
                   height={64}
                 />
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
