@@ -9,6 +9,7 @@ import Landing from "./pages/Shared/Landing";
 import Dashboard from "./pages/Academic/Dashboard";
 import Login from "./pages/Auth/Login";
 import Register from "./pages/Auth/Register";
+import SSOCallback from "./pages/Auth/SSOCallback";
 import Search from "./pages/Shared/Search";
 import Trending from "./pages/Researcher/Trending";
 import Bookmarks from "./pages/Academic/Bookmarks";
@@ -40,6 +41,7 @@ export default function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/sso-callback" element={<SSOCallback />} />
             <Route element={<Layout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/search" element={<Search />} />

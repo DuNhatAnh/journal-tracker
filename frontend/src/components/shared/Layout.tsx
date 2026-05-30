@@ -1,12 +1,40 @@
+import { useState } from "react";
 import { Outlet, Navigate, Link } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { TopNav } from "./TopNav";
 import { Logo } from "./Logo";
+import { api } from "../../lib/api";
+import { GraduationCap, BookOpen, Award, ArrowRight } from "lucide-react";
 
 export function Layout() {
   const token = localStorage.getItem("token");
   const userStr = localStorage.getItem("user");
   const user = userStr ? JSON.parse(userStr) : null;
+
+  const [showRoleModal, setShowRoleModal] = useState(() => localStorage.getItem("show_role_selection") === "true");
+  const [selectedRole, setSelectedRole] = useState("student");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleRoleConfirm = async () => {
+    setError(null);
+    setSubmitting(true);
+    try {
+      const response = await api.post<{ user: any }>("/auth/select-role", {
+        role: selectedRole,
+      });
+
+      localStorage.setItem("user", JSON.stringify(response.user));
+      localStorage.removeItem("show_role_selection");
+      setShowRoleModal(false);
+      window.location.reload();
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Không thể thiết lập vai trò lúc này. Vui lòng thử lại.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (!token || !user) {
     return <Navigate to="/login" replace />;
@@ -21,6 +49,102 @@ export function Layout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
+      {showRoleModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-lg p-6">
+          <div className="glass-panel p-8 rounded-3xl max-w-lg w-full space-y-6 border border-outline-variant/30 shadow-2xl relative z-10 animate-fade-in">
+            <div className="text-center space-y-3">
+              <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-primary/10 text-primary mb-2">
+                <Logo size={48} />
+              </div>
+              <h2 className="font-display text-2xl font-bold text-on-surface">Chào mừng đến với SciTrend! 🎉</h2>
+              <p className="text-sm text-on-surface-variant">
+                Để tối ưu hóa trải nghiệm tìm kiếm và phân tích của bạn, vui lòng xác nhận vai trò của bạn trên hệ thống.
+              </p>
+            </div>
+
+            {error && (
+              <div className="p-3 text-xs bg-error-container/30 border border-error/50 text-error rounded-xl font-medium">
+                ⚠️ {error}
+              </div>
+            )}
+
+            <div className="grid gap-4">
+              {/* Sinh viên */}
+              <button
+                type="button"
+                onClick={() => setSelectedRole("student")}
+                className={`flex gap-4 p-4 rounded-2xl border-2 text-left transition-all ${
+                  selectedRole === "student"
+                    ? "border-primary bg-primary/5 shadow-md shadow-primary/5"
+                    : "border-outline-variant/30 bg-surface-container-low/50 hover:bg-surface-container-high/50"
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  selectedRole === "student" ? "bg-primary/20 text-primary" : "bg-secondary/10 text-secondary"
+                }`}>
+                  <GraduationCap className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-on-surface text-sm">Sinh viên</h4>
+                  <p className="text-xs text-on-surface-variant mt-1">Dành cho việc tìm kiếm tài liệu học tập, làm tiểu luận, lưu trữ bài báo yêu thích.</p>
+                </div>
+              </button>
+
+              {/* Giảng viên */}
+              <button
+                type="button"
+                onClick={() => setSelectedRole("lecturer")}
+                className={`flex gap-4 p-4 rounded-2xl border-2 text-left transition-all ${
+                  selectedRole === "lecturer"
+                    ? "border-primary bg-primary/5 shadow-md shadow-primary/5"
+                    : "border-outline-variant/30 bg-surface-container-low/50 hover:bg-surface-container-high/50"
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  selectedRole === "lecturer" ? "bg-primary/20 text-primary" : "bg-secondary/10 text-secondary"
+                }`}>
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-on-surface text-sm">Giảng viên</h4>
+                  <p className="text-xs text-on-surface-variant mt-1">Hỗ trợ tìm kiếm tài liệu giảng dạy, lưu bài báo chuyên ngành phục vụ bài giảng.</p>
+                </div>
+              </button>
+
+              {/* Nhà nghiên cứu */}
+              <button
+                type="button"
+                onClick={() => setSelectedRole("researcher")}
+                className={`flex gap-4 p-4 rounded-2xl border-2 text-left transition-all ${
+                  selectedRole === "researcher"
+                    ? "border-primary bg-primary/5 shadow-md shadow-primary/5"
+                    : "border-outline-variant/30 bg-surface-container-low/50 hover:bg-surface-container-high/50"
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  selectedRole === "researcher" ? "bg-primary/20 text-primary" : "bg-primary/10 text-primary"
+                }`}>
+                  <Award className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-on-surface text-sm">Nhà nghiên cứu</h4>
+                  <p className="text-xs text-on-surface-variant mt-1">Truy cập đầy đủ tính năng: Xem Xu hướng (Trending) bài báo khoa học và Theo dõi (Following) tác giả/journal.</p>
+                </div>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={handleRoleConfirm}
+              className="w-full gradient-btn py-4 rounded-xl font-display font-bold uppercase tracking-widest text-on-primary flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? "Đang xử lý..." : "Xác nhận vai trò"}
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
+        </div>
+      )}
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 relative h-full">
         <TopNav />

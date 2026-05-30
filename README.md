@@ -38,8 +38,9 @@ Nếu bạn không muốn cài đặt thủ công PHP, Composer, Node.js và Red
 
 ### Hướng dẫn chạy:
 
-1. **Điền thông tin kết nối Supabase:**
+1. **Điền thông tin kết nối Supabase & Google Client:**
    Sao chép file `backend/.env.example` thành `backend/.env` và cập nhật thông tin database kết nối tới Supabase của bạn (`DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`).
+   Để sử dụng tính năng Đăng nhập bằng Google, điền thêm các khóa `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` và `GOOGLE_REDIRECT_URI`.
 
 2. **Khởi động Docker Compose:**
    Tại thư mục gốc của dự án (`journal-tracker/`), chạy lệnh sau:
@@ -49,7 +50,7 @@ Nếu bạn không muốn cài đặt thủ công PHP, Composer, Node.js và Red
    *Hệ thống sẽ tự động sao chép .env, cài đặt toàn bộ PHP/Node dependencies và sinh `APP_KEY`.*
 
 3. **Truy cập ứng dụng:**
-   - **Frontend:** [http://localhost:5173](http://localhost:5173)
+   - **Frontend:** [http://localhost:3000](http://localhost:3000)
    - **Backend API:** [http://localhost:8000](http://localhost:8000)
 
 4. **Các lệnh tiện ích:**
@@ -79,8 +80,9 @@ composer install
 cp .env.example .env
 php artisan key:generate
 
-# 3. Điền Supabase credentials vào .env
+# 3. Điền Supabase & Google credentials vào .env
 #    DB_HOST, DB_DATABASE, DB_USERNAME, DB_PASSWORD
+#    GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI
 
 # 4. Chạy migrations
 php artisan migrate
@@ -117,13 +119,13 @@ npm install
 # 2. Tạo .env
 cp .env.example .env
 
-# 3. Chạy dev server (port 5173)
+# 3. Chạy dev server (port 3000)
 npm run dev
 ```
 
 Vite dev proxy tự động forward `/api/*` → `http://localhost:8000` nên không cần cấu hình thêm.
 
-Mở trình duyệt: **http://localhost:5173**
+Mở trình duyệt: **http://localhost:3000**
 
 ---
 
@@ -203,6 +205,8 @@ frontend/
 |--------|----------|-------|
 | POST | `/api/login` | Đăng nhập, nhận token |
 | POST | `/api/register` | Đăng ký tài khoản |
+| GET | `/api/auth/google/redirect` | Chuyển hướng đăng nhập Google (SSO) |
+| GET | `/api/auth/google/callback` | Xử lý callback xác thực từ Google |
 | POST | `/api/logout` | Đăng xuất |
 | GET | `/api/me` | Thông tin user hiện tại |
 | GET | `/api/dashboard` | Stats + trending topics |

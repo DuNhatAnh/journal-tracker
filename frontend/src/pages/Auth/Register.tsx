@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Mail, Lock, User, ChevronLeft } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Mail, Lock, User, ChevronLeft, ArrowLeft } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Logo } from "@/src/components/shared/Logo";
 import { ThemeToggle } from "@/src/components/shared/ThemeToggle";
@@ -14,6 +14,13 @@ export default function Register() {
   const [role, setRole] = useState("lecturer");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [navigate]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,6 +49,12 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative overflow-hidden transition-colors duration-500">
+      <div className="absolute top-6 left-6 z-50">
+        <Link to="/" className="flex items-center gap-2 text-xs font-semibold text-on-surface-variant hover:text-primary transition-colors bg-surface-container-low/50 hover:bg-surface-container-high/50 border border-outline-variant/30 px-3.5 py-2.5 rounded-xl backdrop-blur-md">
+          <ArrowLeft className="w-4 h-4" /> Quay về Trang chủ
+        </Link>
+      </div>
+
       <div className="absolute top-6 right-6 z-50">
         <ThemeToggle />
       </div>
@@ -49,10 +62,11 @@ export default function Register() {
       <div className="absolute top-[-10%] right-[-5%] w-[50%] h-[50%] bg-primary/10 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-5%] w-[40%] h-[40%] bg-secondary/10 rounded-full blur-[120px] pointer-events-none" />
 
-      <div className="w-full max-w-sm space-y-12 relative z-10">
+      {/* Main Column: Register Form (Always centered) */}
+      <div className="w-full max-w-sm space-y-8 relative z-10">
         <div className="text-center space-y-4">
           <div className="inline-flex items-center justify-center mb-2">
-            <Logo size={100} />
+            <Logo size={80} />
           </div>
           <h1 className="font-display text-4xl font-black text-primary tracking-tighter uppercase">SciTrend</h1>
           <p className="text-on-surface-variant font-medium text-center">Tạo tài khoản mới để theo dõi xu hướng xuất bản.</p>
@@ -137,6 +151,7 @@ export default function Register() {
               >
                 <option value="lecturer">Giảng viên</option>
                 <option value="student">Sinh viên</option>
+                <option value="researcher">Nhà nghiên cứu</option>
               </select>
             </div>
           </div>
@@ -157,6 +172,29 @@ export default function Register() {
             </Link>
           </div>
         </form>
+
+        {/* Guide Card (Floating next to the form on large screens, stacked below on mobile) */}
+        <div className="w-full lg:w-[320px] xl:w-[350px] mt-8 lg:mt-0 lg:absolute lg:left-[calc(100%+32px)] lg:top-1/2 lg:-translate-y-1/2 z-10">
+          <div className="glass-panel p-6 rounded-2xl space-y-6 text-left border border-white/5 bg-white/[0.02] shadow-xl h-fit">
+            <h3 className="font-display text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-1.5 border-b border-white/5 pb-4">
+              💡 Bạn nên chọn vai trò nào?
+            </h3>
+            <div className="space-y-5 text-xs text-on-surface-variant leading-relaxed">
+              <div className="space-y-1">
+                <span className="font-bold text-secondary flex items-center gap-1.5">👨‍🎓 Sinh viên:</span>
+                <p className="pl-6 text-on-surface-variant">Dành cho các bạn tìm tài liệu học tập, làm tiểu luận. Bạn có thể tìm kiếm, xem và lưu trữ các bài báo yêu thích.</p>
+              </div>
+              <div className="space-y-1">
+                <span className="font-bold text-secondary flex items-center gap-1.5">👩‍🏫 Giảng viên:</span>
+                <p className="pl-6 text-on-surface-variant">Dành cho thầy cô giáo. Giúp tìm tài liệu giảng dạy nhanh chóng và lưu các bài báo chuyên ngành.</p>
+              </div>
+              <div className="space-y-1">
+                <span className="font-bold text-primary flex items-center gap-1.5">🔬 Nhà nghiên cứu:</span>
+                <p className="pl-6 text-on-surface-variant">Bản nâng cao có thêm tính năng xem **Xu hướng (Trending)** đề tài "hot" trên thế giới và **Theo dõi (Following)** các tác giả/tạp chí bạn quan tâm.</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

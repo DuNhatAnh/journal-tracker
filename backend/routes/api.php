@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Auth\AuthController;
+use App\Http\Controllers\Api\Auth\GoogleAuthController;
 use App\Http\Controllers\Api\PaperController;
 use App\Http\Controllers\Api\JournalController;
 use App\Http\Controllers\Api\KeywordController;
@@ -22,6 +23,8 @@ use App\Http\Controllers\Api\Admin\AdminDashboardController;
 */
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login',    [AuthController::class, 'login']);
+Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirectToGoogle']);
+Route::get('/auth/google/callback', [GoogleAuthController::class, 'handleGoogleCallback']);
 
 /*
 |--------------------------------------------------------------------------
@@ -33,6 +36,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Auth
     Route::post('/logout',  [AuthController::class, 'logout']);
     Route::get('/me',       [AuthController::class, 'me']);
+    Route::post('/auth/select-role', [GoogleAuthController::class, 'selectRole']);
 
     // Settings & Profile
     Route::get('/settings', [App\Http\Controllers\Api\SettingsController::class, 'show']);

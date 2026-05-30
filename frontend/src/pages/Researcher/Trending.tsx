@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Download, Bell } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { api } from "@/src/lib/api";
@@ -123,12 +123,87 @@ export default function Trending() {
   const [startYear, setStartYear] = useState(2020);
   const [endYear, setEndYear] = useState(2026);
 
-  // Update year range dynamically when details change
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+
+  // Handle scroll-to-zoom on the publication velocity chart
+  useEffect(() => {
+    const element = chartContainerRef.current;
+    if (!element) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (!selectedDetail?.trends || selectedDetail.trends.length === 0) return;
+
+      const years = selectedDetail.trends.map((t: any) => t.year).sort((a: number, b: number) => a - b);
+      if (years.length === 0) return;
+      const minYear = years[0];
+      const maxYear = years[years.length - 1];
+
+      // Prevent page from scrolling vertically
+      e.preventDefault();
+
+      const direction = e.deltaY < 0 ? "in" : "out";
+      const span = endYear - startYear;
+
+      if (direction === "in") {
+        if (span > 1) {
+          if (span >= 3) {
+            setStartYear((prev) => prev + 1);
+            setEndYear((prev) => prev - 1);
+          } else {
+            // span is 2: narrow to 1 by shifting startYear
+            setStartYear((prev) => prev + 1);
+          }
+        }
+      } else {
+        // Zoom out: widen range symmetrically or asymmetric if blocked
+        const nextStart = Math.max(minYear, startYear - 1);
+        const nextEnd = Math.min(maxYear, endYear + 1);
+        setStartYear(nextStart);
+        setEndYear(nextEnd);
+      }
+    };
+
+    element.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      element.removeEventListener("wheel", handleWheel);
+    };
+  }, [selectedDetail, startYear, endYear]);
+
+  // Update year range dynamically when details change to zoom into the 5 consecutive years with the highest publication volume
   useEffect(() => {
     if (selectedDetail?.trends && selectedDetail.trends.length > 0) {
       const years = selectedDetail.trends.map((t: any) => t.year);
-      setStartYear(Math.min(...years));
-      setEndYear(Math.max(...years));
+      const minYear = Math.min(...years);
+      const maxYear = Math.max(...years);
+
+      if (maxYear - minYear < 4) {
+        setStartYear(minYear);
+        setEndYear(maxYear);
+      } else {
+        const yearMap: { [key: number]: number } = {};
+        selectedDetail.trends.forEach((t: any) => {
+          yearMap[t.year] = t.paper_count || 0;
+        });
+
+        let maxVolume = -1;
+        let bestStart = minYear;
+        let bestEnd = minYear + 4;
+
+        for (let y = minYear; y <= maxYear - 4; y++) {
+          let currentVolume = 0;
+          for (let i = 0; i < 5; i++) {
+            currentVolume += yearMap[y + i] || 0;
+          }
+          if (currentVolume > maxVolume) {
+            maxVolume = currentVolume;
+            bestStart = y;
+            bestEnd = y + 4;
+          }
+        }
+
+        setStartYear(bestStart);
+        setEndYear(bestEnd);
+      }
     }
   }, [selectedDetail]);
 
@@ -437,12 +512,14 @@ export default function Trending() {
           {/* Publication Velocity Chart (Full-width for Keywords, Side-by-side for Authors) */}
           {selectedEntity?.type === "author" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <PublicationVelocity 
-                categories={velocityChartData.categories}
-                series={velocityChartData.series}
-                loading={loadingDetail || loading}
-                selectedEntity={selectedEntity}
-              />
+              <div ref={chartContainerRef}>
+                <PublicationVelocity 
+                  categories={velocityChartData.categories}
+                  series={velocityChartData.series}
+                  loading={loadingDetail || loading}
+                  selectedEntity={selectedEntity}
+                />
+              </div>
               <TopicDistribution 
                 keywords={coOccurringKeywords}
                 loading={loadingDetail || loading}
@@ -450,12 +527,14 @@ export default function Trending() {
               />
             </div>
           ) : (
-            <PublicationVelocity 
-              categories={velocityChartData.categories}
-              series={velocityChartData.series}
-              loading={loadingDetail || loading}
-              selectedEntity={selectedEntity}
-            />
+            <div ref={chartContainerRef}>
+              <PublicationVelocity 
+                categories={velocityChartData.categories}
+                series={velocityChartData.series}
+                loading={loadingDetail || loading}
+                selectedEntity={selectedEntity}
+              />
+            </div>
           )}
 
           {/* Co-authorship Network Graph */}

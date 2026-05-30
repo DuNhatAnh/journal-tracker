@@ -13,16 +13,11 @@ class BookmarkController extends Controller
      */
     public function index()
     {
-        $userId = auth()->id();
-        $page = request('page', 1);
-
-        $bookmarks = \Illuminate\Support\Facades\Cache::tags(["bookmarks_{$userId}"])->remember("bookmarks_page_{$page}", 3600, function () {
-            return auth()->user()
-                ->bookmarks()
-                ->with(['paper.journal', 'paper.keywords', 'paper.authors'])
-                ->latest()
-                ->paginate(request('per_page', 6));
-        });
+        $bookmarks = auth()->user()
+            ->bookmarks()
+            ->with(['paper.journal', 'paper.keywords', 'paper.authors'])
+            ->latest()
+            ->paginate(request('per_page', 6));
 
         return response()->json($bookmarks);
     }
@@ -39,7 +34,6 @@ class BookmarkController extends Controller
             ['note'     => $request->note]
         );
 
-        \Illuminate\Support\Facades\Cache::tags(["bookmarks_" . auth()->id()])->flush();
         \Illuminate\Support\Facades\Cache::forget("dash.bookmarks_new." . auth()->id());
         \Illuminate\Support\Facades\Cache::forget("dash.bookmarks." . auth()->id());
 
@@ -59,8 +53,6 @@ class BookmarkController extends Controller
 
         $bookmark->update(['note' => $request->note]);
 
-        \Illuminate\Support\Facades\Cache::tags(["bookmarks_" . auth()->id()])->flush();
-
         return response()->json($bookmark->load('paper'));
     }
 
@@ -75,7 +67,6 @@ class BookmarkController extends Controller
 
         $bookmark->delete();
 
-        \Illuminate\Support\Facades\Cache::tags(["bookmarks_" . auth()->id()])->flush();
         \Illuminate\Support\Facades\Cache::forget("dash.bookmarks_new." . auth()->id());
         \Illuminate\Support\Facades\Cache::forget("dash.bookmarks." . auth()->id());
 
@@ -95,7 +86,6 @@ class BookmarkController extends Controller
             return response()->json(['message' => 'Không tìm thấy bookmark cho bài báo này.'], 404);
         }
 
-        \Illuminate\Support\Facades\Cache::tags(["bookmarks_" . auth()->id()])->flush();
         \Illuminate\Support\Facades\Cache::forget("dash.bookmarks_new." . auth()->id());
         \Illuminate\Support\Facades\Cache::forget("dash.bookmarks." . auth()->id());
 

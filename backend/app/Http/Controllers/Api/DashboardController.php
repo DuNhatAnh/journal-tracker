@@ -272,8 +272,10 @@ class DashboardController extends Controller
 
         $bookmarkedPaperIds = $this->getBookmarkedPaperIds($user);
 
-        $recommendedPapers = Cache::remember("dash.recommended.{$user->id}", 600, function () use ($user, $bookmarkedPaperIds) {
-            $followedKeywordIds = $user->followedKeywords()->pluck('keywords.id');
+        $recommendedPapers = Cache::remember("dash.recommended.{$user->id}", 5, function () use ($user, $bookmarkedPaperIds) {
+            $followedKeywordIds = $user->followedKeywords()->pluck('id');
+            $followedAuthorIds = $user->followedAuthors()->pluck('id');
+            $followedJournalIds = $user->followedJournals()->pluck('id');
 
             $bookmarkedKeywordIds = $bookmarkedPaperIds->isNotEmpty()
                 ? DB::table('keyword_paper')
@@ -292,54 +294,114 @@ class DashboardController extends Controller
                     ->unique()
                 : collect();
 
+            $hasPreferences = $targetKeywordIds->isNotEmpty()
+                || $followedAuthorIds->isNotEmpty()
+                || $followedJournalIds->isNotEmpty()
+                || $bookmarkedJournalFields->isNotEmpty();
+
+            if (!$hasPreferences) {
+                return [];
+            }
+
             $query = ResearchPaper::select('id', 'title', 'abstract', 'published_year', 'journal_id', 'citations_count', 'doi')
                 ->with(['authors:id,name', 'journal:id,name', 'keywords:id,name'])
                 ->whereNotIn('id', $bookmarkedPaperIds);
 
-            if ($targetKeywordIds->isNotEmpty() || $bookmarkedJournalFields->isNotEmpty()) {
-                $query->where(function ($q) use ($targetKeywordIds, $bookmarkedJournalFields) {
+            if ($targetKeywordIds->isNotEmpty() || $bookmarkedJournalFields->isNotEmpty() || $followedAuthorIds->isNotEmpty() || $followedJournalIds->isNotEmpty()) {
+                $query->where(function ($q) use ($targetKeywordIds, $bookmarkedJournalFields, $followedAuthorIds, $followedJournalIds) {
                     if ($targetKeywordIds->isNotEmpty()) {
                         $q->whereHas('keywords', fn($k) => $k->whereIn('keywords.id', $targetKeywordIds));
                     }
                     if ($bookmarkedJournalFields->isNotEmpty()) {
                         $q->orWhereHas('journal', fn($j) => $j->whereIn('field', $bookmarkedJournalFields));
                     }
+                    if ($followedAuthorIds->isNotEmpty()) {
+                        $q->orWhereHas('authors', fn($a) => $a->whereIn('authors.id', $followedAuthorIds));
+                    }
+                    if ($followedJournalIds->isNotEmpty()) {
+                        $q->orWhereIn('journal_id', $followedJournalIds);
+                    }
                 });
             }
 
-            return $query->orderByDesc('citations_count')->limit(2)->get()
-                ->map(function ($paper) use ($targetKeywordIds, $bookmarkedJournalFields) {
-                    $matchedCount   = $paper->keywords->pluck('id')->intersect($targetKeywordIds)->count();
-                    $hasFieldMatch  = $bookmarkedJournalFields->isNotEmpty()
-                        && $paper->journal
-                        && $bookmarkedJournalFields->contains($paper->journal->field);
+            $candidates = $query->orderByDesc('citations_count')
+                ->limit(50)
+                ->get();
 
-                    if ($targetKeywordIds->isEmpty() && $bookmarkedJournalFields->isEmpty()) {
-                        $score = 70 + min(25, (int)($paper->citations_count / 10));
-                    } else {
-                        $score = 50 + min(30, $matchedCount * 15) + ($hasFieldMatch ? 15 : 0) + min(4, (int)($paper->citations_count / 50));
-                    }
+            $scored = $candidates->map(function ($paper) use ($followedKeywordIds, $bookmarkedKeywordIds, $followedAuthorIds, $followedJournalIds, $bookmarkedJournalFields) {
+                $matchScoreRaw = 0;
 
-                    $matchScore = min(99, max(0, $score));
+                // 1. Followed keywords match (+30 points per match)
+                $paperKeywordIds = $paper->keywords->pluck('id');
+                if ($followedKeywordIds->isNotEmpty()) {
+                    $matchedFollowedKeywords = $paperKeywordIds->intersect($followedKeywordIds)->count();
+                    $matchScoreRaw += $matchedFollowedKeywords * 30;
+                }
 
-                    $authorNames = $paper->authors->isNotEmpty()
-                        ? $paper->authors->pluck('name')->join(', ')
-                        : 'Chưa rõ tác giả';
+                // 2. Bookmarked keywords match (+20 points per match)
+                if ($bookmarkedKeywordIds->isNotEmpty()) {
+                    $matchedBookmarkedKeywords = $paperKeywordIds->intersect($bookmarkedKeywordIds)->count();
+                    $matchScoreRaw += $matchedBookmarkedKeywords * 20;
+                }
 
-                    return [
-                        'id'       => $paper->id,
-                        'title'    => $paper->title,
-                        'authors'  => $authorNames,
-                        'journal'  => $paper->journal?->name ?? 'Khác',
-                        'time'     => (string) ($paper->published_year ?? ''),
-                        'impact'   => $paper->citations_count ? round(($paper->citations_count / 10), 1) : 0,
-                        'citations'=> $paper->citations_count ?? 0,
-                        'doi'      => $paper->doi,
-                        'abstract' => $paper->abstract,
-                        'keywords' => $paper->keywords->map(fn($k) => ['id' => $k->id, 'name' => $k->name])->toArray(),
-                        'match'    => $matchScore . '%',
-                    ];
-                });
+                // 3. Followed authors match (+40 points per match)
+                $paperAuthorIds = $paper->authors->pluck('id');
+                if ($followedAuthorIds->isNotEmpty()) {
+                    $matchedFollowedAuthors = $paperAuthorIds->intersect($followedAuthorIds)->count();
+                    $matchScoreRaw += $matchedFollowedAuthors * 40;
+                }
+
+                // 4. Followed journals match (+40 points)
+                if ($followedJournalIds->isNotEmpty() && $followedJournalIds->contains($paper->journal_id)) {
+                    $matchScoreRaw += 40;
+                }
+
+                // 5. Bookmarked journal fields match (+15 points)
+                if ($bookmarkedJournalFields->isNotEmpty() && $paper->journal && $bookmarkedJournalFields->contains($paper->journal->field)) {
+                    $matchScoreRaw += 15;
+                }
+
+                // 6. Base citation points
+                $matchScoreRaw += min(10, (int)($paper->citations_count / 10));
+
+                // Calculate final percentage score
+                $hasPreferences = $followedKeywordIds->isNotEmpty() 
+                    || $bookmarkedKeywordIds->isNotEmpty() 
+                    || $followedAuthorIds->isNotEmpty() 
+                    || $followedJournalIds->isNotEmpty() 
+                    || $bookmarkedJournalFields->isNotEmpty();
+
+                if (!$hasPreferences) {
+                    $scorePercent = 70 + min(25, (int)($paper->citations_count / 10));
+                } else {
+                    $scorePercent = 50 + min(49, $matchScoreRaw);
+                }
+
+                $matchScore = min(99, max(0, $scorePercent));
+
+                $authorNames = $paper->authors->isNotEmpty()
+                    ? $paper->authors->pluck('name')->join(', ')
+                    : 'Chưa rõ tác giả';
+
+                return [
+                    'id'         => $paper->id,
+                    'title'      => $paper->title,
+                    'authors'    => $authorNames,
+                    'journal'    => $paper->journal?->name ?? 'Khác',
+                    'time'       => (string) ($paper->published_year ?? ''),
+                    'impact'     => $paper->citations_count ? round(($paper->citations_count / 10), 1) : 0,
+                    'citations'  => $paper->citations_count ?? 0,
+                    'doi'        => $paper->doi,
+                    'abstract'   => $paper->abstract,
+                    'keywords'   => $paper->keywords->map(fn($k) => ['id' => $k->id, 'name' => $k->name])->toArray(),
+                    'match'      => $matchScore . '%',
+                    '_raw_score' => $matchScoreRaw,
+                ];
+            });
+
+            return $scored->sortByDesc(function ($item) {
+                return [$item['_raw_score'], $item['citations']];
+            })->values()->take(2)->all();
         });
 
         return response()->json([

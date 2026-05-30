@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
   ArrowRight, Search, Users, Database, 
@@ -13,6 +13,12 @@ export default function Landing() {
   const token = localStorage.getItem("token");
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    if (token) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [token, navigate]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,7 +100,7 @@ export default function Landing() {
       <section className="relative z-10 w-full pt-40 pb-20 flex flex-col items-center justify-center text-center px-4">
         
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/10 border border-secondary/20 text-secondary text-xs sm:text-sm font-bold uppercase tracking-wider mb-8 shadow-sm">
-          <Database className="w-4 h-4" /> Đồng bộ Metadata từ OpenAlex & Semantic Scholar
+          <Database className="w-4 h-4" /> Đồng bộ Metadata từ OpenAlex
         </div>
 
         <h1 className="max-w-5xl font-display text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight leading-[1.1] text-on-surface">
@@ -103,7 +109,7 @@ export default function Landing() {
         </h1>
         
         <p className="mt-8 text-base sm:text-lg text-on-surface-variant max-w-3xl leading-relaxed mx-auto">
-          Các nền tảng học thuật hiện nay chỉ hỗ trợ tìm kiếm bài báo. Chúng tôi mang đến giải pháp <strong className="text-on-surface">phân tích xu hướng công bố theo thời gian</strong> và trực quan hóa dữ liệu nghiên cứu chuyên sâu cho lĩnh vực Computer Science & AI.
+          Các nền tảng học thuật hiện nay chỉ hỗ trợ tìm kiếm bài báo. Chúng tôi mang đến giải pháp <strong className="text-on-surface">phân tích xu hướng công bố theo thời gian</strong> và trực quan hóa dữ liệu nghiên cứu chuyên sâu cho lĩnh vực Computer Science (Khoa học Máy tính).
         </p>
 
         {/* Dynamic Search Bar */}
@@ -311,7 +317,7 @@ export default function Landing() {
           </h2>
           <p className="text-on-surface-variant max-w-xl mx-auto text-base leading-relaxed">
             Tham gia nền tảng theo dõi xu hướng bài báo khoa học. 
-            Cập nhật những công nghệ đột phá trong lĩnh vực Computer Science và AI.
+            Cập nhật những công nghệ đột phá trong lĩnh vực Computer Science (Khoa học Máy tính).
           </p>
 
           <div className="pt-6">
@@ -327,7 +333,7 @@ export default function Landing() {
 
       {/* Footer Details */}
       <footer className="relative z-10 px-6 py-8 border-t border-outline-variant bg-surface-container text-center text-[10px] sm:text-xs text-on-surface-variant font-mono">
-        <p className="mb-2"><strong>Dữ liệu:</strong> Metadata được trích xuất từ OpenAlex & Semantic Scholar thông qua API công khai.</p>
+        <p className="mb-2"><strong>Dữ liệu:</strong> Metadata được trích xuất từ OpenAlex thông qua API công khai.</p>
         <p>&copy; {new Date().getFullYear()} Scientific Journal Publication Trend Tracking System.</p>
       </footer>
     </div>

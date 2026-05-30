@@ -56,7 +56,12 @@ export function AiInsightsWidget({ onSelectPaper, onOpenAiReview }: AiInsightsWi
           </div>
         ))}
         {recommendedPapers.length === 0 && (
-          <p className="text-xs text-on-surface-variant text-center py-4">Chưa có bài viết gợi ý nào mới.</p>
+          <div className="text-center py-6 px-4 border border-dashed border-outline-variant/30 rounded-xl space-y-2">
+            <p className="text-xs text-on-surface font-semibold">Chưa có gợi ý cá nhân hóa</p>
+            <p className="text-[11px] text-on-surface-variant leading-normal">
+              Hãy theo dõi ít nhất một chủ đề, tác giả hoặc tạp chí để động cơ phân tích và đề xuất bài báo phù hợp với bạn.
+            </p>
+          </div>
         )}
       </div>
       <button
