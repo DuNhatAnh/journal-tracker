@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\Admin\AdminUserController;
 use App\Http\Controllers\Api\Admin\ApiSourceController;
 use App\Http\Controllers\Api\Admin\AdminDashboardController;
 use App\Http\Controllers\Api\Admin\AdminKeywordController;
+use App\Http\Controllers\Api\Admin\AdminSettingsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -152,5 +153,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('keywords/merge', [AdminKeywordController::class, 'merge']);
         Route::post('keywords/{id}/recalculate-trends', [AdminKeywordController::class, 'recalculateTrends']);
         Route::apiResource('keywords', AdminKeywordController::class)->only(['index', 'update', 'destroy']);
+
+        // System Settings
+        Route::get('settings', [AdminSettingsController::class, 'getSettings']);
+        Route::put('settings', [AdminSettingsController::class, 'saveSettings']);
     });
 });
