@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\Admin\AdminUserController;
 use App\Http\Controllers\Api\Admin\ApiSourceController;
 use App\Http\Controllers\Api\Admin\AdminDashboardController;
+use App\Http\Controllers\Api\Admin\AdminKeywordController;
 
 /*
 |--------------------------------------------------------------------------
@@ -146,5 +147,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('sync-logs/{sync_log}/cancel', [ApiSourceController::class, 'cancelSync']);
         Route::get('sync-logs', [ApiSourceController::class, 'syncLogs']);
         Route::get('sync-logs/{sync_log}', [ApiSourceController::class, 'showSyncLog']);
+
+        // Keyword Management & Merge
+        Route::post('keywords/merge', [AdminKeywordController::class, 'merge']);
+        Route::post('keywords/{id}/recalculate-trends', [AdminKeywordController::class, 'recalculateTrends']);
+        Route::apiResource('keywords', AdminKeywordController::class)->only(['index', 'update', 'destroy']);
     });
 });

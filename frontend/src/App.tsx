@@ -23,6 +23,7 @@ import Guide from "./pages/Shared/Guide";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
 import AdminUsers from "./pages/Admin/Users";
 import AdminSync from "./pages/Admin/Sync";
+import AdminKeywords from "./pages/Admin/Keywords";
 
 
 const LoadingScreen = () => (
@@ -58,6 +59,7 @@ export default function App() {
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/sync" element={<AdminSync />} />
+              <Route path="/admin/keywords" element={<AdminKeywords />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

@@ -57,3 +57,21 @@ export type UserItem = {
   role: string;
   created_at: string;
 };
+
+export type KeywordItem = {
+  id: number;
+  name: string;
+  slug: string;
+  papers_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PaginatedKeywords = {
+  data: KeywordItem[];
+  current_page: number;
+  last_page: number;
+  total: number;
+  per_page: number;
+};
+

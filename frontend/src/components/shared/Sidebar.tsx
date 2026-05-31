@@ -1,4 +1,4 @@
-import { LayoutDashboard, Search, TrendingUp, Bookmark, Users, Bell, Settings, LogOut, Clock } from "lucide-react";
+import { LayoutDashboard, Search, TrendingUp, Bookmark, Users, Bell, Settings, LogOut, Clock, Tag } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/src/lib/utils";
 import { Logo } from "@/src/components/shared/Logo";
@@ -36,6 +36,7 @@ export function Sidebar() {
         { icon: LayoutDashboard, label: "Tổng quan hệ thống", path: "/admin/dashboard" },
         { icon: Users, label: "Quản lý người dùng", path: "/admin/users" },
         { icon: Settings, label: "Đồng bộ API", path: "/admin/sync" },
+        { icon: Tag, label: "Quản lý từ khóa", path: "/admin/keywords" },
       ]
     }
   ];
