@@ -87,31 +87,6 @@ export default function AdminDashboard() {
         <RoleDistribution stats={stats} loading={loading} />
         <RecentSyncLogs stats={stats} loading={loading} />
       </div>
-
-      {/* Quick Links */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Link to="/admin/users" className="group glass-panel rounded-2xl p-6 bg-surface border border-white/10 flex items-center gap-5 hover:border-primary/40 hover:bg-primary/5 transition-all duration-300">
-          <div className="p-4 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-            <Users className="w-6 h-6 text-primary" />
-          </div>
-          <div className="flex-1">
-            <h4 className="font-display font-bold text-on-surface">Quản lý người dùng</h4>
-            <p className="text-xs text-on-surface-variant mt-1">Thêm, sửa, xóa tài khoản và phân quyền vai trò.</p>
-          </div>
-          <ArrowRight className="w-5 h-5 text-on-surface-variant group-hover:text-primary group-hover:translate-x-1 transition-all" />
-        </Link>
-
-        <Link to="/admin/sync" className="group glass-panel rounded-2xl p-6 bg-surface border border-white/10 flex items-center gap-5 hover:border-secondary/40 hover:bg-secondary/5 transition-all duration-300">
-          <div className="p-4 rounded-xl bg-secondary/10 group-hover:bg-secondary/20 transition-colors">
-            <Settings className="w-6 h-6 text-secondary" />
-          </div>
-          <div className="flex-1">
-            <h4 className="font-display font-bold text-on-surface">Cấu hình đồng bộ API</h4>
-            <p className="text-xs text-on-surface-variant mt-1">Bật/tắt nguồn dữ liệu và kích hoạt đồng bộ thủ công.</p>
-          </div>
-          <ArrowRight className="w-5 h-5 text-on-surface-variant group-hover:text-secondary group-hover:translate-x-1 transition-all" />
-        </Link>
-      </div>
     </div>
   );
 }

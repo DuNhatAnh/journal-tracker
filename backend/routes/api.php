@@ -27,6 +27,8 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login',    [AuthController::class, 'login']);
 Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirectToGoogle']);
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'handleGoogleCallback']);
+Route::get('/public/trends', [TrendController::class, 'publicTrends']);
+
 
 /*
 |--------------------------------------------------------------------------

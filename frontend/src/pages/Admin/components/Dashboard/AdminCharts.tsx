@@ -17,9 +17,11 @@ const chartBaseOptions = {
 };
 
 export default function AdminCharts({ charts, chartsLoading }: AdminChartsProps) {
+  const [yearRange, setYearRange] = React.useState<number>(10);
+
   // ── Chart 1: Papers per year (Bar) ──────────────────────────────────────
   const currentYear = new Date().getFullYear();
-  const allYears = Array.from({ length: 10 }, (_, i) => currentYear - 9 + i);
+  const allYears = Array.from({ length: yearRange }, (_, i) => currentYear - (yearRange - 1) + i);
   const yearMap = Object.fromEntries((charts?.papers_per_year ?? []).map(d => [d.year, d.total]));
   const papersPerYearFilled = allYears.map(y => ({ year: y, total: yearMap[y] ?? 0 }));
 
@@ -94,10 +96,23 @@ export default function AdminCharts({ charts, chartsLoading }: AdminChartsProps)
 
       {/* Chart 1: Papers per year — full width */}
       <div className="glass-panel rounded-2xl p-6 bg-surface border border-white/10 space-y-4">
-        <div className="flex items-center gap-2">
-          <BarChart2 className="w-4 h-4 text-primary" />
-          <h4 className="font-display font-bold text-base text-on-surface">Xu hướng bài báo theo năm</h4>
-          <span className="ml-auto text-[10px] font-bold text-on-surface-variant uppercase tracking-widest bg-white/5 px-2 py-1 rounded-lg">Biểu đồ cột</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <BarChart2 className="w-4 h-4 text-primary" />
+            <h4 className="font-display font-bold text-base text-on-surface">Xu hướng bài báo theo năm</h4>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Phạm vi:</label>
+            <select
+              value={yearRange}
+              onChange={(e) => setYearRange(Number(e.target.value))}
+              className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1 text-xs font-bold text-on-surface outline-none focus:border-primary/50 transition-colors"
+            >
+              <option value={5} className="bg-background">5 năm gần nhất</option>
+              <option value={10} className="bg-background">10 năm gần nhất</option>
+              <option value={15} className="bg-background">15 năm gần nhất</option>
+            </select>
+          </div>
         </div>
         {chartsLoading ? (
           <ChartSkeleton />

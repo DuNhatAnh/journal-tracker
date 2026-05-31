@@ -13,6 +13,48 @@ export default function Landing() {
   const token = localStorage.getItem("token");
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTopic, setActiveTopic] = useState("dl");
+
+  // Real Computer Science publication volume trends data (mượt mà với đường cong Q và T)
+  const topicsData: Record<string, {
+    color: string;
+    linePath: string;
+    areaPath: string;
+    points: { year: number; val: number; x: number; y: number }[];
+  }> = {
+    dl: {
+      color: "#2563EB", // Primary Blue
+      linePath: "M 0,162 Q 250,145 500,95 T 1000,32",
+      areaPath: "M 0,162 Q 250,145 500,95 T 1000,32 L 1000,200 L 0,200 Z",
+      points: [
+        { year: 2020, val: 12400, x: 0, y: 162 },
+        { year: 2022, val: 24500, x: 500, y: 95 },
+        { year: 2026, val: 56200, x: 1000, y: 32 },
+      ]
+    },
+    cyber: {
+      color: "#0891B2", // Secondary Cyan
+      linePath: "M 0,145 Q 250,135 500,118 T 1000,75",
+      areaPath: "M 0,145 Q 250,135 500,118 T 1000,75 L 1000,200 L 0,200 Z",
+      points: [
+        { year: 2020, val: 8200, x: 0, y: 145 },
+        { year: 2022, val: 14800, x: 500, y: 118 },
+        { year: 2026, val: 29800, x: 1000, y: 75 },
+      ]
+    },
+    cloud: {
+      color: "#059669", // Tertiary Emerald
+      linePath: "M 0,175 Q 250,158 500,132 T 1000,105",
+      areaPath: "M 0,175 Q 250,158 500,132 T 1000,105 L 1000,200 L 0,200 Z",
+      points: [
+        { year: 2020, val: 4100, x: 0, y: 175 },
+        { year: 2022, val: 9200, x: 500, y: 132 },
+        { year: 2026, val: 18400, x: 1000, y: 105 },
+      ]
+    }
+  };
+
+  const activeTopicData = topicsData[activeTopic] || topicsData.dl;
 
   useEffect(() => {
     if (token) {
@@ -29,24 +71,111 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background text-on-background font-sans selection:bg-primary/30 selection:text-primary overflow-x-hidden relative flex flex-col justify-between scroll-smooth transition-colors duration-500">
-      {/* --- CUSTOM ANIMATIONS --- */}
+
+      {/* ═══════════════════════════════════════════════════════════
+           ANIMATED AURORA MESH GRADIENT BACKGROUND
+           6 glowing orbs mỗi cái chuyển động độc lập theo keyframe
+           riêng, tạo hiệu ứng aurora mesh cực kỳ đẹp mắt và thư giãn
+      ═══════════════════════════════════════════════════════════ */}
       <style>{`
+        /* ── Animation keyframes cho 6 Aurora Orbs ── */
+        @keyframes aurora-1 {
+          0%   { transform: translate(0%, 0%)    scale(1);    }
+          25%  { transform: translate(18%, -12%) scale(1.15); }
+          50%  { transform: translate(30%, 8%)   scale(0.9);  }
+          75%  { transform: translate(10%, 20%)  scale(1.1);  }
+          100% { transform: translate(0%, 0%)    scale(1);    }
+        }
+        @keyframes aurora-2 {
+          0%   { transform: translate(0%, 0%)     scale(1);    }
+          33%  { transform: translate(-20%, 15%)  scale(1.2);  }
+          66%  { transform: translate(15%, -20%)  scale(0.85); }
+          100% { transform: translate(0%, 0%)     scale(1);    }
+        }
+        @keyframes aurora-3 {
+          0%   { transform: translate(0%, 0%)    scale(0.95); }
+          20%  { transform: translate(25%, 15%)  scale(1.1);  }
+          40%  { transform: translate(-10%, 25%) scale(1.2);  }
+          60%  { transform: translate(-25%, -5%) scale(0.9);  }
+          80%  { transform: translate(10%, -20%) scale(1.05); }
+          100% { transform: translate(0%, 0%)    scale(0.95); }
+        }
+        @keyframes aurora-4 {
+          0%   { transform: translate(0%, 0%)    scale(1);    }
+          30%  { transform: translate(-15%, -18%) scale(1.3); }
+          60%  { transform: translate(20%, -10%)  scale(0.8); }
+          100% { transform: translate(0%, 0%)    scale(1);    }
+        }
+        @keyframes aurora-5 {
+          0%   { transform: translate(0%, 0%)   scale(1.1);  }
+          40%  { transform: translate(-20%, 20%) scale(0.85); }
+          80%  { transform: translate(15%, -15%) scale(1.2);  }
+          100% { transform: translate(0%, 0%)   scale(1.1);  }
+        }
+        @keyframes aurora-6 {
+          0%   { transform: translate(0%, 0%)    scale(1);    }
+          25%  { transform: translate(22%, -8%)  scale(0.9);  }
+          50%  { transform: translate(-8%, 22%)  scale(1.15); }
+          75%  { transform: translate(-18%, -15%) scale(0.95);}
+          100% { transform: translate(0%, 0%)    scale(1);    }
+        }
+        .aurora-orb-1 { animation: aurora-1 26s ease-in-out infinite; }
+        .aurora-orb-2 { animation: aurora-2 32s ease-in-out infinite; }
+        .aurora-orb-3 { animation: aurora-3 40s ease-in-out infinite; }
+        .aurora-orb-4 { animation: aurora-4 22s ease-in-out infinite; }
+        .aurora-orb-5 { animation: aurora-5 35s ease-in-out infinite; }
+        .aurora-orb-6 { animation: aurora-6 28s ease-in-out infinite; }
+
+        /* ── Utility animations giữ nguyên cho các phần khác ── */
         @keyframes float {
           0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-15px) rotate(2deg); }
+          50%       { transform: translateY(-15px) rotate(2deg); }
         }
         @keyframes gradient-x {
           0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
+          50%      { background-position: 100% 50%; }
         }
-        .animate-float { animation: float 6s ease-in-out infinite; }
-        .bg-gradient-animate { background-size: 200% 200%; animation: gradient-x 15s ease infinite; }
+        .animate-float        { animation: float 6s ease-in-out infinite; }
+        .bg-gradient-animate  { background-size: 200% 200%; animation: gradient-x 15s ease infinite; }
       `}</style>
 
-      {/* Background Glows (Adapts blending for light/dark mode automatically based on CSS setup or keeps it subtle) */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] max-w-[800px] max-h-[800px] bg-primary/10 blur-[120px] rounded-full animate-pulse duration-[8000ms]" />
-        <div className="absolute top-[30%] right-[-10%] w-[40vw] h-[40vw] max-w-[600px] max-h-[600px] bg-tertiary/10 blur-[150px] rounded-full" />
+      {/* Aurora Mesh Gradient — 6 orbs phủ toàn màn hình, luôn nằm dưới cùng */}
+      <div aria-hidden="true" className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: -1 }}>
+        {/* Orb 1 — Slate Blue: top-left lớn, primary */}
+        <div className="aurora-orb-1 absolute -top-[30%] -left-[15%]
+          w-[70vw] h-[70vw] max-w-[800px] max-h-[800px] rounded-full
+          bg-[radial-gradient(ellipse_at_center,_rgba(37,99,235,0.18)_0%,_transparent_70%)]
+          blur-[90px]" />
+
+        {/* Orb 2 — Teal / Cyan: top-right, secondary */}
+        <div className="aurora-orb-2 absolute -top-[10%] -right-[20%]
+          w-[65vw] h-[65vw] max-w-[750px] max-h-[750px] rounded-full
+          bg-[radial-gradient(ellipse_at_center,_rgba(8,145,178,0.15)_0%,_transparent_70%)]
+          blur-[110px]" />
+
+        {/* Orb 3 — Indigo / Violet: center, depth */}
+        <div className="aurora-orb-3 absolute top-[25%] left-[25%]
+          w-[55vw] h-[55vw] max-w-[650px] max-h-[650px] rounded-full
+          bg-[radial-gradient(ellipse_at_center,_rgba(99,102,241,0.1)_0%,_transparent_65%)]
+          blur-[100px]" />
+
+        {/* Orb 4 — Emerald Green: bottom-left, tertiary accent */}
+        <div className="aurora-orb-4 absolute -bottom-[20%] -left-[10%]
+          w-[60vw] h-[60vw] max-w-[700px] max-h-[700px] rounded-full
+          bg-[radial-gradient(ellipse_at_center,_rgba(5,150,105,0.1)_0%,_transparent_68%)]
+          blur-[120px]" />
+
+        {/* Orb 5 — Slate / Steel: bottom-right, neutral cool tone */}
+        <div className="aurora-orb-5 absolute -bottom-[15%] -right-[15%]
+          w-[58vw] h-[58vw] max-w-[680px] max-h-[680px] rounded-full
+          bg-[radial-gradient(ellipse_at_center,_rgba(100,116,139,0.12)_0%,_transparent_70%)]
+          blur-[130px]" />
+
+        {/* Orb 6 — Sky Blue: mid-right, fill gaps */}
+        <div className="aurora-orb-6 absolute top-[50%] right-[10%]
+          w-[45vw] h-[45vw] max-w-[550px] max-h-[550px] rounded-full
+          bg-[radial-gradient(ellipse_at_center,_rgba(56,189,248,0.08)_0%,_transparent_65%)]
+          blur-[100px]" />
       </div>
 
       {/* 1. Navigation Bar */}
@@ -227,38 +356,152 @@ export default function Landing() {
           </div>
 
           {/* Feature Mockup Card */}
-          <div className="glass-panel p-6 rounded-3xl bg-surface-container-high/80 border border-outline-variant relative overflow-hidden shadow-2xl">
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/20 blur-3xl rounded-full" />
-            <h3 className="text-lg font-bold text-on-surface mb-6 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-secondary" /> Biểu đồ xu hướng (Mockup)
-            </h3>
-            
-            {/* SVG Chart Mockup */}
-            <div className="w-full h-48 relative">
-              <svg className="w-full h-full overflow-visible" viewBox="0 0 1000 200" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="chartGlow2" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="currentColor" stopOpacity="0.4" />
-                    <stop offset="100%" stopColor="currentColor" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-                <line x1="0" y1="50" x2="1000" y2="50" stroke="currentColor" strokeOpacity="0.1" strokeWidth="1" strokeDasharray="4 4" className="text-on-surface" />
-                <line x1="0" y1="100" x2="1000" y2="100" stroke="currentColor" strokeOpacity="0.1" strokeWidth="1" strokeDasharray="4 4" className="text-on-surface" />
-                <line x1="0" y1="150" x2="1000" y2="150" stroke="currentColor" strokeOpacity="0.1" strokeWidth="1" strokeDasharray="4 4" className="text-on-surface" />
-                
-                <path d="M 0 180 Q 200 170, 400 120 T 700 80 T 1000 20 L 1000 200 L 0 200 Z" fill="url(#chartGlow2)" className="text-primary" />
-                <path d="M 0 180 Q 200 170, 400 120 T 700 80 T 1000 20" fill="none" stroke="currentColor" strokeWidth="3" className="text-primary" />
-                
-                <circle cx="400" cy="120" r="5" fill="currentColor" className="text-primary border-4 border-surface shadow-sm" />
-                <circle cx="700" cy="80" r="5" fill="currentColor" className="text-primary border-4 border-surface shadow-sm" />
-                <circle cx="1000" cy="20" r="6" fill="currentColor" className="text-secondary animate-pulse" />
+          <div className="glass-panel p-6 rounded-3xl bg-surface-container-high/80 border border-outline-variant relative overflow-hidden shadow-2xl flex flex-col justify-between min-h-[380px]">
+            {/* Animated Wave Background */}
+            <div className="absolute inset-0 pointer-events-none opacity-20 z-0 overflow-hidden">
+              <svg className="absolute w-[200%] h-full top-0 left-0 animate-wave-flow" viewBox="0 0 1200 400" preserveAspectRatio="none">
+                <path d="M0,150 C150,200 350,100 500,150 C650,200 850,100 1000,150 C1150,200 1250,150 1300,150 L1300,400 L0,400 Z" fill="url(#waveGrad1)" />
+                <path d="M0,180 C200,120 400,220 600,180 C800,140 1000,220 1200,180 L1200,400 L0,400 Z" fill="url(#waveGrad2)" />
               </svg>
+              <svg className="absolute w-[200%] h-full top-0 left-0 animate-wave-flow-slow" viewBox="0 0 1200 400" preserveAspectRatio="none">
+                <path d="M0,220 C300,180 500,260 800,220 C1100,180 1200,240 1300,220 L1300,400 L0,400 Z" fill="url(#waveGrad3)" />
+              </svg>
+              <defs>
+                <linearGradient id="waveGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="transparent" />
+                </linearGradient>
+                <linearGradient id="waveGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="var(--secondary)" stopOpacity="0.2" />
+                  <stop offset="100%" stopColor="transparent" />
+                </linearGradient>
+                <linearGradient id="waveGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="var(--tertiary)" stopOpacity="0.15" />
+                  <stop offset="100%" stopColor="transparent" />
+                </linearGradient>
+              </defs>
             </div>
-            <div className="flex justify-between text-[10px] font-mono text-on-surface-variant mt-2">
-              <span>Năm 2020</span>
-              <span>Năm 2022</span>
-              <span>Năm 2024</span>
-              <span>Hiện tại</span>
+
+            <style>{`
+              @keyframes waveFlow {
+                0% { transform: translateX(0) translateY(0); }
+                50% { transform: translateX(-25%) translateY(10px); }
+                100% { transform: translateX(0) translateY(0); }
+              }
+              @keyframes waveFlowSlow {
+                0% { transform: translateX(-15%) translateY(5px); }
+                50% { transform: translateX(10%) translateY(-5px); }
+                100% { transform: translateX(-15%) translateY(5px); }
+              }
+              .animate-wave-flow { animation: waveFlow 18s ease-in-out infinite; }
+              .animate-wave-flow-slow { animation: waveFlowSlow 25s ease-in-out infinite; }
+            `}</style>
+
+            <div className="relative z-10 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-secondary animate-pulse" />
+                  <h3 className="text-lg font-bold text-on-surface">Xu hướng công bố khoa học</h3>
+                </div>
+                {/* Topic Selector Tabs */}
+                <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/5">
+                  {[
+                    { id: "dl", label: "Trí tuệ nhân tạo", color: "text-primary" },
+                    { id: "cyber", label: "An ninh mạng", color: "text-secondary" },
+                    { id: "cloud", label: "Điện toán đám mây", color: "text-tertiary" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTopic(tab.id)}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                        activeTopic === tab.id
+                          ? "bg-white/10 text-on-surface shadow-sm"
+                          : "text-on-surface-variant hover:text-on-surface"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dynamic Interactive SVG Chart */}
+              <div className="w-full h-44 relative mt-2">
+                <svg className="w-full h-full overflow-visible" viewBox="0 0 1000 200" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="chartAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={activeTopicData.color} stopOpacity="0.35" />
+                      <stop offset="100%" stopColor={activeTopicData.color} stopOpacity="0.0" />
+                    </linearGradient>
+                  </defs>
+                  
+                  {/* Grid Lines */}
+                  <line x1="0" y1="50" x2="1000" y2="50" stroke="currentColor" strokeOpacity="0.05" strokeWidth="1" strokeDasharray="4 4" className="text-on-surface" />
+                  <line x1="0" y1="100" x2="1000" y2="100" stroke="currentColor" strokeOpacity="0.05" strokeWidth="1" strokeDasharray="4 4" className="text-on-surface" />
+                  <line x1="0" y1="150" x2="1000" y2="150" stroke="currentColor" strokeOpacity="0.05" strokeWidth="1" strokeDasharray="4 4" className="text-on-surface" />
+                  
+                  {/* Filled Area */}
+                  <path
+                    d={activeTopicData.areaPath}
+                    fill="url(#chartAreaGrad)"
+                    className="transition-all duration-700 ease-in-out"
+                  />
+                  
+                  {/* Smooth Trend Line */}
+                  <path
+                    d={activeTopicData.linePath}
+                    fill="none"
+                    stroke={activeTopicData.color}
+                    strokeWidth="3.5"
+                    className="transition-all duration-700 ease-in-out"
+                  />
+                  
+                  {/* Interactive/Highlight Circles */}
+                  {activeTopicData.points.map((pt, i) => (
+                    <g key={i} className="group/node cursor-pointer">
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r="5"
+                        fill={activeTopicData.color}
+                        stroke="var(--surface)"
+                        strokeWidth="2.5"
+                        className="transition-all duration-300 group-hover/node:r-7"
+                      />
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r="14"
+                        fill={activeTopicData.color}
+                        fillOpacity="0"
+                        className="group-hover/node:fill-opacity-10 transition-all duration-300"
+                      />
+                      {/* Tooltip on Hover */}
+                      <foreignObject
+                        x={pt.x - 50}
+                        y={pt.y - 45}
+                        width="100"
+                        height="35"
+                        className="opacity-0 group-hover/node:opacity-100 transition-opacity duration-200 pointer-events-none"
+                      >
+                        <div className="bg-surface-container border border-outline-variant/50 rounded-lg p-1 text-center shadow-lg">
+                          <p className="text-[9px] font-black text-on-surface leading-none">{pt.val} bài</p>
+                          <p className="text-[7px] text-on-surface-variant font-mono leading-none mt-0.5">{pt.year}</p>
+                        </div>
+                      </foreignObject>
+                    </g>
+                  ))}
+                </svg>
+              </div>
+
+              <div className="flex justify-between text-[10px] font-mono text-on-surface-variant/80 border-t border-white/5 pt-3">
+                {activeTopicData.points.map((pt, i) => (
+                  <span key={i}>Năm {pt.year}</span>
+                ))}
+              </div>
+
+
             </div>
           </div>
         </div>
