@@ -7,6 +7,7 @@ import { BookmarkedPapersList } from "./components/Bookmarks/BookmarkedPapersLis
 import { FollowedKeywordsGrid } from "./components/Bookmarks/FollowedKeywordsGrid";
 import { FollowedJournalsGrid } from "./components/Bookmarks/FollowedJournalsGrid";
 import { BookmarkPaperDetailModal } from "./components/Bookmarks/BookmarkPaperDetailModal";
+import { ExportReportModal } from "./components/Bookmarks/ExportReportModal";
 
 export default function Bookmarks() {
   const userStr = localStorage.getItem("user");
@@ -18,6 +19,7 @@ export default function Bookmarks() {
   const [editNote, setEditNote] = useState("");
   const [page, setPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"papers" | "keywords" | "journals">("papers");
   const [selectedPaper, setSelectedPaper] = useState<any | null>(null);
   const [bookmarkLoadingIds, setBookmarkLoadingIds] = useState<Set<number>>(new Set());
@@ -56,32 +58,8 @@ export default function Bookmarks() {
   const followedKeywords = apiFollowedData?.keywords || [];
   const followedJournals = apiFollowedData?.journals || [];
 
-  const handleExport = async () => {
-    setIsExporting(true);
-    try {
-      const token = localStorage.getItem("token");
-      const headers: HeadersInit = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-      const response = await fetch("/api/bookmarks/export", { headers });
-      if (!response.ok) throw new Error("Không thể xuất báo cáo.");
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `bao_cao_dau_trang_${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(err);
-      toast.error("Lỗi khi xuất báo cáo");
-    } finally {
-      setIsExporting(false);
-    }
+  const handleExport = () => {
+    setIsExportModalOpen(true);
   };
 
   const deleteKeyword = async (id: number, name: string) => {
@@ -238,6 +216,14 @@ export default function Bookmarks() {
           onClose={() => setSelectedPaper(null)}
           bookmarkLoadingIds={bookmarkLoadingIds}
           onToggleBookmark={handleToggleBookmarkInModal}
+        />
+      )}
+
+      {isExportModalOpen && (
+        <ExportReportModal
+          onClose={() => setIsExportModalOpen(false)}
+          token={localStorage.getItem("token")}
+          user={user}
         />
       )}
     </div>
