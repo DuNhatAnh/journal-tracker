@@ -13,6 +13,7 @@ import { JournalBenchmark } from "./components/JournalBenchmark";
 import { RepresentativePublications } from "./components/RepresentativePublications";
 import { TrendsSidebar } from "./components/TrendsSidebar";
 import { PaperQuickViewModal } from "./components/PaperQuickViewModal";
+import { ExportTrendReportModal } from "./components/ExportTrendReportModal";
 
 interface TrendRecord {
   id: number;
@@ -118,6 +119,7 @@ export default function Trending() {
   const [bookmarkLoadingIds, setBookmarkLoadingIds] = useState<Set<number>>(new Set());
   const [followingJournalLoadingIds, setFollowingJournalLoadingIds] = useState<Set<number>>(new Set());
   const [selectedPaper, setSelectedPaper] = useState<any | null>(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Time slider filter state
   const [startYear, setStartYear] = useState(2020);
@@ -490,7 +492,11 @@ export default function Trending() {
             </select>
           </div>
 
-          <button className="flex items-center gap-2 px-4 py-2 glass-panel rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-white/5 transition-all cursor-pointer">
+          <button
+            onClick={() => setIsExportModalOpen(true)}
+            disabled={loading || !selectedDetail}
+            className="flex items-center gap-2 px-4 py-2 glass-panel rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-white/5 transition-all cursor-pointer disabled:opacity-50"
+          >
             <Download className="w-4 h-4" /> Xuất báo cáo
           </button>
           <button className="flex items-center gap-2 px-4 py-2 gradient-btn rounded-xl text-xs font-bold uppercase tracking-widest text-on-primary cursor-pointer">
@@ -571,7 +577,6 @@ export default function Trending() {
         />
       </div>
 
-      {/* Quick View Paper Abstract Modal with Citation Block */}
       {selectedPaper && (
         <PaperQuickViewModal 
           paper={selectedPaper}
@@ -579,6 +584,20 @@ export default function Trending() {
           bookmarkedIds={bookmarkedIds}
           bookmarkLoadingIds={bookmarkLoadingIds}
           onToggleBookmark={handleToggleBookmark}
+        />
+      )}
+
+      {isExportModalOpen && (
+        <ExportTrendReportModal
+          onClose={() => setIsExportModalOpen(false)}
+          user={user}
+          selectedEntity={selectedEntity}
+          selectedDetail={selectedDetail}
+          startYear={startYear}
+          endYear={endYear}
+          activeStats={activeStats}
+          researchGapInsight={researchGapInsight}
+          coOccurringKeywords={coOccurringKeywords}
         />
       )}
     </div>
