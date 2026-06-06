@@ -10,7 +10,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 
 # Pre-install dependencies to utilize docker layer cache
-COPY composer.json ./
+COPY composer.json composer.lock* ./
 RUN composer install --no-interaction --no-plugins --no-scripts --prefer-dist --no-autoloader || true
 
 # Copy application files

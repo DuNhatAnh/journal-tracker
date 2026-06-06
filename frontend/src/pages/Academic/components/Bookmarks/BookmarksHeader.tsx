@@ -6,6 +6,7 @@ interface BookmarksHeaderProps {
   activeTab: "papers" | "keywords" | "journals";
   setActiveTab: (tab: "papers" | "keywords" | "journals") => void;
   totalPapers?: number;
+  bookmarkLimit?: number;
   showExport: boolean;
   isExporting: boolean;
   onExport: () => void;
@@ -15,6 +16,7 @@ export function BookmarksHeader({
   activeTab,
   setActiveTab,
   totalPapers,
+  bookmarkLimit,
   showExport,
   isExporting,
   onExport,
@@ -26,7 +28,7 @@ export function BookmarksHeader({
           <h2 className="font-display text-4xl font-bold text-on-surface">Đã lưu</h2>
           {activeTab === "papers" && totalPapers !== undefined && (
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary">
-              Tìm thấy {totalPapers} bài báo khoa học
+              Đã lưu {totalPapers} / {bookmarkLimit && bookmarkLimit > 0 ? `${bookmarkLimit} bài` : "Không giới hạn"}
             </div>
           )}
         </div>

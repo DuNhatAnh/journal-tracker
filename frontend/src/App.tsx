@@ -36,7 +36,7 @@ const LoadingScreen = () => (
 export default function App() {
   return (
     <ThemeProvider>
-      <Toaster position="bottom-right" toastOptions={{ style: { background: '#1E293B', color: '#fff', borderRadius: '12px' } }} />
+      <Toaster position="top-center" toastOptions={{ style: { background: '#1E293B', color: '#fff', borderRadius: '12px' } }} />
       <BrowserRouter>
         <Suspense fallback={<LoadingScreen />}>
           <Routes>

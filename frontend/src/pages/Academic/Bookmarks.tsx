@@ -40,8 +40,8 @@ export default function Bookmarks() {
     setData: setApiBookmarksData,
     refetch: refetchBookmarks 
   } = useApiQuery<any>(
-    `/bookmarks?page=${page}`,
-    { enabled: activeTab === "papers", persist: true }
+    `/bookmarks?page=${page}&per_page=5`,
+    { enabled: activeTab === "papers", staleTime: 0, ttl: 0 }
   );
 
   // useApiQuery for followed status (keywords and journals)
@@ -52,7 +52,7 @@ export default function Bookmarks() {
     refetch: refetchFollowedData 
   } = useApiQuery<any>(
     "/following/status",
-    { enabled: activeTab !== "papers", persist: true }
+    { enabled: activeTab !== "papers", staleTime: 0, ttl: 0 }
   );
 
   const followedKeywords = apiFollowedData?.keywords || [];
@@ -73,9 +73,9 @@ export default function Bookmarks() {
       }
       toast.success(`Đã hủy lưu từ khóa "${name}"!`);
       refetchFollowedData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Lỗi khi hủy lưu từ khóa. Vui lòng thử lại.");
+      toast.error(err.message || "Lỗi khi hủy lưu từ khóa. Vui lòng thử lại.");
     }
   };
 
@@ -90,9 +90,9 @@ export default function Bookmarks() {
       }
       toast.success(`Đã hủy theo dõi tạp chí "${name}"!`);
       refetchFollowedData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Lỗi khi hủy theo dõi tạp chí. Vui lòng thử lại.");
+      toast.error(err.message || "Lỗi khi hủy theo dõi tạp chí. Vui lòng thử lại.");
     }
   };
 
@@ -107,13 +107,17 @@ export default function Bookmarks() {
           total: Math.max(0, apiBookmarksData.total - 1)
         };
         setApiBookmarksData(updatedData);
-        queryCache.set(`/bookmarks?page=${page}`, updatedData);
+        queryCache.set(`/bookmarks?page=${page}&per_page=5`, updatedData);
       }
       toast.success("Đã xóa bài báo khỏi danh sách lưu!");
-      refetchBookmarks();
-    } catch (err) {
+      if (apiBookmarksData?.data?.length === 1 && page > 1) {
+        setPage(prev => prev - 1);
+      } else {
+        refetchBookmarks();
+      }
+    } catch (err: any) {
       console.error(err);
-      toast.error("Lỗi khi xóa bài báo. Vui lòng thử lại.");
+      toast.error(err.message || "Lỗi khi xóa bài báo. Vui lòng thử lại.");
     }
   };
 
@@ -127,13 +131,13 @@ export default function Bookmarks() {
         );
         const updatedData = { ...apiBookmarksData, data: updatedList };
         setApiBookmarksData(updatedData);
-        queryCache.set(`/bookmarks?page=${page}`, updatedData);
+        queryCache.set(`/bookmarks?page=${page}&per_page=5`, updatedData);
       }
       toast.success("Đã cập nhật ghi chú!");
       refetchBookmarks();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Không thể lưu ghi chú. Vui lòng thử lại.");
+      toast.error(err.message || "Không thể lưu ghi chú. Vui lòng thử lại.");
     }
   };
 
@@ -152,11 +156,15 @@ export default function Bookmarks() {
           total: Math.max(0, apiBookmarksData.total - 1)
         };
         setApiBookmarksData(updatedData);
-        queryCache.set(`/bookmarks?page=${page}`, updatedData);
+        queryCache.set(`/bookmarks?page=${page}&per_page=5`, updatedData);
       }
-      refetchBookmarks();
-    } catch (err) {
-      toast.error("Thao tác thất bại. Vui lòng thử lại.");
+      if (apiBookmarksData?.data?.length === 1 && page > 1) {
+        setPage(prev => prev - 1);
+      } else {
+        refetchBookmarks();
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Thao tác thất bại. Vui lòng thử lại.");
     } finally {
       setBookmarkLoadingIds(prev => {
         const s = new Set(prev);
@@ -166,16 +174,31 @@ export default function Bookmarks() {
     }
   };
 
+  const totalSaved = apiBookmarksData?.total || 0;
+  const bookmarkLimit = apiBookmarksData?.bookmark_limit || 0;
+  const isLimitExceeded = bookmarkLimit > 0 && totalSaved > bookmarkLimit;
+
   return (
-    <div ref={bookmarksTopRef} className="space-y-12 pb-20">
+    <div ref={bookmarksTopRef} className="space-y-8 pb-20">
       <BookmarksHeader
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         totalPapers={apiBookmarksData?.total}
+        bookmarkLimit={apiBookmarksData?.bookmark_limit}
         showExport={showExport}
         isExporting={isExporting}
         onExport={handleExport}
       />
+
+      {/* Subtle warning banner if limit exceeded */}
+      {activeTab === "papers" && isLimitExceeded && (
+        <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs font-semibold max-w-4xl animate-fade-in">
+          <span className="text-sm">⚠️</span>
+          <span>
+            Tài khoản đang lưu <b>{totalSaved}</b> bài báo, vượt hạn mức của hệ thống (<b>{bookmarkLimit}</b> bài). Vui lòng xóa bớt tài liệu cũ để có thể lưu thêm bài mới.
+          </span>
+        </div>
+      )}
 
       {activeTab === "papers" && (
         <BookmarkedPapersList

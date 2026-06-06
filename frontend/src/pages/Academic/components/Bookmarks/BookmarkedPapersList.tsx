@@ -48,7 +48,7 @@ export function BookmarkedPapersList({
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {Array.from({ length: 6 }).map((_, i) => (
+        {Array.from({ length: 5 }).map((_, i) => (
           <div
             key={i}
             className="glass-panel p-8 rounded-2xl relative overflow-hidden animate-pulse flex flex-col h-[320px]"

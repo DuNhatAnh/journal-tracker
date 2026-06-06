@@ -7,9 +7,9 @@ if [ ! -f .env ]; then
     cp .env.example .env
 fi
 
-# Run composer install if vendor doesn't exist (in case volume is empty)
-if [ ! -d vendor ]; then
-    echo "Installing composer dependencies..."
+# Run composer install if vendor doesn't exist or if in local environment (to keep it updated)
+if [ "$APP_ENV" = "local" ] || [ ! -d vendor ]; then
+    echo "Installing/updating composer dependencies..."
     composer install --no-interaction --prefer-dist
 fi
 

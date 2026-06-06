@@ -78,8 +78,8 @@ export default function AllPapers() {
         setBookmarkedIds(prev => new Set(prev).add(paperId));
         toast.success("Lưu bài báo thành công!");
       }
-    } catch (err) {
-      toast.error("Thao tác thất bại. Vui lòng thử lại.");
+    } catch (err: any) {
+      toast.error(err.message || "Thao tác thất bại. Vui lòng thử lại.");
     } finally {
       setBookmarkLoadingIds(prev => {
         const s = new Set(prev);

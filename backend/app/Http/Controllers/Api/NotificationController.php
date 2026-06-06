@@ -51,12 +51,15 @@ class NotificationController extends Controller
 
     public function deleteRead()
     {
-        auth()->user()
+        $deleted = auth()->user()
             ->notifications()
             ->where('is_read', 'true')
             ->delete();
 
-        return response()->json(['message' => 'Đã xóa thông báo đã đọc.']);
+        return response()->json([
+            'message' => 'Đã xóa thông báo đã đọc.',
+            'count'   => $deleted
+        ]);
     }
 
     public function deleteMultiple(\Illuminate\Http\Request $request)
@@ -67,11 +70,14 @@ class NotificationController extends Controller
             return response()->json(['message' => 'Vui lòng chọn thông báo cần xóa.'], 400);
         }
 
-        auth()->user()
+        $deleted = auth()->user()
             ->notifications()
             ->whereIn('id', $ids)
             ->delete();
 
-        return response()->json(['message' => 'Đã xóa các thông báo được chọn.']);
+        return response()->json([
+            'message' => 'Đã xóa các thông báo được chọn.',
+            'count'   => $deleted
+        ]);
     }
 }

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, X } from "lucide-react";
+import { Search, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/src/lib/api";
+import toast from "react-hot-toast";
 import { useApiQuery, queryCache } from "../../hooks/useApiQuery";
 import { NotificationHeader } from "./components/Notifications/NotificationHeader";
 import { NotificationItem, NotificationItemCard, getNotificationType } from "./components/Notifications/NotificationItemCard";
@@ -22,11 +23,8 @@ function getDayLabel(dateStr: string) {
 }
 
 export default function Notifications() {
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
   const navigate = useNavigate();
 
   // Search & Filter States
@@ -45,29 +43,18 @@ export default function Notifications() {
   const [confirmDeleteRead, setConfirmDeleteRead] = useState(false);
   const [confirmDeleteSelected, setConfirmDeleteSelected] = useState(false);
 
-  // useApiQuery for the first page of notifications (persist: false ensures loading skeleton shows on entry)
+  // useApiQuery for notifications (staleTime: 0, ttl: 0 ensures loading skeleton shows on page change)
   const { 
-    data: firstPageData, 
+    data: apiData, 
     loading: loading, 
-    setData: setFirstPageData, 
-    refetch: refetchFirstPage 
+    setData: setApiData, 
+    refetch: refetchData 
   } = useApiQuery<{ data: NotificationItem[], current_page: number, last_page: number }>(
-    "/notifications?page=1&per_page=5",
-    { persist: false }
+    `/notifications?page=${page}&per_page=5`,
+    { staleTime: 0, ttl: 0 }
   );
 
-  // Synchronize firstPageData with local notifications state
-  useEffect(() => {
-    if (firstPageData) {
-      const newData = firstPageData.data || [];
-      const isLastPage = (firstPageData.current_page || 1) >= (firstPageData.last_page || 1);
-      
-      if (page === 1) {
-        setNotifications(newData);
-        setHasMore(!isLastPage && newData.length > 0);
-      }
-    }
-  }, [firstPageData, page]);
+  const notificationsList = apiData?.data || [];
 
   const handleNotificationClick = (notification: NotificationItem) => {
     setSelectedNotification(notification);
@@ -75,17 +62,13 @@ export default function Notifications() {
       api.patch(`/notifications/${notification.id}/read`).catch(console.error);
       window.dispatchEvent(new CustomEvent("notifications-updated"));
       
-      // Update local state instantly
-      setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n));
-      
-      // Update firstPageData cache if notification is part of page 1
-      if (firstPageData) {
-        const updatedList = firstPageData.data.map((n: any) => 
+      // Update cache instantly
+      if (apiData) {
+        const updatedList = apiData.data.map((n: any) => 
           n.id === notification.id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
         );
-        const updatedData = { ...firstPageData, data: updatedList };
-        setFirstPageData(updatedData);
-        queryCache.set("/notifications?page=1&per_page=5", updatedData);
+        const updatedData = { ...apiData, data: updatedList };
+        setApiData(updatedData);
       }
     }
   };
@@ -108,47 +91,15 @@ export default function Notifications() {
     setSelectedNotification(null);
   };
 
-  const loadMoreNotifications = async () => {
-    setLoadingMore(true);
-    setError(null);
-    const nextPage = page + 1;
-
-    try {
-      const response = await api.get<{ data: NotificationItem[], current_page: number, last_page: number }>(
-        `/notifications?page=${nextPage}&per_page=5`
-      );
-      const newData = response.data || [];
-      const isLastPage = (response.current_page || 1) >= (response.last_page || 1);
-      
-      setNotifications(prev => [...prev, ...newData]);
-      setHasMore(!isLastPage && newData.length > 0);
-      setPage(nextPage);
-    } catch (err: any) {
-      setError(err.message || "Không thể tải thông báo.");
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
   const handleMarkAllRead = async () => {
     setError(null);
     try {
       await api.post("/notifications/read-all");
       window.dispatchEvent(new CustomEvent("notifications-updated"));
       
-      // Update local state instantly
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() })));
-      
-      // Update firstPageData in cache
-      if (firstPageData) {
-        const updatedData = {
-          ...firstPageData,
-          data: firstPageData.data.map((n: any) => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
-        };
-        setFirstPageData(updatedData);
-        queryCache.set("/notifications?page=1&per_page=5", updatedData);
-      }
-      refetchFirstPage();
+      toast.success("Đã đánh dấu đọc tất cả thông báo!");
+      setPage(1);
+      refetchData();
     } catch (err: any) {
       setError(err.message || "Không thể đánh dấu tất cả.");
     }
@@ -157,20 +108,12 @@ export default function Notifications() {
   const handleDeleteRead = async () => {
     setError(null);
     try {
-      await api.delete("/notifications/read");
+      const res = await api.delete<{ count: number }>("/notifications/read");
       window.dispatchEvent(new CustomEvent("notifications-updated"));
       
-      // Update local state instantly by keeping only unread notifications
-      setNotifications(prev => prev.filter(n => !n.is_read && !n.read_at));
-      
-      // Update firstPageData in cache
-      if (firstPageData) {
-        const updatedList = firstPageData.data.filter((n: any) => !n.is_read && !n.read_at);
-        const updatedData = { ...firstPageData, data: updatedList };
-        setFirstPageData(updatedData);
-        queryCache.set("/notifications?page=1&per_page=5", updatedData);
-      }
-      refetchFirstPage();
+      toast.success(`Đã xóa thành công ${res.count || 0} thông báo đã đọc!`);
+      setPage(1);
+      refetchData();
     } catch (err: any) {
       setError(err.message || "Không thể xóa thông báo đã đọc.");
     }
@@ -180,20 +123,14 @@ export default function Notifications() {
     if (selectedIds.size === 0) return;
     setError(null);
     try {
-      await api.post("/notifications/delete-multiple", { ids: Array.from(selectedIds) });
+      const res = await api.post<{ count: number }>("/notifications/delete-multiple", { ids: Array.from(selectedIds) });
       window.dispatchEvent(new CustomEvent("notifications-updated"));
       
-      setNotifications(prev => prev.filter(n => !selectedIds.has(n.id)));
-      
-      if (firstPageData) {
-        const updatedList = firstPageData.data.filter((n: any) => !selectedIds.has(n.id));
-        const updatedData = { ...firstPageData, data: updatedList };
-        setFirstPageData(updatedData);
-        queryCache.set("/notifications?page=1&per_page=5", updatedData);
-      }
+      toast.success(`Đã xóa thành công ${res.count || 0} thông báo được chọn!`);
       setSelectedIds(new Set());
       setSelectionMode(false);
-      refetchFirstPage();
+      setPage(1);
+      refetchData();
     } catch (err: any) {
       setError(err.message || "Không thể xóa các thông báo được chọn.");
     }
@@ -209,7 +146,7 @@ export default function Notifications() {
   };
 
   // Local filtering logic
-  const filteredNotifications = notifications.filter(notification => {
+  const filteredNotifications = notificationsList.filter(notification => {
     // 1. Text Search Filter
     const title = (notification.title || "").toLowerCase();
     const content = (notification.content || "").toLowerCase();
@@ -249,16 +186,16 @@ export default function Notifications() {
     return groups;
   }, {} as Record<string, NotificationItem[]>);
 
-  const hasUnread = notifications.some(n => !n.is_read && !n.read_at);
-  const hasRead = notifications.some(n => n.is_read || n.read_at);
+  const hasUnread = notificationsList.some(n => !n.is_read && !n.read_at);
+  const hasRead = notificationsList.some(n => n.is_read || n.read_at);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
       <NotificationHeader 
         onMarkAllRead={() => setConfirmMarkAll(true)} 
-        disableMarkAll={notifications.length === 0 || loading || !hasUnread} 
+        disableMarkAll={notificationsList.length === 0 || loading || !hasUnread} 
         onDeleteRead={() => setConfirmDeleteRead(true)}
-        disableDeleteRead={notifications.length === 0 || loading || !hasRead}
+        disableDeleteRead={notificationsList.length === 0 || loading || !hasRead}
         selectionMode={selectionMode}
         selectedCount={selectedIds.size}
         onToggleSelectionMode={() => {
@@ -267,7 +204,7 @@ export default function Notifications() {
         }}
         onDeleteSelected={() => setConfirmDeleteSelected(true)}
         onSelectAll={() => {
-          const allIds = notifications.map(n => n.id);
+          const allIds = notificationsList.map(n => n.id);
           if (selectedIds.size === allIds.length) {
             setSelectedIds(new Set());
           } else {
@@ -277,7 +214,7 @@ export default function Notifications() {
       />
 
       {/* Control Bar (Search & Filters) */}
-      {notifications.length > 0 && (
+      {notificationsList.length > 0 && (
         <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between bg-surface-container/40 p-4 rounded-3xl border border-white/5">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
@@ -388,7 +325,7 @@ export default function Notifications() {
 
       {loading ? (
         <NotificationSkeleton />
-      ) : notifications.length === 0 ? (
+      ) : notificationsList.length === 0 ? (
         <div className="rounded-3xl border border-white/10 bg-surface p-10 text-center text-on-surface-variant">
           <p className="text-lg font-semibold text-on-surface">Chưa có thông báo mới.</p>
           <p className="mt-2 text-sm">Hệ thống sẽ hiển thị khi có cảnh báo hoặc cập nhật từ dữ liệu của bạn.</p>
@@ -425,14 +362,25 @@ export default function Notifications() {
         })
       )}
 
-      {hasMore && (
-        <div className="flex justify-center pt-8">
-          <button
-            onClick={loadMoreNotifications}
-            disabled={loadingMore}
-            className="px-6 py-3 rounded-xl border border-white/10 bg-white/5 text-on-surface text-sm font-bold hover:bg-white/10 transition-all disabled:opacity-50"
+      {/* Pagination Controls */}
+      {apiData?.last_page && apiData.last_page > 1 && (
+        <div className="flex justify-center items-center gap-2 pt-8">
+          <button 
+            onClick={() => setPage(prev => Math.max(1, prev - 1))}
+            disabled={page === 1 || loading}
+            className="p-2 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
-            {loadingMore ? "Đang tải..." : "Tải thêm thông báo"}
+            <ChevronLeft className="w-4 h-4 text-on-surface" />
+          </button>
+          <span className="text-xs font-bold text-on-surface-variant px-4">
+            Trang {page} / {apiData.last_page}
+          </span>
+          <button 
+            onClick={() => setPage(prev => Math.min(apiData.last_page, prev + 1))}
+            disabled={page === apiData.last_page || loading}
+            className="p-2 rounded-xl border border-white/10 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          >
+            <ChevronRight className="w-4 h-4 text-on-surface" />
           </button>
         </div>
       )}

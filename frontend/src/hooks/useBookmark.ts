@@ -24,8 +24,8 @@ export function useBookmark() {
         setBookmarkedIds(prev => new Set(prev).add(paperId));
         toast.success("Lưu bài báo thành công!");
       }
-    } catch {
-      toast.error("Thao tác thất bại. Vui lòng thử lại.");
+    } catch (err: any) {
+      toast.error(err.message || "Thao tác thất bại. Vui lòng thử lại.");
     } finally {
       setLoadingIds(prev => { const s = new Set(prev); s.delete(paperId); return s; });
     }

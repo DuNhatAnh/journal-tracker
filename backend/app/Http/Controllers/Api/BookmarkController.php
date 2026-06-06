@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Bookmark;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Cache;
 
 class BookmarkController extends Controller
 {
@@ -15,6 +17,24 @@ class BookmarkController extends Controller
     {
         $query = $this->buildFilteredQuery($request);
 
+        // Load limit from settings file
+        $user = auth()->user();
+        $path = storage_path('app/system_settings.json');
+        $limit = 0;
+        $role = $user->role;
+        
+        if (File::exists($path)) {
+            $settings = json_decode(File::get($path), true);
+            $limitKey = "{$role}_bookmark_limit";
+            if (isset($settings[$limitKey])) {
+                $limit = (int)$settings[$limitKey];
+            }
+        } else {
+            // Fallback default limits
+            if ($role === 'student') $limit = 50;
+            elseif ($role === 'lecturer') $limit = 200;
+        }
+
         $perPage = $request->input('per_page', 6);
         if ($perPage === 'all' || $perPage == -1) {
             $bookmarks = $query->get();
@@ -23,13 +43,16 @@ class BookmarkController extends Controller
                 'total' => $bookmarks->count(),
                 'per_page' => $bookmarks->count(),
                 'current_page' => 1,
-                'last_page' => 1
+                'last_page' => 1,
+                'bookmark_limit' => $limit
             ]);
         }
 
         $bookmarks = $query->paginate($perPage);
+        $data = $bookmarks->toArray();
+        $data['bookmark_limit'] = $limit;
 
-        return response()->json($bookmarks);
+        return response()->json($data);
     }
 
     /**
@@ -39,13 +62,49 @@ class BookmarkController extends Controller
     {
         $request->validate(['paper_id' => 'required|exists:research_papers,id']);
 
+        $user = auth()->user();
+
+        // Check if bookmark already exists
+        $exists = Bookmark::where('user_id', $user->id)
+            ->where('paper_id', $request->paper_id)
+            ->exists();
+
+        if (!$exists) {
+            // Load limits from settings file
+            $path = storage_path('app/system_settings.json');
+            $limit = 0;
+            $role = $user->role;
+            
+            if (File::exists($path)) {
+                $settings = json_decode(File::get($path), true);
+                $limitKey = "{$role}_bookmark_limit";
+                if (isset($settings[$limitKey])) {
+                    $limit = (int)$settings[$limitKey];
+                }
+            } else {
+                // Fallback default limits
+                if ($role === 'student') $limit = 50;
+                elseif ($role === 'lecturer') $limit = 200;
+            }
+
+            // If limit is set (> 0) and reached, block creation
+            if ($limit > 0) {
+                $currentCount = $user->bookmarks()->count();
+                if ($currentCount >= $limit) {
+                    return response()->json([
+                        'message' => "Bạn đã đạt giới hạn lưu tối đa cho vai trò của mình ($limit bài báo). Vui lòng xóa bớt bài báo cũ để lưu thêm."
+                    ], 422);
+                }
+            }
+        }
+
         $bookmark = Bookmark::firstOrCreate(
-            ['user_id'  => auth()->id(), 'paper_id' => $request->paper_id],
+            ['user_id'  => $user->id, 'paper_id' => $request->paper_id],
             ['note'     => $request->note]
         );
 
-        \Illuminate\Support\Facades\Cache::forget("dash.bookmarks_new." . auth()->id());
-        \Illuminate\Support\Facades\Cache::forget("dash.bookmarks." . auth()->id());
+        Cache::forget("dash.bookmarks_new." . $user->id);
+        Cache::forget("dash.bookmarks." . $user->id);
 
         return response()->json($bookmark->load('paper'), 201);
     }
