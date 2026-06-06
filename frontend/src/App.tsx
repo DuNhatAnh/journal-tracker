@@ -1,5 +1,5 @@
 import React, { Suspense } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { Layout } from "./components/shared/Layout";
 import { ThemeProvider } from "./lib/theme";
@@ -26,47 +26,50 @@ import AdminSync from "./pages/Admin/Sync";
 import AdminKeywords from "./pages/Admin/Keywords";
 import AdminSettings from "./pages/Admin/Settings"; // Import Admin settings & schedules
 
-
 const LoadingScreen = () => (
   <div className="flex h-screen w-full items-center justify-center bg-surface">
     <div className="w-8 h-8 border-4 border-tertiary border-t-transparent rounded-full animate-spin"></div>
   </div>
 );
 
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <>
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/sso-callback" element={<SSOCallback />} />
+      <Route element={<Layout />}>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/search" element={<Search />} />
+        <Route path="/papers" element={<AllPapers />} />
+        <Route path="/trending" element={<Trending />} />
+        <Route path="/bookmarks" element={<Bookmarks />} />
+        <Route path="/following" element={<Following />} />
+        <Route path="/notifications" element={<Notifications />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/guide" element={<Guide />} />
+        {/* Admin Routes */}
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/users" element={<AdminUsers />} />
+        <Route path="/admin/sync" element={<AdminSync />} />
+        <Route path="/admin/keywords" element={<AdminKeywords />} />
+        <Route path="/admin/settings" element={<AdminSettings />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </>
+  )
+);
+
 export default function App() {
   return (
     <ThemeProvider>
       <Toaster position="top-center" toastOptions={{ style: { background: '#1E293B', color: '#fff', borderRadius: '12px' } }} />
-      <BrowserRouter>
-        <Suspense fallback={<LoadingScreen />}>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/sso-callback" element={<SSOCallback />} />
-            <Route element={<Layout />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/search" element={<Search />} />
-              <Route path="/papers" element={<AllPapers />} />
-              <Route path="/trending" element={<Trending />} />
-              <Route path="/bookmarks" element={<Bookmarks />} />
-              <Route path="/following" element={<Following />} />
-              <Route path="/notifications" element={<Notifications />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/guide" element={<Guide />} />
-              {/* Admin Routes */}
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/users" element={<AdminUsers />} />
-              <Route path="/admin/sync" element={<AdminSync />} />
-              <Route path="/admin/keywords" element={<AdminKeywords />} />
-              <Route path="/admin/settings" element={<AdminSettings />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
+      <Suspense fallback={<LoadingScreen />}>
+        <RouterProvider router={router} />
+      </Suspense>
     </ThemeProvider>
   );
 }

@@ -148,6 +148,13 @@ class AuthController extends Controller
         ]);
 
         $user = $request->user();
+
+        if (Hash::check($request->password, $user->password)) {
+            throw ValidationException::withMessages([
+                'password' => 'Mật khẩu mới không được trùng với mật khẩu hiện tại.',
+            ]);
+        }
+
         $user->update([
             'password' => Hash::make($request->password),
         ]);

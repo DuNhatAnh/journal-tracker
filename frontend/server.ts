@@ -58,10 +58,7 @@ async function startServer() {
       server: {
         middlewareMode: true,
         hmr: {
-          protocol: "ws",
-          host: "localhost",
-          port: 3000,
-          clientPort: 3000,
+          server: undefined,
         },
       },
       appType: "spa",

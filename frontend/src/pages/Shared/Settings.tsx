@@ -1,13 +1,27 @@
-import { User, Bell, Palette, ShieldCheck, Mail, Lock, Smartphone, Github, Loader2, Trash2 } from "lucide-react";
+import { User, Bell, Palette, ShieldCheck, Mail, Lock, Smartphone, Github, Loader2, Trash2, Eye, EyeOff, Edit2 } from "lucide-react";
 import { cn } from "@/src/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { api } from "@/src/lib/api";
+import { useBlocker } from "react-router-dom";
 import toast from "react-hot-toast";
 
 type NotificationSettings = {
   notify_journal: boolean;
   notify_keyword: boolean;
   notify_trending: boolean;
+};
+
+type ProfileData = {
+  name: string;
+  academic_title: string;
+  email: string;
+  dob: string;
+  phone: string;
+  gender: string;
+  institution: string;
+  bio: string;
+  website: string;
+  avatar: string;
 };
 
 export default function Settings() {
@@ -17,7 +31,19 @@ export default function Settings() {
     notify_keyword: true,
     notify_trending: true,
   });
-  const [profile, setProfile] = useState({
+  const [profile, setProfile] = useState<ProfileData>({
+    name: "",
+    academic_title: "",
+    email: "",
+    dob: "",
+    phone: "",
+    gender: "",
+    institution: "",
+    bio: "",
+    website: "",
+    avatar: ""
+  });
+  const [originalProfile, setOriginalProfile] = useState<ProfileData>({
     name: "",
     academic_title: "",
     email: "",
@@ -31,6 +57,7 @@ export default function Settings() {
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [editingProfile, setEditingProfile] = useState(false);
   
   const [passwords, setPasswords] = useState({
     current_password: "",
@@ -38,10 +65,44 @@ export default function Settings() {
     password_confirmation: ""
   });
   const [savingPassword, setSavingPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingAvatar, setDeletingAvatar] = useState(false);
+
+  // Check if profile has unsaved changes
+  const profileHasChanges = editingProfile && (
+    JSON.stringify(profile) !== JSON.stringify(originalProfile) || avatarFile !== null
+  );
+
+  // Show unsaved changes dialog
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
+  // Block router navigation when there are unsaved changes
+  const blocker = useBlocker(profileHasChanges);
+
+  const confirmIfUnsaved = useCallback((action: () => void) => {
+    if (profileHasChanges) {
+      setPendingAction(() => action);
+      setShowUnsavedModal(true);
+    } else {
+      action();
+    }
+  }, [profileHasChanges]);
+
+  // Warn on browser tab close / refresh
+  useEffect(() => {
+    if (!profileHasChanges) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [profileHasChanges]);
 
   const tabs = [
     { icon: User, label: "Tài khoản" },
@@ -57,7 +118,7 @@ export default function Settings() {
     try {
       const res = await api.get<any>("/me");
       const u = res;
-      setProfile({
+      const profileData: ProfileData = {
         name: u.name || "",
         academic_title: u.academic_title || "",
         email: u.email || "",
@@ -68,7 +129,9 @@ export default function Settings() {
         bio: u.bio || "",
         website: u.website || "",
         avatar: u.avatar || ""
-      });
+      };
+      setProfile(profileData);
+      setOriginalProfile(profileData);
       localStorage.setItem("user", JSON.stringify(u));
     } catch (e) {
       console.error("Failed to load profile", e);
@@ -99,6 +162,17 @@ export default function Settings() {
     }
   };
 
+  const handleStartEdit = () => {
+    setEditingProfile(true);
+  };
+
+  const handleCancelEdit = () => {
+    setProfile(originalProfile);
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    setEditingProfile(false);
+  };
+
   const handleSaveProfile = async () => {
     try {
       setSaving(true);
@@ -114,6 +188,24 @@ export default function Settings() {
       
       const res = await api.post<any>("/profile", formData);
       
+      const updatedProfile: ProfileData = {
+        name: res.name || "",
+        academic_title: res.academic_title || "",
+        email: res.email || "",
+        dob: res.dob || "",
+        phone: res.phone || "",
+        gender: res.gender || "",
+        institution: res.institution || "",
+        bio: res.bio || "",
+        website: res.website || "",
+        avatar: res.avatar || ""
+      };
+      setProfile(updatedProfile);
+      setOriginalProfile(updatedProfile);
+      setAvatarFile(null);
+      setAvatarPreview(null);
+      setEditingProfile(false);
+      
       localStorage.setItem("user", JSON.stringify(res));
       toast.success("Đã cập nhật hồ sơ thành công.", { position: "top-center" });
       setTimeout(() => window.location.reload(), 1500); // Reload to update Sidebar avatar & name
@@ -125,6 +217,10 @@ export default function Settings() {
   };
 
   const handleSavePassword = async () => {
+    if (passwords.password === passwords.current_password) {
+      toast.error("Mật khẩu mới không được trùng với mật khẩu hiện tại.", { position: "top-center" });
+      return;
+    }
     if (passwords.password !== passwords.password_confirmation) {
       toast.error("Mật khẩu mới không khớp.", { position: "top-center" });
       return;
@@ -165,6 +261,7 @@ export default function Settings() {
       setDeletingAvatar(true);
       const res = await api.delete<any>('/avatar');
       setProfile(prev => ({ ...prev, avatar: '' }));
+      setOriginalProfile(prev => ({ ...prev, avatar: '' }));
       setAvatarFile(null);
       setAvatarPreview(null);
       localStorage.setItem('user', JSON.stringify(res));
@@ -176,22 +273,39 @@ export default function Settings() {
     }
   };
 
+  const inputCls = "w-full bg-surface-container-low border border-outline-variant/50 rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all";
+  const readOnlyCls = "w-full bg-surface-dim/50 border border-outline-variant/30 rounded-xl px-4 py-3 text-sm font-medium text-on-surface outline-none cursor-default shadow-sm";
+
   const renderProfileTab = () => (
     <div className="space-y-8">
       <section className="glass-panel p-10 rounded-2xl space-y-10">
-        <header className="border-b border-white/5 pb-6">
+        <header className="border-b border-white/5 pb-6 flex items-center justify-between">
           <h3 className="font-display text-2xl font-bold">Thông tin hồ sơ</h3>
+          {!editingProfile && (
+            <button
+              onClick={handleStartEdit}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest border border-primary/30 text-primary bg-primary/5 hover:bg-primary/15 transition-all"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+              Chỉnh sửa
+            </button>
+          )}
         </header>
 
         <div className="flex flex-col md:flex-row gap-10">
           {/* Avatar + nút xóa */}
           <div className="flex flex-col items-center gap-3 flex-shrink-0">
-            <div className="w-32 h-32 rounded-2xl overflow-hidden border-2 border-white/10 group cursor-pointer relative bg-surface-container">
-              <input type="file" accept="image/*" onChange={handleAvatarChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+            <div className={cn(
+              "w-32 h-32 rounded-2xl overflow-hidden border-2 border-white/10 relative bg-surface-container",
+              editingProfile ? "group cursor-pointer" : ""
+            )}>
+              {editingProfile && (
+                <input type="file" accept="image/*" onChange={handleAvatarChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+              )}
               {(avatarPreview || profile.avatar) ? (
                 <img
                   src={avatarPreview || `/api/storage/${profile.avatar.replace(/^\/?(storage\/)?/, '')}`}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                  className={cn("w-full h-full object-cover", editingProfile && "group-hover:scale-110 transition-transform")}
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />
               ) : (
@@ -199,11 +313,13 @@ export default function Settings() {
                   {profile.name ? profile.name.substring(0, 2).toUpperCase() : "U"}
                 </div>
               )}
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
-                <Palette className="w-6 h-6 text-white" />
-              </div>
+              {editingProfile && (
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
+                  <Palette className="w-6 h-6 text-white" />
+                </div>
+              )}
             </div>
-            {(avatarPreview || profile.avatar) && (
+            {editingProfile && (avatarPreview || profile.avatar) && (
               <button
                 type="button"
                 onClick={handleDeleteAvatar}
@@ -219,56 +335,120 @@ export default function Settings() {
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant pl-1">Họ tên</label>
-              <input value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})} className="w-full bg-surface-container-low border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none" />
+              <input 
+                value={profile.name} 
+                onChange={e => setProfile({...profile, name: e.target.value})} 
+                readOnly={!editingProfile}
+                className={editingProfile ? inputCls : readOnlyCls} 
+              />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant pl-1">Email</label>
-              <input type="email" value={profile.email} onChange={e => setProfile({...profile, email: e.target.value})} className="w-full bg-surface-container-low border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none" />
+              <input 
+                type="email" 
+                value={profile.email} 
+                onChange={e => setProfile({...profile, email: e.target.value})} 
+                readOnly={!editingProfile}
+                className={editingProfile ? inputCls : readOnlyCls} 
+              />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant pl-1">Chức danh học thuật</label>
-              <input value={profile.academic_title} onChange={e => setProfile({...profile, academic_title: e.target.value})} className="w-full bg-surface-container-low border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none" placeholder="VD: Nhà nghiên cứu, Giảng viên..." />
+              <input 
+                value={profile.academic_title} 
+                onChange={e => setProfile({...profile, academic_title: e.target.value})} 
+                readOnly={!editingProfile}
+                className={editingProfile ? inputCls : readOnlyCls} 
+                placeholder={editingProfile ? "VD: Nhà nghiên cứu, Giảng viên..." : ""} 
+              />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant pl-1">Ngày sinh</label>
-              <input type="date" value={profile.dob} onChange={e => setProfile({...profile, dob: e.target.value})} className="w-full bg-surface-container-low border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none" />
+              <input 
+                type={editingProfile ? "date" : "text"}
+                value={editingProfile ? profile.dob : (profile.dob ? new Date(profile.dob).toLocaleDateString("vi-VN") : "")} 
+                onChange={e => setProfile({...profile, dob: e.target.value})} 
+                readOnly={!editingProfile}
+                className={editingProfile ? inputCls : readOnlyCls} 
+              />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant pl-1">Số điện thoại</label>
-              <input type="tel" value={profile.phone} onChange={e => setProfile({...profile, phone: e.target.value})} className="w-full bg-surface-container-low border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none" />
+              <input 
+                type="tel" 
+                value={profile.phone} 
+                onChange={e => setProfile({...profile, phone: e.target.value})} 
+                readOnly={!editingProfile}
+                className={editingProfile ? inputCls : readOnlyCls} 
+              />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant pl-1">Giới tính</label>
-              <select value={profile.gender} onChange={e => setProfile({...profile, gender: e.target.value})} className="w-full bg-surface-container-low border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none appearance-none">
-                <option value="">Chọn giới tính</option>
-                <option value="Nam">Nam</option>
-                <option value="Nữ">Nữ</option>
-                <option value="Khác">Khác</option>
-              </select>
+              {editingProfile ? (
+                <select value={profile.gender} onChange={e => setProfile({...profile, gender: e.target.value})} className={cn(inputCls, "appearance-none")}>
+                  <option value="">Chọn giới tính</option>
+                  <option value="Nam">Nam</option>
+                  <option value="Nữ">Nữ</option>
+                  <option value="Khác">Khác</option>
+                </select>
+              ) : (
+                <input value={profile.gender || ""} readOnly className={readOnlyCls} />
+              )}
             </div>
             <div className="space-y-2 md:col-span-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant pl-1">Cơ quan / Trường học</label>
-              <input value={profile.institution} onChange={e => setProfile({...profile, institution: e.target.value})} className="w-full bg-surface-container-low border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none" placeholder="Đại học Quốc gia, Viện Khoa học..." />
+              <input 
+                value={profile.institution} 
+                onChange={e => setProfile({...profile, institution: e.target.value})} 
+                readOnly={!editingProfile}
+                className={editingProfile ? inputCls : readOnlyCls} 
+                placeholder={editingProfile ? "Đại học Quốc gia, Viện Khoa học..." : ""} 
+              />
             </div>
             <div className="space-y-2 md:col-span-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant pl-1">Website / Link cá nhân</label>
-              <input type="url" value={profile.website} onChange={e => setProfile({...profile, website: e.target.value})} className="w-full bg-surface-container-low border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none" placeholder="https://..." />
+              <input 
+                type="url" 
+                value={profile.website} 
+                onChange={e => setProfile({...profile, website: e.target.value})} 
+                readOnly={!editingProfile}
+                className={editingProfile ? inputCls : readOnlyCls} 
+                placeholder={editingProfile ? "https://..." : ""} 
+              />
             </div>
             <div className="space-y-2 md:col-span-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant pl-1">Tiểu sử</label>
-              <textarea value={profile.bio} onChange={e => setProfile({...profile, bio: e.target.value})} rows={3} className="w-full bg-surface-container-low border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none resize-none" placeholder="Giới thiệu ngắn gọn về bản thân..." />
+              <textarea 
+                value={profile.bio} 
+                onChange={e => setProfile({...profile, bio: e.target.value})} 
+                readOnly={!editingProfile}
+                rows={3} 
+                className={cn(editingProfile ? inputCls : readOnlyCls, "resize-none")} 
+                placeholder={editingProfile ? "Giới thiệu ngắn gọn về bản thân..." : ""} 
+              />
             </div>
           </div>
         </div>
       </section>
 
-      <div className="flex justify-end gap-4 pt-4">
-        <button onClick={loadProfile} className="px-10 py-4 glass-panel rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant">Hủy bỏ</button>
-        <button disabled={saving} onClick={handleSaveProfile} className="px-10 py-4 gradient-btn rounded-xl text-[10px] font-bold uppercase tracking-widest text-white shadow-2xl flex items-center gap-2">
-          {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-          Áp dụng thay đổi
-        </button>
-      </div>
+      {editingProfile && (
+        <div className="flex justify-end gap-4 pt-4">
+          <button onClick={handleCancelEdit} className="px-10 py-4 glass-panel rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant">Hủy bỏ</button>
+          <button 
+            disabled={!profileHasChanges || saving} 
+            onClick={handleSaveProfile} 
+            className={cn(
+              "px-10 py-4 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all",
+              profileHasChanges
+                ? "gradient-btn text-white shadow-2xl"
+                : "bg-white/5 text-on-surface-variant/50 cursor-not-allowed border border-white/5"
+            )}
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            Áp dụng thay đổi
+          </button>
+        </div>
+      )}
     </div>
   );
 
@@ -285,32 +465,62 @@ export default function Settings() {
             <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant pl-1 flex items-center gap-2">
               <Lock className="w-3 h-3" /> Mật khẩu hiện tại
             </label>
-            <input 
-              type="password" 
-              value={passwords.current_password} 
-              onChange={e => setPasswords({...passwords, current_password: e.target.value})} 
-              className="w-full bg-surface-container-low border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none" 
-            />
+            <div className="relative">
+              <input 
+                type={showCurrentPassword ? "text" : "password"} 
+                value={passwords.current_password} 
+                onChange={e => setPasswords({...passwords, current_password: e.target.value})} 
+                className="w-full bg-surface-container-low border border-white/10 rounded-xl px-4 py-3 pr-11 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none" 
+              />
+              <button 
+                type="button" 
+                onClick={() => setShowCurrentPassword(!showCurrentPassword)} 
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors p-1"
+                tabIndex={-1}
+              >
+                {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
           
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant pl-1">Mật khẩu mới</label>
-            <input 
-              type="password" 
-              value={passwords.password} 
-              onChange={e => setPasswords({...passwords, password: e.target.value})} 
-              className="w-full bg-surface-container-low border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none" 
-            />
+            <div className="relative">
+              <input 
+                type={showNewPassword ? "text" : "password"} 
+                value={passwords.password} 
+                onChange={e => setPasswords({...passwords, password: e.target.value})} 
+                className="w-full bg-surface-container-low border border-white/10 rounded-xl px-4 py-3 pr-11 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none" 
+              />
+              <button 
+                type="button" 
+                onClick={() => setShowNewPassword(!showNewPassword)} 
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors p-1"
+                tabIndex={-1}
+              >
+                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
           
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant pl-1">Xác nhận mật khẩu mới</label>
-            <input 
-              type="password" 
-              value={passwords.password_confirmation} 
-              onChange={e => setPasswords({...passwords, password_confirmation: e.target.value})} 
-              className="w-full bg-surface-container-low border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none" 
-            />
+            <div className="relative">
+              <input 
+                type={showConfirmPassword ? "text" : "password"} 
+                value={passwords.password_confirmation} 
+                onChange={e => setPasswords({...passwords, password_confirmation: e.target.value})} 
+                className="w-full bg-surface-container-low border border-white/10 rounded-xl px-4 py-3 pr-11 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none" 
+              />
+              <button 
+                type="button" 
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)} 
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors p-1"
+                tabIndex={-1}
+              >
+                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -335,34 +545,105 @@ export default function Settings() {
   );
 
   return (
-    <div className="flex flex-col md:flex-row gap-12 pb-20">
-      <aside className="w-full md:w-64 space-y-8 flex-shrink-0">
-         <div>
-           <h2 className="font-display text-4xl font-bold">Cài đặt</h2>
-           <p className="text-on-surface-variant mt-2 font-medium">Quản lý tùy chọn.</p>
-         </div>
-
-         <nav className="flex md:flex-col overflow-x-auto gap-2">
-            {tabs.map((item, i) => (
-              <button 
-                key={i} 
-                onClick={() => setActiveTab(item.label)}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-xl transition-all whitespace-nowrap",
-                  activeTab === item.label ? "bg-primary-container/20 text-primary border border-primary/30 shadow-lg" : "text-on-surface-variant hover:bg-white/5"
-                )}
+    <>
+      {/* Unsaved changes modal */}
+      {(showUnsavedModal || blocker.state === "blocked") && (
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm" 
+          onClick={() => {
+            if (blocker.state === "blocked") {
+              blocker.reset();
+            } else {
+              setShowUnsavedModal(false);
+            }
+          }}
+        >
+          <div className="glass-panel p-8 rounded-2xl max-w-md w-full mx-4 space-y-6 border border-white/10 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="font-display text-xl font-bold">Thay đổi chưa được lưu</h3>
+            <p className="text-on-surface-variant text-sm leading-relaxed">
+              Bạn có thay đổi hồ sơ chưa lưu. Bạn muốn lưu trước khi rời đi không?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setProfile(originalProfile);
+                  setAvatarFile(null);
+                  setAvatarPreview(null);
+                  setEditingProfile(false);
+                  if (blocker.state === "blocked") {
+                    blocker.proceed();
+                  } else {
+                    setShowUnsavedModal(false);
+                    if (pendingAction) pendingAction();
+                    setPendingAction(null);
+                  }
+                }}
+                className="px-6 py-3 glass-panel rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
               >
-                <item.icon className="w-5 h-5" />
-                <span className="text-sm font-bold uppercase tracking-widest">{item.label}</span>
+                Không lưu
               </button>
-            ))}
-         </nav>
-      </aside>
+              <button
+                onClick={() => {
+                  if (blocker.state === "blocked") {
+                    blocker.reset();
+                  } else {
+                    setShowUnsavedModal(false);
+                    setPendingAction(null);
+                  }
+                }}
+                className="px-6 py-3 glass-panel rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
+              >
+                Ở lại
+              </button>
+              <button
+                onClick={async () => {
+                  await handleSaveProfile();
+                  if (blocker.state === "blocked") {
+                    blocker.proceed();
+                  } else {
+                    setShowUnsavedModal(false);
+                    if (pendingAction) pendingAction();
+                    setPendingAction(null);
+                  }
+                }}
+                className="px-6 py-3 gradient-btn rounded-xl text-[10px] font-bold uppercase tracking-widest text-white shadow-xl"
+              >
+                Lưu & rời đi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      <div className="flex-1 max-w-4xl">
-        {activeTab === "Tài khoản" && renderProfileTab()}
-        {activeTab === "Bảo mật" && renderSecurityTab()}
+      <div className="flex flex-col md:flex-row gap-12 pb-20">
+        <aside className="w-full md:w-64 space-y-8 flex-shrink-0">
+           <div>
+             <h2 className="font-display text-4xl font-bold">Cài đặt</h2>
+             <p className="text-on-surface-variant mt-2 font-medium">Quản lý tùy chọn.</p>
+           </div>
+
+           <nav className="flex md:flex-col overflow-x-auto gap-2">
+              {tabs.map((item, i) => (
+                <button 
+                  key={i} 
+                  onClick={() => confirmIfUnsaved(() => setActiveTab(item.label))}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-all whitespace-nowrap",
+                    activeTab === item.label ? "bg-primary-container/20 text-primary border border-primary/30 shadow-lg" : "text-on-surface-variant hover:bg-white/5"
+                  )}
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span className="text-sm font-bold uppercase tracking-widest">{item.label}</span>
+                </button>
+              ))}
+           </nav>
+        </aside>
+
+        <div className="flex-1 max-w-4xl">
+          {activeTab === "Tài khoản" && renderProfileTab()}
+          {activeTab === "Bảo mật" && renderSecurityTab()}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -224,6 +224,14 @@ class SyncPapersFromApi implements ShouldQueue
             // Final cancelled check before marking success
             if ($this->isCancelled()) return;
 
+            // Recalculate trends
+            $this->updateProgress("Đang tính toán lại xu hướng các chủ đề...");
+            try {
+                \Illuminate\Support\Facades\Artisan::call('trends:calculate');
+            } catch (\Throwable $e) {
+                Log::warning('Trend calculation failed during sync', ['error' => $e->getMessage()]);
+            }
+
             $this->syncLog->update([
                 'status'        => 'success',
                 'papers_synced' => $this->syncedCount,

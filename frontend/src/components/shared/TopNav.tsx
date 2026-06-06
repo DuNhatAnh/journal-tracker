@@ -1,10 +1,11 @@
 import { Search } from "lucide-react";
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export function TopNav() {
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && searchTerm.trim() !== "") {
@@ -12,10 +13,17 @@ export function TopNav() {
     }
   };
 
+  const hiddenSearchPaths = ["/settings", "/profile", "/search"];
+  const isSearchHidden = hiddenSearchPaths.includes(location.pathname);
+
+  if (isSearchHidden) {
+    return null;
+  }
+
   return (
-    <header className="flex justify-between items-center px-6 py-4 w-full sticky top-0 z-40 bg-surface/70 backdrop-blur-xl border-b border-white/10 shadow-sm transition-all duration-300">
+    <header className="flex justify-between items-center px-6 py-4 w-full sticky top-0 z-40 bg-surface/70 backdrop-blur-xl border-b border-white/10 shadow-sm transition-all duration-300 min-h-[72px]">
       <div className="flex-1 max-w-xl">
-        <div className="relative group">
+        <div className="relative group animate-fade-in">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline group-focus-within:text-primary transition-colors" />
           <input 
             type="text" 

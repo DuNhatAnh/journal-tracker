@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
-import { Download, Bell } from "lucide-react";
+import { Download, Bell, BellOff } from "lucide-react";
 import { Navigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { api } from "@/src/lib/api";
 import { useApiQuery, queryCache } from "../../hooks/useApiQuery";
 
@@ -69,6 +70,16 @@ export default function Trending() {
     return new Set<number>(statusData.journals.map((j: any) => j.id));
   }, [statusData]);
 
+  const followedKeywordIds = useMemo(() => {
+    if (!statusData?.keywords) return new Set<number>();
+    return new Set<number>(statusData.keywords.map((k: any) => k.id));
+  }, [statusData]);
+
+  const followedAuthorIds = useMemo(() => {
+    if (!statusData?.authors) return new Set<number>();
+    return new Set<number>(statusData.authors.map((a: any) => a.id));
+  }, [statusData]);
+
   // useApiQuery for bookmarks status
   const { data: bookmarksData, setData: setBookmarksData } = useApiQuery<any>("/dashboard/bookmarks", { persist: true });
 
@@ -118,6 +129,8 @@ export default function Trending() {
   // Bookmarks details state
   const [bookmarkLoadingIds, setBookmarkLoadingIds] = useState<Set<number>>(new Set());
   const [followingJournalLoadingIds, setFollowingJournalLoadingIds] = useState<Set<number>>(new Set());
+  const [followingKeywordLoadingIds, setFollowingKeywordLoadingIds] = useState<Set<number>>(new Set());
+  const [followingAuthorLoadingIds, setFollowingAuthorLoadingIds] = useState<Set<number>>(new Set());
   const [selectedPaper, setSelectedPaper] = useState<any | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
@@ -293,6 +306,80 @@ export default function Trending() {
       });
     }
   };
+
+  const handleToggleAlert = async () => {
+    if (!selectedEntity) return;
+    const entityId = selectedEntity.id;
+    const isKeyword = selectedEntity.type === "keyword";
+
+    if (isKeyword) {
+      if (followingKeywordLoadingIds.has(entityId)) return;
+      const isFollowing = followedKeywordIds.has(entityId);
+      setFollowingKeywordLoadingIds(prev => new Set(prev).add(entityId));
+      try {
+        if (isFollowing) {
+          await api.delete(`/following/keywords/${entityId}`);
+          queryCache.delete("/following/status");
+          refetchStatus();
+          toast.success(`Đã hủy nhận thông báo cho chủ đề "${selectedEntity.name}"`);
+        } else {
+          await api.post("/following/keywords", { keyword_id: entityId });
+          queryCache.delete("/following/status");
+          refetchStatus();
+          toast.success(`Đã đăng ký nhận thông báo cho chủ đề "${selectedEntity.name}"!`);
+        }
+      } catch (err: any) {
+        console.error(err);
+        toast.error("Thao tác thất bại. Vui lòng thử lại.");
+      } finally {
+        setFollowingKeywordLoadingIds(prev => {
+          const s = new Set(prev);
+          s.delete(entityId);
+          return s;
+        });
+      }
+    } else {
+      if (followingAuthorLoadingIds.has(entityId)) return;
+      const isFollowing = followedAuthorIds.has(entityId);
+      setFollowingAuthorLoadingIds(prev => new Set(prev).add(entityId));
+      try {
+        if (isFollowing) {
+          await api.delete(`/following/authors/${entityId}`);
+          queryCache.delete("/following/status");
+          refetchStatus();
+          toast.success(`Đã hủy nhận thông báo cho tác giả "${selectedEntity.name}"`);
+        } else {
+          await api.post("/following/authors", { author_id: entityId });
+          queryCache.delete("/following/status");
+          refetchStatus();
+          toast.success(`Đã đăng ký nhận thông báo cho tác giả "${selectedEntity.name}"!`);
+        }
+      } catch (err: any) {
+        console.error(err);
+        toast.error("Thao tác thất bại. Vui lòng thử lại.");
+      } finally {
+        setFollowingAuthorLoadingIds(prev => {
+          const s = new Set(prev);
+          s.delete(entityId);
+          return s;
+        });
+      }
+    }
+  };
+
+  const isAlertActive = useMemo(() => {
+    if (!selectedEntity) return false;
+    return selectedEntity.type === "keyword"
+      ? followedKeywordIds.has(selectedEntity.id)
+      : followedAuthorIds.has(selectedEntity.id);
+  }, [selectedEntity, followedKeywordIds, followedAuthorIds]);
+
+  const isAlertLoading = useMemo(() => {
+    if (!selectedEntity) return false;
+    return selectedEntity.type === "keyword"
+      ? followingKeywordLoadingIds.has(selectedEntity.id)
+      : followingAuthorLoadingIds.has(selectedEntity.id);
+  }, [selectedEntity, followingKeywordLoadingIds, followingAuthorLoadingIds]);
 
   // Filter trends based on startYear and endYear
   const filteredTrends = useMemo(() => {
@@ -499,9 +586,23 @@ export default function Trending() {
           >
             <Download className="w-4 h-4" /> Xuất báo cáo
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 gradient-btn rounded-xl text-xs font-bold uppercase tracking-widest text-on-primary cursor-pointer">
-            <Bell className="w-4 h-4 fill-current" /> Tạo cảnh báo
-          </button>
+          {isAlertActive ? (
+            <button
+              onClick={handleToggleAlert}
+              disabled={loading || !selectedDetail || isAlertLoading}
+              className="flex items-center gap-2 px-4 py-2 glass-panel rounded-xl text-xs font-bold uppercase tracking-widest text-primary border border-primary/30 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <BellOff className="w-4 h-4 fill-current" /> Hủy thông báo
+            </button>
+          ) : (
+            <button
+              onClick={handleToggleAlert}
+              disabled={loading || !selectedDetail || isAlertLoading}
+              className="flex items-center gap-2 px-4 py-2 gradient-btn rounded-xl text-xs font-bold uppercase tracking-widest text-on-primary cursor-pointer disabled:opacity-50"
+            >
+              <Bell className="w-4 h-4 fill-current" /> Nhận thông báo
+            </button>
+          )}
         </div>
       </div>
 

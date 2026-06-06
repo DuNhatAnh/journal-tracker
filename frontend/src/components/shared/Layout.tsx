@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Outlet, Navigate, Link } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
-import { TopNav } from "./TopNav";
 import { Logo } from "./Logo";
 import { api } from "../../lib/api";
 import { GraduationCap, BookOpen, Award, ArrowRight } from "lucide-react";
@@ -147,7 +146,6 @@ export function Layout() {
       )}
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 relative h-full">
-        <TopNav />
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-8 scroll-smooth relative z-10">
           {/* Ambient Background Globs */}
           <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
