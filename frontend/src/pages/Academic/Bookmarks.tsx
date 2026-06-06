@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import toast from "react-hot-toast";
+import { Search, X } from "lucide-react";
 import { api } from "@/src/lib/api";
 import { useApiQuery, queryCache } from "../../hooks/useApiQuery";
 import { BookmarksHeader } from "./components/Bookmarks/BookmarksHeader";
@@ -25,6 +26,29 @@ export default function Bookmarks() {
   const [bookmarkLoadingIds, setBookmarkLoadingIds] = useState<Set<number>>(new Set());
   const bookmarksTopRef = useRef<HTMLDivElement>(null);
 
+  // Search States
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Reset to page 1 on new search query
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  // Clear search on tab change
+  useEffect(() => {
+    setSearchQuery("");
+    setDebouncedSearch("");
+  }, [activeTab]);
+
   // Scroll to top when page changes
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -40,8 +64,8 @@ export default function Bookmarks() {
     setData: setApiBookmarksData,
     refetch: refetchBookmarks 
   } = useApiQuery<any>(
-    `/bookmarks?page=${page}&per_page=5`,
-    { enabled: activeTab === "papers", staleTime: 0, ttl: 0 }
+    `/bookmarks?page=${page}&per_page=5${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`,
+    { enabled: activeTab === "papers", persist: true, staleTime: Infinity }
   );
 
   // useApiQuery for followed status (keywords and journals)
@@ -52,11 +76,27 @@ export default function Bookmarks() {
     refetch: refetchFollowedData 
   } = useApiQuery<any>(
     "/following/status",
-    { enabled: activeTab !== "papers", staleTime: 0, ttl: 0 }
+    { enabled: activeTab !== "papers", persist: true, staleTime: Infinity }
   );
 
   const followedKeywords = apiFollowedData?.keywords || [];
   const followedJournals = apiFollowedData?.journals || [];
+
+  // Filter keywords client-side
+  const filteredKeywords = useMemo(() => {
+    if (!searchQuery) return followedKeywords;
+    return followedKeywords.filter((kw: any) => 
+      kw.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [followedKeywords, searchQuery]);
+
+  // Filter journals client-side
+  const filteredJournals = useMemo(() => {
+    if (!searchQuery) return followedJournals;
+    return followedJournals.filter((j: any) => 
+      j.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [followedJournals, searchQuery]);
 
   const handleExport = () => {
     setIsExportModalOpen(true);
@@ -190,6 +230,34 @@ export default function Bookmarks() {
         onExport={handleExport}
       />
 
+      {/* Mini search input */}
+      <div className="flex justify-start">
+        <div className="relative w-full max-w-md">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
+          <input
+            type="text"
+            placeholder={
+              activeTab === "papers"
+                ? "Tìm kiếm bài báo đã lưu..."
+                : activeTab === "keywords"
+                ? "Tìm kiếm chủ đề quan tâm..."
+                : "Tìm kiếm tạp chí..."
+            }
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-surface-container-low border border-white/10 rounded-2xl py-2.5 pl-11 pr-10 text-sm text-on-surface focus:outline-none focus:border-primary/50 transition-all placeholder:text-on-surface-variant/60"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full hover:bg-white/10 text-on-surface-variant cursor-pointer border-0 bg-transparent p-0"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Subtle warning banner if limit exceeded */}
       {activeTab === "papers" && isLimitExceeded && (
         <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs font-semibold max-w-4xl animate-fade-in">
@@ -219,7 +287,7 @@ export default function Bookmarks() {
 
       {activeTab === "keywords" && (
         <FollowedKeywordsGrid
-          keywords={followedKeywords}
+          keywords={filteredKeywords}
           loading={isFollowedLoading}
           onDeleteKeyword={deleteKeyword}
         />
@@ -227,7 +295,7 @@ export default function Bookmarks() {
 
       {activeTab === "journals" && (
         <FollowedJournalsGrid
-          journals={followedJournals}
+          journals={filteredJournals}
           loading={isFollowedLoading}
           onDeleteJournal={deleteJournal}
         />
