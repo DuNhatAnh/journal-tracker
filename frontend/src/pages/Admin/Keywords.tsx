@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Search, Tag, RefreshCw, Trash2, Edit2, Merge, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
+import { Search, Tag, RefreshCw, Trash2, Edit2, Merge, ChevronLeft, ChevronRight, RotateCcw, Info, X } from "lucide-react";
 import { api } from "@/src/lib/api";
 import { KeywordItem, PaginatedKeywords } from "./types";
 import KeywordModal from "./components/Keywords/KeywordModal";
@@ -22,6 +22,8 @@ export default function AdminKeywords() {
 
   const [isMergeOpen, setIsMergeOpen] = useState(false);
   const [mergeTargetKeyword, setMergeTargetKeyword] = useState<KeywordItem | null>(null);
+
+  const [reasonKeyword, setReasonKeyword] = useState<KeywordItem | null>(null);
 
   const currentUserStr = localStorage.getItem("user");
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
@@ -103,6 +105,11 @@ export default function AdminKeywords() {
   };
 
   const handleRestoreKeyword = async (id: number, name: string) => {
+    if (statusFilter === "merged") {
+      if (!window.confirm(`LƯU Ý: Khôi phục từ khóa đã gộp sẽ khiến nó trở lại trạng thái hoạt động độc lập, nhưng SẼ KHÔNG CÓ BÀI VIẾT NÀO ĐI KÈM (do bài viết đã chuyển hết sang từ khóa đích). Bạn có muốn tiếp tục?`)) {
+        return;
+      }
+    }
     try {
       await api.post(`/admin/keywords/${id}/restore`);
       toast.success(`Đã khôi phục từ khóa "${name}"!`);
@@ -206,6 +213,16 @@ export default function AdminKeywords() {
             Đang hoạt động
           </button>
           <button
+            onClick={() => { setStatusFilter("merged"); setPagination(p => ({...p, current: 1})); }}
+            className={`flex-1 px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+              statusFilter === "merged"
+                ? "bg-secondary/20 text-secondary"
+                : "text-on-surface-variant hover:text-on-surface hover:bg-white/5"
+            }`}
+          >
+            Đã gộp
+          </button>
+          <button
             onClick={() => { setStatusFilter("trashed"); setPagination(p => ({...p, current: 1})); }}
             className={`flex-1 px-4 py-2 text-sm font-bold rounded-lg transition-all ${
               statusFilter === "trashed"
@@ -281,15 +298,33 @@ export default function AdminKeywords() {
                     <td className="px-6 py-4 font-bold text-on-surface">{kw.name}</td>
                     <td className="px-6 py-4 text-on-surface-variant font-mono text-xs">{kw.slug}</td>
                     <td className="px-6 py-4 text-center">
-                      <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
-                        {kw.papers_count} bài
-                      </span>
+                      {statusFilter === "merged" && kw.merged_into ? (
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-xs text-on-surface-variant">Đã gộp vào:</span>
+                          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold bg-secondary/10 text-secondary border border-secondary/20 truncate max-w-[150px]">
+                            {kw.merged_into.name}
+                          </span>
+                          {kw.merge_reason && (
+                            <button
+                              onClick={() => setReasonKeyword(kw)}
+                              className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-on-surface-variant/60 hover:text-primary transition-colors"
+                              title="Xem lý do gộp"
+                            >
+                              <Info className="w-3 h-3" /> Xem lý do
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
+                          {kw.papers_count} bài
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-on-surface-variant">
                       {new Date(kw.created_at).toLocaleDateString("vi-VN")}
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
-                      {statusFilter === "trashed" ? (
+                      {statusFilter === "trashed" || statusFilter === "merged" ? (
                         <>
                           <button
                             onClick={() => handleRestoreKeyword(kw.id, kw.name)}
@@ -390,6 +425,47 @@ export default function AdminKeywords() {
         onMerged={handleMerged}
         defaultTarget={mergeTargetKeyword}
       />
+
+      {/* Merge Reason Detail Popup */}
+      {reasonKeyword && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+          onClick={() => setReasonKeyword(null)}
+        >
+          <div
+            className="glass-panel w-full max-w-md bg-surface border border-white/10 rounded-2xl shadow-2xl p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Info className="w-5 h-5 text-secondary flex-shrink-0" />
+                <h3 className="font-display font-bold text-on-surface text-base">Lý do gộp từ khóa</h3>
+              </div>
+              <button onClick={() => setReasonKeyword(null)} className="text-on-surface-variant hover:text-on-surface transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-on-surface">{reasonKeyword.name}</span>
+                <span className="text-on-surface-variant">→</span>
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-secondary/10 text-secondary border border-secondary/20">
+                  {reasonKeyword.merged_into?.name ?? "—"}
+                </span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 text-on-surface-variant leading-relaxed">
+                {reasonKeyword.merge_reason || <em className="text-on-surface-variant/50">Không có lý do được ghi lại.</em>}
+              </div>
+
+              <p className="text-[10px] text-on-surface-variant/50">
+                Gộp lúc: {reasonKeyword.deleted_at ? new Date(reasonKeyword.deleted_at).toLocaleString("vi-VN") : "—"}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

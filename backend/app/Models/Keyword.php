@@ -10,7 +10,7 @@ class Keyword extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['name', 'slug'];
+    protected $fillable = ['name', 'slug', 'merged_into_id', 'merge_reason'];
 
     protected static function booted()
     {
@@ -51,5 +51,10 @@ class Keyword extends Model
     public function paperCount(): int
     {
         return $this->papers()->count();
+    }
+
+    public function mergedInto()
+    {
+        return $this->belongsTo(Keyword::class, 'merged_into_id')->withTrashed();
     }
 }

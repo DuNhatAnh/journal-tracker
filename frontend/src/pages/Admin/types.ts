@@ -66,6 +66,9 @@ export type KeywordItem = {
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
+  merged_into_id?: number | null;
+  merged_into?: KeywordItem | null;
+  merge_reason?: string | null;
 };
 
 export type PaginatedKeywords = {

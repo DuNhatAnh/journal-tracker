@@ -21,6 +21,7 @@ export default function MergeKeywordsModal({
   const [sourceKeywords, setSourceKeywords] = useState<KeywordItem[]>([]);
   const [targetInput, setTargetInput] = useState(defaultTarget ? defaultTarget.name : "");
   const [sourceInput, setSourceInput] = useState("");
+  const [mergeReason, setMergeReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,6 +35,7 @@ export default function MergeKeywordsModal({
     }
     setSourceKeywords([]);
     setSourceInput("");
+    setMergeReason("");
     setError(null);
   }, [defaultTarget, isOpen]);
 
@@ -104,6 +106,7 @@ export default function MergeKeywordsModal({
       await api.post("/admin/keywords/merge", {
         target_id: targetKeyword.id,
         source_ids: sourceKeywords.map((k) => k.id),
+        merge_reason: mergeReason.trim() || null,
       });
 
       onMerged();
@@ -138,14 +141,24 @@ export default function MergeKeywordsModal({
             </div>
           )}
 
-          <div className="p-4 rounded-xl bg-warning/10 border border-warning/20 text-warning text-xs space-y-1">
-            <p className="font-bold flex items-center gap-1.5">Lưu ý trước khi thực hiện:</p>
-            <ul className="list-disc list-inside space-y-1 mt-1 opacity-90">
-              <li>Toàn bộ bài viết thuộc từ khóa nguồn sẽ chuyển sang từ khóa đích.</li>
-              <li>Người dùng đang theo dõi từ khóa nguồn sẽ tự động theo dõi từ khóa đích.</li>
-              <li>Dữ liệu biểu đồ xu hướng xuất bản sẽ được cộng dồn và tính toán lại.</li>
-              <li>Các từ khóa nguồn sẽ bị <b>xóa vĩnh viễn</b> khỏi hệ thống.</li>
-            </ul>
+          <div className="p-4 rounded-xl bg-warning/10 border border-warning/20 text-warning text-xs space-y-3">
+            <div>
+              <p className="font-bold flex items-center gap-1.5">💡 Gợi ý - Khi nào nên gộp từ khóa?</p>
+              <ul className="list-disc list-inside mt-1.5 space-y-1 opacity-90">
+                <li><span className="font-semibold">Sai chính tả / Lỗi đánh máy:</span> "machin learning" ➔ "machine learning"</li>
+                <li><span className="font-semibold">Từ viết tắt vs Tên đầy đủ:</span> "AI" ➔ "Artificial Intelligence"</li>
+                <li><span className="font-semibold">Khác biệt số ít / số nhiều:</span> "neural network" ➔ "neural networks"</li>
+                <li><span className="font-semibold">Khác biệt ngôn ngữ (Đồng nghĩa):</span> "Trí tuệ nhân tạo" ➔ "Artificial Intelligence"</li>
+              </ul>
+            </div>
+            <div className="border-t border-warning/20 pt-2">
+              <p className="font-bold flex items-center gap-1.5">⚠️ Lưu ý hệ quả:</p>
+              <ul className="list-disc list-inside mt-1.5 space-y-1 opacity-90">
+                <li>Toàn bộ bài viết thuộc từ khóa nguồn sẽ chuyển sang từ khóa đích.</li>
+                <li>Người dùng đang theo dõi từ khóa nguồn sẽ tự động chuyển sang theo dõi từ khóa đích.</li>
+                <li>Dữ liệu biểu đồ xu hướng sẽ được tự động cộng dồn và tính toán lại.</li>
+              </ul>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
@@ -236,7 +249,23 @@ export default function MergeKeywordsModal({
             </div>
           </div>
 
-          <div className="pt-6 flex justify-end gap-3 border-t border-white/5 flex-shrink-0">
+          {/* Lý do gộp */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest block">
+              Lý do gộp <span className="font-normal normal-case text-on-surface-variant/60">(không bắt buộc)</span>
+            </label>
+            <textarea
+              value={mergeReason}
+              onChange={(e) => setMergeReason(e.target.value)}
+              rows={2}
+              maxLength={500}
+              placeholder="Ví dụ: Từ viết tắt của Artificial Intelligence, gộp để thống nhất từ khóa..."
+              className="w-full px-4 py-3 rounded-xl bg-surface/50 border border-white/10 text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all outline-none resize-none text-sm"
+            />
+            <p className="text-right text-[10px] text-on-surface-variant/50">{mergeReason.length}/500</p>
+          </div>
+
+          <div className="pt-4 flex justify-end gap-3 border-t border-white/5 flex-shrink-0">
             <button
               type="button"
               onClick={onClose}

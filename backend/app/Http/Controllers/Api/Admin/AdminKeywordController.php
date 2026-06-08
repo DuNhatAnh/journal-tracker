@@ -21,14 +21,18 @@ class AdminKeywordController extends Controller
         $sortBy = $request->input('sort_by', 'papers_count');
         $perPage = (int) $request->input('per_page', 15);
 
-        $status = $request->input('status', 'active'); // 'active', 'trashed', 'all'
+        $status = $request->input('status', 'active'); // 'active', 'trashed', 'merged', 'all'
 
-        $query = Keyword::withCount('papers');
+        $query = Keyword::withCount('papers')->with('mergedInto');
 
         if ($status === 'trashed') {
-            $query->onlyTrashed();
+            $query->onlyTrashed()->whereNull('merged_into_id');
+        } elseif ($status === 'merged') {
+            $query->onlyTrashed()->whereNotNull('merged_into_id');
         } elseif ($status === 'all') {
             $query->withTrashed();
+        } else {
+            // active is default (whereNull deleted_at)
         }
 
         if (!empty($q)) {
@@ -125,6 +129,13 @@ class AdminKeywordController extends Controller
     {
         $keyword = Keyword::onlyTrashed()->findOrFail($id);
         $keyword->restore();
+        
+        // Clear merged_into_id and merge_reason if it was merged
+        if ($keyword->merged_into_id !== null) {
+            $keyword->merged_into_id = null;
+            $keyword->merge_reason = null;
+            $keyword->save();
+        }
 
         Cache::flush();
 
@@ -153,12 +164,14 @@ class AdminKeywordController extends Controller
             'target_id' => 'required|integer|exists:keywords,id',
             'source_ids' => 'required|array|min:1',
             'source_ids.*' => 'required|integer|exists:keywords,id|different:target_id',
+            'merge_reason' => 'nullable|string|max:500',
         ]);
 
         $targetId = $request->input('target_id');
         $sourceIds = $request->input('source_ids');
+        $mergeReason = $request->input('merge_reason');
 
-        DB::transaction(function () use ($targetId, $sourceIds) {
+        DB::transaction(function () use ($targetId, $sourceIds, $mergeReason) {
             // 1. Move papers from sources to target without duplication
             $targetPaperIds = DB::table('keyword_paper')
                 ->where('keyword_id', $targetId)
@@ -194,7 +207,11 @@ class AdminKeywordController extends Controller
             // 3. Delete old trends of sources
             PublicationTrend::whereIn('keyword_id', $sourceIds)->delete();
 
-            // 4. Delete the source keywords themselves
+            // 4. Update the source keywords to reference the target, then soft delete them
+            Keyword::whereIn('id', $sourceIds)->update([
+                'merged_into_id' => $targetId,
+                'merge_reason' => $mergeReason,
+            ]);
             Keyword::whereIn('id', $sourceIds)->delete();
 
             // 5. Recalculate trends for target keyword based on its new papers
