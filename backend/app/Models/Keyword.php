@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Keyword extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = ['name', 'slug'];
 
@@ -18,7 +19,13 @@ class Keyword extends Model
         });
 
         static::deleted(function ($keyword) {
+            // Soft delete still fires the deleted event
             \App\Models\SystemCounter::decrementKey('total_keywords');
+        });
+
+        static::restored(function ($keyword) {
+            // When restored from soft delete
+            \App\Models\SystemCounter::incrementKey('total_keywords');
         });
     }
 

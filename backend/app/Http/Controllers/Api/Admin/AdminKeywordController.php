@@ -21,7 +21,15 @@ class AdminKeywordController extends Controller
         $sortBy = $request->input('sort_by', 'papers_count');
         $perPage = (int) $request->input('per_page', 15);
 
+        $status = $request->input('status', 'active'); // 'active', 'trashed', 'all'
+
         $query = Keyword::withCount('papers');
+
+        if ($status === 'trashed') {
+            $query->onlyTrashed();
+        } elseif ($status === 'all') {
+            $query->withTrashed();
+        }
 
         if (!empty($q)) {
             $query->where(function ($sub) use ($q) {
@@ -65,11 +73,30 @@ class AdminKeywordController extends Controller
         $keyword = Keyword::findOrFail($id);
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:keywords,name,' . $keyword->id,
+            'name' => 'required|string|max:255',
         ]);
 
+        // Check if name exists (excluding current and trashed)
+        $existingName = Keyword::withTrashed()
+            ->where('name', $validated['name'])
+            ->where('id', '!=', $keyword->id)
+            ->first();
+            
+        if ($existingName) {
+            return response()->json(['message' => 'Tên từ khóa đã tồn tại.'], 422);
+        }
+
         $keyword->name = $validated['name'];
-        $keyword->slug = Str::slug($validated['name']);
+        
+        // Safe slug generation
+        $slug = Str::slug($validated['name']);
+        $originalSlug = $slug;
+        $counter = 1;
+        while (Keyword::withTrashed()->where('slug', $slug)->where('id', '!=', $keyword->id)->exists()) {
+            $slug = $originalSlug . '-' . $counter;
+            $counter++;
+        }
+        $keyword->slug = $slug;
         $keyword->save();
 
         // Clear cache
@@ -87,6 +114,31 @@ class AdminKeywordController extends Controller
         $keyword->delete();
 
         // Clear cache
+        Cache::flush();
+
+        return response()->json(null, 204);
+    }
+    /**
+     * POST /api/admin/keywords/{id}/restore
+     */
+    public function restore($id)
+    {
+        $keyword = Keyword::onlyTrashed()->findOrFail($id);
+        $keyword->restore();
+
+        Cache::flush();
+
+        return response()->json(['message' => 'Đã khôi phục từ khóa thành công!', 'keyword' => $keyword]);
+    }
+
+    /**
+     * DELETE /api/admin/keywords/{id}/force
+     */
+    public function forceDelete($id)
+    {
+        $keyword = Keyword::onlyTrashed()->findOrFail($id);
+        $keyword->forceDelete();
+
         Cache::flush();
 
         return response()->json(null, 204);

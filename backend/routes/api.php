@@ -154,6 +154,8 @@ Route::middleware('auth:sanctum')->group(function () {
         // Keyword Management & Merge
         Route::post('keywords/merge', [AdminKeywordController::class, 'merge']);
         Route::post('keywords/{id}/recalculate-trends', [AdminKeywordController::class, 'recalculateTrends']);
+        Route::post('keywords/{id}/restore', [AdminKeywordController::class, 'restore']);
+        Route::delete('keywords/{id}/force', [AdminKeywordController::class, 'forceDelete']);
         Route::apiResource('keywords', AdminKeywordController::class)->only(['index', 'update', 'destroy']);
 
         // System Settings

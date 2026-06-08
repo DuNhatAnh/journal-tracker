@@ -4,7 +4,7 @@ import {
   ArrowRight, Search, Users, Database, 
   Sparkles, AlertTriangle, Zap, Activity, 
   BookOpenText, LineChart, BellRing, Bookmark,
-  GraduationCap, Settings
+  GraduationCap, Settings, UserPlus
 } from "lucide-react";
 import { Logo } from "@/src/components/shared/Logo";
 import { ThemeToggle } from "@/src/components/shared/ThemeToggle";
@@ -68,6 +68,46 @@ export default function Landing() {
       navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
     }
   };
+
+  // Typing Effect Hook for search placeholder
+  const placeholderPhrases = [
+    "How can we help you?",
+    "Bạn muốn tìm xu hướng AI mới nhất?",
+    "Tìm kiếm bài báo khoa học theo từ khóa...",
+    "Khám phá chủ đề Computer Science nổi bật...",
+    "Tìm kiếm theo Tác giả hoặc Tạp chí..."
+  ];
+
+  const [placeholder, setPlaceholder] = useState("");
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  const [charIndex, setCharIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const currentPhrase = placeholderPhrases[phraseIndex];
+    let timer: any;
+
+    if (isDeleting) {
+      timer = setTimeout(() => {
+        setPlaceholder(currentPhrase.substring(0, charIndex - 1));
+        setCharIndex((prev) => prev - 1);
+      }, 30);
+    } else {
+      timer = setTimeout(() => {
+        setPlaceholder(currentPhrase.substring(0, charIndex + 1));
+        setCharIndex((prev) => prev + 1);
+      }, 70);
+    }
+
+    if (!isDeleting && charIndex === currentPhrase.length) {
+      timer = setTimeout(() => setIsDeleting(true), 2500);
+    } else if (isDeleting && charIndex === 0) {
+      setIsDeleting(false);
+      setPhraseIndex((prev) => (prev + 1) % placeholderPhrases.length);
+    }
+
+    return () => clearTimeout(timer);
+  }, [charIndex, isDeleting, phraseIndex]);
 
   return (
     <div className="min-h-screen bg-background text-on-background font-sans selection:bg-primary/30 selection:text-primary overflow-x-hidden relative flex flex-col justify-between scroll-smooth transition-colors duration-500">
@@ -215,9 +255,10 @@ export default function Landing() {
                 </Link>
                 <Link
                   to="/register"
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs uppercase tracking-wider hover:brightness-110 shadow-lg shadow-primary/20 transition-all active:scale-95"
+                  className="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-xl font-bold text-sm transition-all hover:brightness-110 active:scale-95 shadow-sm"
                 >
-                  Đăng ký miễn phí
+                  <UserPlus className="w-4 h-4" />
+                  Đăng ký
                 </Link>
               </>
             )}
@@ -225,42 +266,44 @@ export default function Landing() {
         </div>
       </header>
 
-      {/* 2. Hero Section */}
-      <section className="relative z-10 w-full pt-40 pb-20 flex flex-col items-center justify-center text-center px-4">
+      {/* 2. Hero Section - Centered Layout */}
+      <section className="relative z-10 max-w-6xl mx-auto w-full pt-32 md:pt-40 pb-20 px-6 md:px-12 flex flex-col items-center text-center">
         
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/10 border border-secondary/20 text-secondary text-xs sm:text-sm font-bold uppercase tracking-wider mb-8 shadow-sm">
+        <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-secondary/10 border border-secondary/20 text-secondary text-xs sm:text-sm font-bold uppercase tracking-wider shadow-sm mb-8">
           <Database className="w-4 h-4" /> Đồng bộ Metadata từ OpenAlex
         </div>
 
-        <h1 className="max-w-5xl font-display text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight leading-[1.1] text-on-surface">
-          Scientific Journal Publication <br className="hidden md:block" />
-          <span className="bg-gradient-to-r from-primary via-tertiary to-secondary bg-clip-text text-transparent bg-gradient-animate">Trend Tracking System</span>
+        <h1 className="font-display text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.15] text-on-surface mb-6">
+          Scientific Journal Publication <br />
+          <span className="bg-gradient-to-r from-primary via-tertiary to-secondary bg-clip-text text-transparent bg-gradient-animate pb-2">Trend Tracking System</span>
         </h1>
         
-        <p className="mt-8 text-base sm:text-lg text-on-surface-variant max-w-3xl leading-relaxed mx-auto">
-          Các nền tảng học thuật hiện nay chỉ hỗ trợ tìm kiếm bài báo. Chúng tôi mang đến giải pháp <strong className="text-on-surface">phân tích xu hướng công bố theo thời gian</strong> và trực quan hóa dữ liệu nghiên cứu chuyên sâu cho lĩnh vực Computer Science (Khoa học Máy tính).
+        <p className="text-base sm:text-lg md:text-xl text-on-surface-variant leading-relaxed max-w-3xl mb-12">
+          Hệ thống theo dõi xu hướng xuất bản học thuật. <strong className="text-on-surface">Tìm kiếm và phân tích trực quan</strong> hàng ngàn bài báo Khoa học Máy tính (Computer Science) theo thời gian thực.
         </p>
 
-        {/* Dynamic Search Bar */}
-        <form onSubmit={handleSearch} className="w-full max-w-2xl mx-auto mt-12 relative group">
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-primary via-secondary to-tertiary rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500 bg-gradient-animate"></div>
-          <div className="relative flex items-center bg-surface border border-outline-variant backdrop-blur-xl rounded-2xl p-2 pl-4 shadow-xl">
-            <Search className="w-6 h-6 text-on-surface-variant" />
+        {/* BIG Dynamic Search Bar */}
+        <form onSubmit={handleSearch} className="w-full max-w-3xl relative group mb-20">
+          <div className="absolute -inset-1 bg-gradient-to-r from-primary via-secondary to-tertiary rounded-3xl blur opacity-30 group-hover:opacity-60 transition duration-500 bg-gradient-animate"></div>
+          <div className="relative flex items-center bg-surface border-2 border-outline-variant/50 backdrop-blur-2xl rounded-3xl p-2 pl-6 shadow-2xl">
+            <Search className="w-7 h-7 text-primary" />
             <input 
               type="text" 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Nhập từ khóa nghiên cứu (VD: 'Machine Learning', 'Computer Vision')..." 
-              className="flex-1 bg-transparent border-none text-on-surface px-4 py-3 outline-none placeholder:text-on-surface-variant/70 font-medium text-sm sm:text-base" 
+              placeholder={placeholder} 
+              className="flex-1 bg-transparent border-none text-on-surface px-5 py-5 outline-none placeholder:text-on-surface-variant/70 font-semibold text-lg sm:text-xl w-full" 
             />
             <button 
               type="submit"
-              className="hidden sm:flex items-center gap-2 bg-primary hover:brightness-110 text-on-primary px-8 py-3.5 rounded-xl font-bold uppercase tracking-widest text-xs transition-all active:scale-95 shadow-md"
+              className="hidden sm:flex items-center gap-3 bg-gradient-to-r from-primary to-secondary hover:brightness-110 text-on-primary px-10 py-5 rounded-2xl font-bold uppercase tracking-widest text-sm transition-all active:scale-95 shadow-lg shrink-0 cursor-pointer"
             >
-              Khám Phá <ArrowRight className="w-4 h-4" />
+              Khám Phá <ArrowRight className="w-5 h-5" />
             </button>
           </div>
         </form>
+
+
       </section>
 
       {/* 3. Problem Grid (Bối cảnh & Vấn đề) */}
@@ -504,6 +547,55 @@ export default function Landing() {
 
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* 4.5 Network Visualization Showcase Section */}
+      <section className="relative z-10 max-w-7xl mx-auto w-full px-6 md:px-12 py-24 border-t border-outline-variant">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          
+          {/* Left: Content Description */}
+          <div className="lg:col-span-5 space-y-6 text-left">
+            <span className="text-sm font-bold uppercase tracking-wider text-tertiary">Mạng Lưới Tri Thức</span>
+            <h2 className="font-display text-3xl sm:text-4xl font-extrabold text-on-surface leading-tight">
+              Khám phá mối tương quan học thuật 3D
+            </h2>
+            <p className="text-on-surface-variant text-base leading-relaxed">
+              SciTrend mô hình hóa hàng ngàn bài báo khoa học và mối liên kết đồng tác giả, trích dẫn, và tạp chí xuất bản. Nhờ đó, giảng viên và nhà nghiên cứu có thể phát hiện các khoảng trống nghiên cứu (Research Gaps) và cơ hội hợp tác mới một cách khách quan.
+            </p>
+            <div className="pt-2 flex flex-wrap gap-2.5">
+              <span className="px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-on-surface-variant">
+                # Mạng lưới đồng tác giả
+              </span>
+              <span className="px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-on-surface-variant">
+                # Tương quan trích dẫn
+              </span>
+              <span className="px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-on-surface-variant">
+                # Xu hướng nổi bật CS
+              </span>
+            </div>
+          </div>
+
+          {/* Right: Network visualization mockup */}
+          <div className="lg:col-span-7 relative group">
+            {/* Glowing blur background */}
+            <div className="absolute -inset-4 bg-gradient-to-r from-tertiary via-secondary to-primary rounded-3xl blur-2xl opacity-20 group-hover:opacity-45 transition duration-700"></div>
+            
+            <div className="relative glass-panel rounded-3xl border border-white/10 overflow-hidden shadow-2xl bg-surface-container-high/40">
+              <img 
+                src="/scientific_trends_visualization.png" 
+                alt="Scientific Trends Network Visualization" 
+                className="w-full h-auto object-cover opacity-90 group-hover:scale-[1.01] transition-transform duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent flex items-end p-6">
+                <div className="text-left">
+                  <p className="text-xs font-mono text-tertiary uppercase tracking-widest">SciTrend Analytics Engine</p>
+                  <p className="text-sm font-bold text-white mt-1">Trực quan hóa mạng lưới liên kết học thuật đa chiều</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </section>
 
