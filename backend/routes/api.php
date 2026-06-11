@@ -58,6 +58,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/recommended', [DashboardController::class, 'recommended']);
         Route::get('/journals',    [DashboardController::class, 'journals']);
         Route::get('/fields',      [DashboardController::class, 'fields']);
+        Route::post('/ai-review',  [\App\Http\Controllers\Api\AiController::class, 'review']);
     });
 
     // Research Papers
