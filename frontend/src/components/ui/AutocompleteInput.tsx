@@ -72,7 +72,7 @@ export function AutocompleteInput<T>({
   const showDropdown = isFocused && value.trim() !== "";
 
   return (
-    <div className={cn("relative group w-full z-20", className)} ref={containerRef}>
+    <div className={cn("relative group w-full", showDropdown ? "z-50" : "z-20", className)} ref={containerRef}>
       {icon && (
         <div className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline group-focus-within:text-primary transition-colors flex items-center justify-center">
           {icon}

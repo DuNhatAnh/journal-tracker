@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { Plus, Tag, BookOpen, Users, Loader2, X } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 
@@ -100,8 +101,11 @@ export function FollowingSidebar({
           ) : getActiveList().length > 0 ? (
             getActiveList().map((item: any) => (
               <div key={item.id} className="flex justify-between items-center p-3 rounded-xl hover:bg-white/5 transition-all group">
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                <Link 
+                  to={`/search?${activeTab}=${encodeURIComponent(item.name)}`}
+                  className="flex items-center gap-3 overflow-hidden flex-1 mr-2 cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0 group-hover:bg-white/10 transition-colors">
                     {activeTab === "keyword" && <Tag className="w-4 h-4 text-secondary" />}
                     {activeTab === "journal" && <BookOpen className="w-4 h-4 text-tertiary" />}
                     {activeTab === "author" && <Users className="w-4 h-4 text-primary" />}
@@ -109,7 +113,7 @@ export function FollowingSidebar({
                   <span className="text-sm font-bold text-on-surface group-hover:text-primary transition-colors truncate text-left">
                     {item.name}
                   </span>
-                </div>
+                </Link>
                 <button 
                   onClick={() => onUnfollow(item.id, activeTab)}
                   className="p-1 rounded hover:bg-white/10 text-on-surface-variant hover:text-error transition-colors cursor-pointer"

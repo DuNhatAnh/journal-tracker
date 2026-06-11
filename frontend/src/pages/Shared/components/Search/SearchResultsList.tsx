@@ -30,7 +30,29 @@ interface SearchResultsListProps {
   page: number;
   lastPage: number;
   onPageChange: (p: number) => void;
+  q?: string;
 }
+
+const HighlightText = ({ text, highlight }: { text: string; highlight?: string }) => {
+  if (!highlight || !highlight.trim()) {
+    return <>{text}</>;
+  }
+  const regex = new RegExp(`(${highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  const parts = text.split(regex);
+  return (
+    <>
+      {parts.map((part, i) =>
+        regex.test(part) ? (
+          <mark key={i} className="bg-primary/30 text-primary font-bold rounded px-0.5">
+            {part}
+          </mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+};
 
 export function SearchResultsList({
   papers,
@@ -42,6 +64,7 @@ export function SearchResultsList({
   page,
   lastPage,
   onPageChange,
+  q,
 }: SearchResultsListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -136,7 +159,7 @@ export function SearchResultsList({
                     onClick={() => onSelectPaper(paper)}
                     className="font-display text-2xl font-bold leading-tight group-hover:text-primary transition-colors cursor-pointer text-left"
                   >
-                    {cleanTitle(paper.title)}
+                    <HighlightText text={cleanTitle(paper.title)} highlight={q} />
                   </h3>
                 </div>
                 <div className="relative group/tooltip">
@@ -167,14 +190,29 @@ export function SearchResultsList({
                 </div>
               </div>
               <p className="text-sm text-secondary font-medium mb-4 text-left">
-                {paper.authors?.map((a) => a.name).join(", ")} •{" "}
+                <HighlightText text={paper.authors?.map((a) => a.name).join(", ")} highlight={q} /> •{" "}
                 <span className="text-on-surface">
-                  {paper.journal?.name || paper.source} | {paper.published_year}
+                  <HighlightText text={paper.journal?.name || paper.source} highlight={q} /> | {paper.published_year}
                 </span>
               </p>
-              <p className="text-on-surface-variant text-sm line-clamp-3 mb-6 leading-relaxed text-left">
-                {paper.abstract}
+              <p className="text-on-surface-variant text-sm line-clamp-3 mb-4 leading-relaxed text-left">
+                <HighlightText text={paper.abstract} highlight={q} />
               </p>
+
+              {paper.keywords && paper.keywords.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {paper.keywords.slice(0, 5).map((kw) => (
+                    <span key={kw.id} className="text-[10px] px-2 py-1 rounded border border-white/10 bg-white/5 text-on-surface-variant">
+                      #<HighlightText text={kw.name} highlight={q} />
+                    </span>
+                  ))}
+                  {paper.keywords.length > 5 && (
+                    <span className="text-[10px] px-2 py-1 text-on-surface-variant">
+                      +{paper.keywords.length - 5} nữa
+                    </span>
+                  )}
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center gap-6 pt-6 border-t border-white/5">
                 <div className="flex items-center gap-6 mr-auto">

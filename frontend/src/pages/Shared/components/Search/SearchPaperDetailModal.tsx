@@ -29,7 +29,29 @@ interface SearchPaperDetailModalProps {
   followedKeywordIds: Set<number>;
   followingKeywordIds: Set<number>;
   onToggleFollowKeyword: (id: number, name: string) => void;
+  q?: string;
 }
+
+const HighlightText = ({ text, highlight }: { text: string; highlight?: string }) => {
+  if (!highlight || !highlight.trim()) {
+    return <>{text}</>;
+  }
+  const regex = new RegExp(`(${highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  const parts = text.split(regex);
+  return (
+    <>
+      {parts.map((part, i) =>
+        regex.test(part) ? (
+          <mark key={i} className="bg-primary/30 text-primary font-bold rounded px-0.5">
+            {part}
+          </mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+};
 
 export function SearchPaperDetailModal({
   paper,
@@ -40,6 +62,7 @@ export function SearchPaperDetailModal({
   followedKeywordIds,
   followingKeywordIds,
   onToggleFollowKeyword,
+  q,
 }: SearchPaperDetailModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -57,18 +80,18 @@ export function SearchPaperDetailModal({
               {(paper.journal?.name || paper.source).toUpperCase()}
             </span>
             <h2 className="font-display text-2xl sm:text-3xl font-bold leading-tight text-on-surface text-left">
-              {cleanTitle(paper.title)}
+              <HighlightText text={cleanTitle(paper.title)} highlight={q} />
             </h2>
           </div>
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-on-surface-variant border-y border-white/5 py-4 text-left">
             <div>
               <span className="font-bold text-on-surface">Tác giả:</span>{" "}
-              {paper.authors?.map((a) => a.name).join(", ") || "N/A"}
+              <HighlightText text={paper.authors?.map((a) => a.name).join(", ") || "N/A"} highlight={q} />
             </div>
             <div>
               <span className="font-bold text-on-surface">Tạp chí:</span>{" "}
-              {paper.journal?.name || paper.source || "N/A"}
+              <HighlightText text={paper.journal?.name || paper.source || "N/A"} highlight={q} />
             </div>
             <div>
               <span className="font-bold text-on-surface">Năm xuất bản:</span>{" "}
@@ -85,7 +108,7 @@ export function SearchPaperDetailModal({
               Tóm tắt (Abstract)
             </h4>
             <p className="text-on-surface-variant text-sm leading-relaxed whitespace-pre-line">
-              {paper.abstract || "Không có tóm tắt cho bài báo này."}
+              <HighlightText text={paper.abstract || "Không có tóm tắt cho bài báo này."} highlight={q} />
             </p>
           </div>
 
@@ -108,7 +131,7 @@ export function SearchPaperDetailModal({
                           : "bg-primary/10 text-primary border-primary/20"
                       )}
                     >
-                      #{kw.name}
+                      #<HighlightText text={kw.name} highlight={q} />
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

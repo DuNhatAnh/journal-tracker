@@ -305,6 +305,7 @@ export default function Search() {
             page={pageParam}
             lastPage={data?.last_page || 1}
             onPageChange={handlePageChange}
+            q={q}
           />
         </div>
 
@@ -337,6 +338,7 @@ export default function Search() {
           followedKeywordIds={followedKeywordIds}
           followingKeywordIds={followingKeywordIds}
           onToggleFollowKeyword={toggleFollowKeyword}
+          q={q}
         />
       )}
     </div>
