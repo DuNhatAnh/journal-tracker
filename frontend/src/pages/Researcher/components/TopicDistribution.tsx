@@ -59,7 +59,11 @@ export function TopicDistribution({ keywords, loading, type }: TopicDistribution
                 },
                 labels: labels,
                 colors: ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#6B7280'],
-                stroke: { show: false },
+                stroke: type === "keyword" ? { show: true, width: 2 } : { show: false },
+                ...(type === "keyword" && {
+                  fill: { opacity: 0.2 },
+                  markers: { size: 4, hover: { size: 6 } },
+                }),
                 legend: {
                   position: 'bottom',
                   fontSize: '11px',
@@ -67,16 +71,17 @@ export function TopicDistribution({ keywords, loading, type }: TopicDistribution
                   labels: { colors: '#9CA3AF' },
                   markers: { size: 6 }
                 },
+                yaxis: type === "keyword" ? { show: false } : undefined,
                 dataLabels: {
-                  enabled: true,
+                  enabled: type !== "keyword",
                   style: { fontSize: '10px', fontFamily: 'JetBrains Mono', fontWeight: 'bold' }
                 },
                 tooltip: { theme: 'dark' }
               }}
-              series={series}
-              type="donut"
+              series={type === "keyword" ? [{ name: 'Số lần đồng xuất hiện', data: series }] : series}
+              type={type === "keyword" ? "radar" : "donut"}
               width="100%"
-              height={220}
+              height={280}
             />
           </div>
         ) : (

@@ -11,6 +11,7 @@ import { PublicationVelocity } from "./components/PublicationVelocity";
 import { TopicDistribution } from "./components/TopicDistribution";
 import { CoAuthorNetwork } from "./components/CoAuthorNetwork";
 import { JournalBenchmark } from "./components/JournalBenchmark";
+import { JournalDistribution } from "./components/JournalDistribution";
 import { RepresentativePublications } from "./components/RepresentativePublications";
 import { TrendsSidebar } from "./components/TrendsSidebar";
 import { PaperQuickViewModal } from "./components/PaperQuickViewModal";
@@ -634,13 +635,23 @@ export default function Trending() {
               />
             </div>
           ) : (
-            <div ref={chartContainerRef}>
-              <PublicationVelocity 
-                categories={velocityChartData.categories}
-                series={velocityChartData.series}
-                loading={loadingDetail || loading}
-                selectedEntity={selectedEntity}
-              />
+            <div className="space-y-6">
+              <div ref={chartContainerRef}>
+                <PublicationVelocity 
+                  categories={velocityChartData.categories}
+                  series={velocityChartData.series}
+                  loading={loadingDetail || loading}
+                  selectedEntity={selectedEntity}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <JournalDistribution selectedEntity={selectedEntity} />
+                <TopicDistribution 
+                  keywords={coOccurringKeywords}
+                  loading={loadingDetail || loading}
+                  type="keyword"
+                />
+              </div>
             </div>
           )}
 

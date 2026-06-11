@@ -178,7 +178,7 @@ class TrendController extends Controller
         }
         
         arsort($journalCounts);
-        $topJournalIds = array_slice(array_keys($journalCounts), 0, 3);
+        $topJournalIds = array_slice(array_keys($journalCounts), 0, 10);
         
         $journals = [];
         foreach ($topJournalIds as $jId) {
@@ -695,7 +695,7 @@ class TrendController extends Controller
         }
         
         arsort($journalCounts);
-        $topJournalIds = array_slice(array_keys($journalCounts), 0, 3);
+        $topJournalIds = array_slice(array_keys($journalCounts), 0, 10);
         
         $journals = [];
         foreach ($topJournalIds as $jId) {
