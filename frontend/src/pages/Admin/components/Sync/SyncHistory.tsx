@@ -105,6 +105,8 @@ export default function SyncHistory({
                 const totalExpected = progressDetails.total_expected || 0;
                 const summary = progressDetails.summary || { success: 0, skipped: 0, failed: 0 };
                 const successCount = summary.success || 0;
+                const createdCount = summary.created;
+                const updatedCount = summary.updated;
                 const skippedCount = summary.skipped || 0;
                 const failedCount = summary.failed || 0;
                 
@@ -115,7 +117,13 @@ export default function SyncHistory({
                       {totalExpected > 0 && (
                         <span className="text-[10px] text-on-surface-variant/80">
                           (
-                          <span className="text-tertiary font-semibold">{successCount} thành công</span>
+                          <span className="text-tertiary font-semibold">
+                            {createdCount !== undefined && updatedCount !== undefined ? (
+                              `${createdCount} thêm mới, ${updatedCount} cập nhật`
+                            ) : (
+                              `${successCount} thành công`
+                            )}
+                          </span>
                           {skippedCount > 0 && <span className="text-on-surface-variant/70 font-semibold">, {skippedCount} trùng</span>}
                           {failedCount > 0 && <span className="text-error font-semibold">, {failedCount} lỗi</span>}
                           )

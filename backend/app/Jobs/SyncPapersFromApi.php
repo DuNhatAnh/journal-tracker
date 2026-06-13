@@ -73,12 +73,19 @@ class SyncPapersFromApi implements ShouldQueue
         if (!$this->syncLog) return;
 
         $success = 0;
+        $created = 0;
+        $updated = 0;
         $skipped = 0;
         $failed = 0;
 
         foreach ($this->progressItems as $item) {
             if ($item['status'] === 'success') {
                 $success++;
+                if (str_contains($item['reason'] ?? '', 'Thêm mới') || str_contains($item['reason'] ?? '', 'created')) {
+                    $created++;
+                } else {
+                    $updated++;
+                }
             } elseif ($item['status'] === 'skipped') {
                 $skipped++;
             } elseif ($item['status'] === 'failed') {
@@ -94,6 +101,8 @@ class SyncPapersFromApi implements ShouldQueue
             'items' => array_values($this->progressItems),
             'summary' => [
                 'success' => $success,
+                'created' => $created,
+                'updated' => $updated,
                 'skipped' => $skipped,
                 'failed' => $failed,
             ]
@@ -243,6 +252,9 @@ class SyncPapersFromApi implements ShouldQueue
                 $apiSource->update(['last_synced_at' => now()]);
             }
 
+            // Clear dashboard and listing caches so all users see updated counts immediately
+            \Illuminate\Support\Facades\Cache::flush();
+
             Log::info("SyncPapersFromApi completed", ['synced_count' => $this->syncedCount]);
 
         } catch (\Throwable $e) {
@@ -319,13 +331,43 @@ class SyncPapersFromApi implements ShouldQueue
                 $existingAuthors = Author::whereIn('name', $authorNames)->pluck('id', 'name')->toArray();
             }
 
-            // Bulk Insert Keywords
-            $existingKeywords = Keyword::whereIn('name', $keywordNames)->pluck('id', 'name')->toArray();
-            $missingKeywords = array_diff($keywordNames, array_keys($existingKeywords));
+            // Bulk Insert Keywords (using withTrashed to avoid inserting existing soft-deleted/merged keywords)
+            $allKeywordsFromDb = Keyword::withTrashed()->whereIn('name', $keywordNames)->get();
+            $existingKeywordsByName = $allKeywordsFromDb->keyBy('name');
+            $missingKeywords = array_diff($keywordNames, $allKeywordsFromDb->pluck('name')->toArray());
             if (!empty($missingKeywords)) {
                 $keywordData = array_map(fn($n) => ['name' => $n, 'slug' => Str::slug($n), 'created_at' => $now, 'updated_at' => $now], $missingKeywords);
                 foreach (array_chunk($keywordData, 500) as $chunk) Keyword::insert($chunk);
-                $existingKeywords = Keyword::whereIn('name', $keywordNames)->pluck('id', 'name')->toArray();
+                // Re-fetch to include newly inserted keywords
+                $newlyInsertedKeywords = Keyword::whereIn('name', $missingKeywords)->get();
+                $allKeywordsFromDb = $allKeywordsFromDb->concat($newlyInsertedKeywords);
+                $existingKeywordsByName = $allKeywordsFromDb->keyBy('name');
+            }
+
+            // Resolve merged keywords to their target keyword IDs (or restore them if they were deleted but not merged)
+            $resolvedKeywordIds = [];
+            foreach ($allKeywordsFromDb as $keyword) {
+                $resolvedKeyword = $keyword;
+                $visited = [];
+                while ($resolvedKeyword->deleted_at !== null && $resolvedKeyword->merged_into_id !== null) {
+                    if (in_array($resolvedKeyword->id, $visited)) {
+                        break; // prevent infinite loops
+                    }
+                    $visited[] = $resolvedKeyword->id;
+                    $target = Keyword::withTrashed()->find($resolvedKeyword->merged_into_id);
+                    if ($target) {
+                        $resolvedKeyword = $target;
+                    } else {
+                        break;
+                    }
+                }
+
+                // If it is soft-deleted but has no merge target, skip it (do not associate, do not restore)
+                if ($resolvedKeyword->deleted_at !== null && $resolvedKeyword->merged_into_id === null) {
+                    continue;
+                }
+
+                $resolvedKeywordIds[$keyword->name] = $resolvedKeyword->id;
             }
 
             // Load existing papers in this batch to compare and bypass database writes if identical
@@ -358,9 +400,10 @@ class SyncPapersFromApi implements ShouldQueue
                         }
 
                         // Citation count updated
+                        $oldCitations = $existing->citations_count;
                         $existing->update(['citations_count' => $citationsOnApi]);
                         $this->progressItems[$item['id']]['status'] = 'success';
-                        $this->progressItems[$item['id']]['reason'] = 'Cập nhật số lượt trích dẫn (' . $existing->getOriginal('citations_count') . ' -> ' . $citationsOnApi . ')';
+                        $this->progressItems[$item['id']]['reason'] = 'Cập nhật số lượt trích dẫn (' . $oldCitations . ' -> ' . $citationsOnApi . ')';
                         $this->syncedCount++;
                         continue;
                     }
@@ -399,10 +442,12 @@ class SyncPapersFromApi implements ShouldQueue
                     foreach (data_get($item, 'concepts', []) as $concept) {
                         if (($concept['score'] ?? 0) > 0.3) {
                             $name = $concept['display_name'];
-                            if (isset($existingKeywords[$name])) $keywordIds[] = $existingKeywords[$name];
+                            if (isset($resolvedKeywordIds[$name])) {
+                                $keywordIds[] = $resolvedKeywordIds[$name];
+                            }
                         }
                     }
-                    $paper->keywords()->sync($keywordIds);
+                    $paper->keywords()->sync(array_unique($keywordIds));
 
                     $newPaperIds[] = $paper->id;
                     $this->progressItems[$item['id']]['status'] = 'success';

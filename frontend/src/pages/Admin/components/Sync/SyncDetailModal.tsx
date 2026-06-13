@@ -103,7 +103,12 @@ export default function SyncDetailModal({
               <div>
                 <h5 className="font-bold text-sm">Đồng bộ hoàn tất thành công!</h5>
                 <p className="text-xs text-tertiary/80 mt-1 leading-relaxed">
-                  Đã hoàn tất xử lý {total_expected} bài báo khoa học. Hệ thống đã thêm mới/cập nhật {summary.success} bài và bỏ qua {summary.skipped} bài trùng khớp dữ liệu.
+                  Đã hoàn tất xử lý {total_expected} bài báo khoa học.
+                  {summary.created !== undefined && summary.updated !== undefined ? (
+                    ` Hệ thống đã thêm mới ${summary.created} bài, cập nhật ${summary.updated} bài và bỏ qua ${summary.skipped} bài trùng khớp dữ liệu.`
+                  ) : (
+                    ` Hệ thống đã thêm mới/cập nhật ${summary.success} bài và bỏ qua ${summary.skipped} bài trùng khớp dữ liệu.`
+                  )}
                 </p>
               </div>
             </div>
@@ -232,11 +237,24 @@ export default function SyncDetailModal({
           </div>
 
           {/* Quick Stats Grid */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-tertiary/5 border border-tertiary/10 text-center">
-              <span className="block text-[10px] font-bold text-tertiary uppercase tracking-wider">Mới / Cập nhật</span>
-              <span className="block text-2xl font-bold text-on-surface mt-1">{summary.success}</span>
-            </div>
+          <div className={`grid ${summary.created !== undefined && summary.updated !== undefined ? 'grid-cols-4' : 'grid-cols-3'} gap-4`}>
+            {summary.created !== undefined && summary.updated !== undefined ? (
+              <>
+                <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-center">
+                  <span className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Thêm mới</span>
+                  <span className="block text-xl font-bold text-on-surface mt-1">{summary.created}</span>
+                </div>
+                <div className="p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/10 text-center">
+                  <span className="block text-[10px] font-bold text-cyan-400 uppercase tracking-wider">Cập nhật</span>
+                  <span className="block text-xl font-bold text-on-surface mt-1">{summary.updated}</span>
+                </div>
+              </>
+            ) : (
+              <div className="p-4 rounded-xl bg-tertiary/5 border border-tertiary/10 text-center">
+                <span className="block text-[10px] font-bold text-tertiary uppercase tracking-wider">Mới / Cập nhật</span>
+                <span className="block text-2xl font-bold text-on-surface mt-1">{summary.success}</span>
+              </div>
+            )}
             <div className="p-4 rounded-xl bg-white/5 border border-white/5 text-center">
               <span className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Trùng khớp</span>
               <span className="block text-2xl font-bold text-on-surface mt-1">{summary.skipped}</span>
