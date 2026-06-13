@@ -15,7 +15,12 @@ class BookmarkController extends Controller
      */
     public function index(Request $request)
     {
-        $query = $this->buildFilteredQuery($request);
+        $query = $this->buildFilteredQuery($request, false);
+        
+        // Fallback to fuzzy search if search query is provided, exact match yields 0, and length >= 3
+        if ($request->filled('search') && mb_strlen($request->search) >= 3 && $query->count() === 0) {
+            $query = $this->buildFilteredQuery($request, true);
+        }
 
         // Load limit from settings file
         $user = auth()->user();
@@ -164,7 +169,7 @@ class BookmarkController extends Controller
     /**
      * Helper to build filtered query
      */
-    private function buildFilteredQuery(Request $request)
+    private function buildFilteredQuery(Request $request, $isFuzzy = false)
     {
         $query = auth()->user()
             ->bookmarks()
@@ -194,16 +199,25 @@ class BookmarkController extends Controller
         // Filter by search query (matching title, journal name, authors, or personal note)
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('note', 'like', "%{$search}%")
-                  ->orWhereHas('paper', function ($pq) use ($search) {
-                      $pq->where('title', 'like', "%{$search}%")
-                        ->orWhere('source', 'like', "%{$search}%")
-                        ->orWhereHas('journal', function ($jq) use ($search) {
-                            $jq->where('name', 'like', "%{$search}%");
+            $lowerSearch = mb_strtolower($search);
+            
+            if ($isFuzzy && mb_strlen($search) >= 3) {
+                $chars = mb_str_split(str_replace(' ', '', $lowerSearch));
+                $pattern = '%' . implode('%', $chars) . '%';
+            } else {
+                $pattern = "%{$lowerSearch}%";
+            }
+
+            $query->where(function ($q) use ($pattern) {
+                $q->whereRaw('LOWER(note) LIKE ?', [$pattern])
+                  ->orWhereHas('paper', function ($pq) use ($pattern) {
+                      $pq->whereRaw('LOWER(title) LIKE ?', [$pattern])
+                        ->orWhereRaw('LOWER(source) LIKE ?', [$pattern])
+                        ->orWhereHas('journal', function ($jq) use ($pattern) {
+                            $jq->whereRaw('LOWER(name) LIKE ?', [$pattern]);
                         })
-                        ->orWhereHas('authors', function ($aq) use ($search) {
-                            $aq->where('name', 'like', "%{$search}%");
+                        ->orWhereHas('authors', function ($aq) use ($pattern) {
+                            $aq->whereRaw('LOWER(name) LIKE ?', [$pattern]);
                         });
                   });
             });
@@ -242,7 +256,14 @@ class BookmarkController extends Controller
      */
     public function export(Request $request)
     {
-        $bookmarks = $this->buildFilteredQuery($request)->get();
+        $query = $this->buildFilteredQuery($request, false);
+        
+        // Fallback to fuzzy search if search query is provided, exact match yields 0, and length >= 3
+        if ($request->filled('search') && mb_strlen($request->search) >= 3 && $query->count() === 0) {
+            $query = $this->buildFilteredQuery($request, true);
+        }
+
+        $bookmarks = $query->get();
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',

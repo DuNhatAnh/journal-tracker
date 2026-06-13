@@ -22,10 +22,25 @@ class KeywordController extends Controller
             return response()->json($keywords);
         }
 
+        $lowerQ = mb_strtolower($q);
+
+        // Standard case-insensitive search
         $keywords = Keyword::withCount('papers')
-            ->where('name', 'like', "%{$q}%")
+            ->whereRaw('LOWER(name) LIKE ?', ["%{$lowerQ}%"])
             ->orderByDesc('papers_count')
             ->paginate($perPage);
+
+        // Fallback to fuzzy match (typo tolerance) if no exact match found
+        if ($keywords->isEmpty() && mb_strlen($q) >= 3) {
+            $chars = mb_str_split(str_replace(' ', '', $lowerQ));
+            $fuzzyPattern = '%' . implode('%', $chars) . '%';
+            
+            $keywords = Keyword::withCount('papers')
+                ->whereRaw('LOWER(name) LIKE ?', [$fuzzyPattern])
+                ->orderByRaw("LENGTH(name) ASC") // Prioritize tighter matches
+                ->orderByDesc('papers_count')
+                ->paginate($perPage);
+        }
 
         return response()->json($keywords);
     }

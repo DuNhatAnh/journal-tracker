@@ -5,6 +5,8 @@ import { api } from "@/src/lib/api";
 import { KeywordItem, PaginatedKeywords } from "./types";
 import KeywordModal from "./components/Keywords/KeywordModal";
 import MergeKeywordsModal from "./components/Keywords/MergeKeywordsModal";
+import MergeDetailsModal from "./components/Keywords/MergeDetailsModal";
+import ForceDeleteModal from "./components/Keywords/ForceDeleteModal";
 import toast from "react-hot-toast";
 
 export default function AdminKeywords() {
@@ -23,7 +25,14 @@ export default function AdminKeywords() {
   const [isMergeOpen, setIsMergeOpen] = useState(false);
   const [mergeTargetKeyword, setMergeTargetKeyword] = useState<KeywordItem | null>(null);
 
-  const [reasonKeyword, setReasonKeyword] = useState<KeywordItem | null>(null);
+  const [detailsKeywordId, setDetailsKeywordId] = useState<number | null>(null);
+
+  // Two-click confirm state
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [pendingRestoreId, setPendingRestoreId] = useState<number | null>(null);
+
+  // Force Delete Modal state
+  const [forceDeleteTarget, setForceDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
   const currentUserStr = localStorage.getItem("user");
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
@@ -85,18 +94,17 @@ export default function AdminKeywords() {
   };
 
   const handleDeleteKeyword = async (id: number, name: string) => {
-    if (
-      !window.confirm(
-        `Bạn có chắc chắn muốn xóa từ khóa "${name}"? Từ khóa sẽ được đưa vào thùng rác.`
-      )
-    ) {
+    // Lần 1: chờ xác nhận
+    if (pendingDeleteId !== id) {
+      setPendingDeleteId(id);
+      setPendingRestoreId(null);
       return;
     }
-
+    // Lần 2: thực hiện
+    setPendingDeleteId(null);
     try {
       await api.delete(`/admin/keywords/${id}`);
-      toast.success(`Đã xóa từ khóa "${name}"!`);
-      // Reload on previous page if current page becomes empty
+      toast.success(`Đã chuyển từ khóa "${name}" vào thùng rác.`);
       const isLastItemOnPage = keywords.length === 1 && pagination.current > 1;
       loadKeywords(isLastItemOnPage ? pagination.current - 1 : pagination.current);
     } catch (err: any) {
@@ -106,9 +114,13 @@ export default function AdminKeywords() {
 
   const handleRestoreKeyword = async (id: number, name: string) => {
     if (statusFilter === "merged") {
-      if (!window.confirm(`LƯU Ý: Khôi phục từ khóa đã gộp sẽ khiến nó trở lại trạng thái hoạt động độc lập, nhưng SẼ KHÔNG CÓ BÀI VIẾT NÀO ĐI KÈM (do bài viết đã chuyển hết sang từ khóa đích). Bạn có muốn tiếp tục?`)) {
+      // Cần xác nhận lần 2 vì restore từ khóa đã gộp sẽ không có bài đi kèm
+      if (pendingRestoreId !== id) {
+        setPendingRestoreId(id);
+        setPendingDeleteId(null);
         return;
       }
+      setPendingRestoreId(null);
     }
     try {
       await api.post(`/admin/keywords/${id}/restore`);
@@ -120,22 +132,19 @@ export default function AdminKeywords() {
     }
   };
 
-  const handleForceDeleteKeyword = async (id: number, name: string) => {
-    if (
-      !window.confirm(
-        `CẢNH BÁO MẤT DỮ LIỆU!\nBạn có chắc chắn muốn xóa VĨNH VIỄN từ khóa "${name}"? Hành động này sẽ xóa toàn bộ liên kết với bài viết và không thể khôi phục.`
-      )
-    ) {
-      return;
-    }
+  const handleForceDeleteKeyword = async (password: string) => {
+    if (!forceDeleteTarget) return;
 
     try {
-      await api.delete(`/admin/keywords/${id}/force`);
-      toast.success(`Đã xóa vĩnh viễn từ khóa "${name}"!`);
+      await api.delete(`/admin/keywords/${forceDeleteTarget.id}/force`, {
+        body: JSON.stringify({ password })
+      });
+      toast.success(`Đã xóa vĩnh viễn từ khóa "${forceDeleteTarget.name}"!`);
       const isLastItemOnPage = keywords.length === 1 && pagination.current > 1;
       loadKeywords(isLastItemOnPage ? pagination.current - 1 : pagination.current);
     } catch (err: any) {
-      toast.error(err.message || "Xóa vĩnh viễn thất bại.");
+      toast.error(err.response?.data?.message || err.message || "Xóa vĩnh viễn thất bại.");
+      throw err; // Ném lỗi để modal biết
     }
   };
 
@@ -301,18 +310,20 @@ export default function AdminKeywords() {
                       {statusFilter === "merged" && kw.merged_into ? (
                         <div className="flex flex-col items-center gap-1">
                           <span className="text-xs text-on-surface-variant">Đã gộp vào:</span>
-                          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold bg-secondary/10 text-secondary border border-secondary/20 truncate max-w-[150px]">
+                          <button
+                            onClick={() => setDetailsKeywordId(kw.id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/20 transition-all truncate max-w-[200px]"
+                            title="Nhấn để xem chi tiết lịch sử gộp"
+                          >
                             {kw.merged_into.name}
-                          </span>
-                          {kw.merge_reason && (
-                            <button
-                              onClick={() => setReasonKeyword(kw)}
-                              className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-on-surface-variant/60 hover:text-primary transition-colors"
-                              title="Xem lý do gộp"
-                            >
-                              <Info className="w-3 h-3" /> Xem lý do
-                            </button>
-                          )}
+                          </button>
+                          <button
+                            onClick={() => setDetailsKeywordId(kw.id)}
+                            className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-on-surface-variant/60 hover:text-primary transition-colors"
+                            title="Xem chi tiết lý do và lịch sử gộp"
+                          >
+                            <Info className="w-3 h-3" /> Xem chi tiết
+                          </button>
                         </div>
                       ) : (
                         <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
@@ -324,55 +335,122 @@ export default function AdminKeywords() {
                       {new Date(kw.created_at).toLocaleDateString("vi-VN")}
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
-                      {statusFilter === "trashed" || statusFilter === "merged" ? (
-                        <>
-                          <button
-                            onClick={() => handleRestoreKeyword(kw.id, kw.name)}
-                            className="p-2 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-all inline-flex"
-                            title="Khôi phục từ khóa"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleForceDeleteKeyword(kw.id, kw.name)}
-                            className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-all inline-flex"
-                            title="Xóa vĩnh viễn"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => handleOpenEdit(kw)}
-                            className="p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all inline-flex"
-                            title="Chỉnh sửa từ khóa"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenMerge(kw)}
-                            className="p-2 rounded-lg bg-secondary/10 text-secondary hover:bg-secondary/20 transition-all inline-flex"
-                            title="Dùng làm từ khóa đích để gộp"
-                          >
-                            <Merge className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleRecalculateTrends(kw.id, kw.name)}
-                            className="p-2 rounded-lg bg-tertiary/10 text-tertiary hover:bg-tertiary/20 transition-all inline-flex"
-                            title="Tính toán lại xu hướng"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteKeyword(kw.id, kw.name)}
-                            className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-all inline-flex"
-                            title="Chuyển vào thùng rác"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </>
-                      )}
+                       {statusFilter === "merged" ? (
+                         // === TAB ĐÃ GỘP: chỉ Khôi phục, KHÔNG có xóa ===
+                         <>
+                           {pendingRestoreId === kw.id ? (
+                             <span className="inline-flex items-center gap-1">
+                               <button
+                                 onClick={() => handleRestoreKeyword(kw.id, kw.name)}
+                                 className="px-2 py-1 rounded-lg bg-warning text-black text-[10px] font-bold hover:bg-warning/80 transition-all inline-flex items-center gap-1"
+                               >
+                                 <RotateCcw className="w-3 h-3" /> Chắc chắn?
+                               </button>
+                               <button
+                                 onClick={() => setPendingRestoreId(null)}
+                                 className="p-1 rounded-lg bg-white/10 text-on-surface-variant hover:bg-white/20 transition-all inline-flex"
+                                 title="Hủy"
+                               >
+                                 <X className="w-3 h-3" />
+                               </button>
+                             </span>
+                           ) : (
+                             <button
+                               onClick={() => handleRestoreKeyword(kw.id, kw.name)}
+                               className="p-2 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-all inline-flex"
+                               title="Khôi phục (Unmerge) từ khóa về trạng thái hoạt động"
+                             >
+                               <RotateCcw className="w-3.5 h-3.5" />
+                             </button>
+                           )}
+                         </>
+                       ) : statusFilter === "trashed" ? (
+                         // === TAB THÙNG RÁC: Khôi phục + Xóa vĩnh viễn ===
+                         <>
+                           {pendingRestoreId === kw.id ? (
+                             <span className="inline-flex items-center gap-1">
+                               <button
+                                 onClick={() => handleRestoreKeyword(kw.id, kw.name)}
+                                 className="px-2 py-1 rounded-lg bg-warning text-black text-[10px] font-bold hover:bg-warning/80 transition-all inline-flex items-center gap-1"
+                               >
+                                 <RotateCcw className="w-3 h-3" /> Chắc chắn?
+                               </button>
+                               <button
+                                 onClick={() => setPendingRestoreId(null)}
+                                 className="p-1 rounded-lg bg-white/10 text-on-surface-variant hover:bg-white/20 transition-all inline-flex"
+                                 title="Hủy"
+                               >
+                                 <X className="w-3 h-3" />
+                               </button>
+                             </span>
+                           ) : (
+                             <button
+                               onClick={() => handleRestoreKeyword(kw.id, kw.name)}
+                               className="p-2 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-all inline-flex"
+                               title="Khôi phục từ khóa"
+                             >
+                               <RotateCcw className="w-3.5 h-3.5" />
+                             </button>
+                           )}
+                           <button
+                             onClick={() => setForceDeleteTarget({ id: kw.id, name: kw.name })}
+                             className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-all inline-flex"
+                             title="Xóa vĩnh viễn khỏi database"
+                           >
+                             <Trash2 className="w-3.5 h-3.5" />
+                           </button>
+                         </>
+                       ) : (
+                         // === TAB ĐANG HOẠT ĐỘNG: Edit / Merge / Recalculate / Soft Delete ===
+                         <>
+                           <button
+                             onClick={() => handleOpenEdit(kw)}
+                             className="p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all inline-flex"
+                             title="Chỉnh sửa từ khóa"
+                           >
+                             <Edit2 className="w-3.5 h-3.5" />
+                           </button>
+                           <button
+                             onClick={() => handleOpenMerge(kw)}
+                             className="p-2 rounded-lg bg-secondary/10 text-secondary hover:bg-secondary/20 transition-all inline-flex"
+                             title="Dùng làm từ khóa đích để gộp"
+                           >
+                             <Merge className="w-3.5 h-3.5" />
+                           </button>
+                           <button
+                             onClick={() => handleRecalculateTrends(kw.id, kw.name)}
+                             className="p-2 rounded-lg bg-tertiary/10 text-tertiary hover:bg-tertiary/20 transition-all inline-flex"
+                             title="Tính toán lại xu hướng"
+                           >
+                             <RefreshCw className="w-3.5 h-3.5" />
+                           </button>
+                           {pendingDeleteId === kw.id ? (
+                             <span className="inline-flex items-center gap-1">
+                               <button
+                                 onClick={() => handleDeleteKeyword(kw.id, kw.name)}
+                                 className="px-2 py-1 rounded-lg bg-error text-white text-[10px] font-bold hover:bg-error/80 transition-all inline-flex items-center gap-1 animate-pulse"
+                               >
+                                 <Trash2 className="w-3 h-3" /> Chắc chắn?
+                               </button>
+                               <button
+                                 onClick={() => setPendingDeleteId(null)}
+                                 className="p-1 rounded-lg bg-white/10 text-on-surface-variant hover:bg-white/20 transition-all inline-flex"
+                                 title="Hủy"
+                               >
+                                 <X className="w-3 h-3" />
+                               </button>
+                             </span>
+                           ) : (
+                             <button
+                               onClick={() => handleDeleteKeyword(kw.id, kw.name)}
+                               className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-all inline-flex"
+                               title="Chuyển vào thùng rác"
+                             >
+                               <Trash2 className="w-3.5 h-3.5" />
+                             </button>
+                           )}
+                         </>
+                       )}
                     </td>
                   </tr>
                 ))}
@@ -427,45 +505,18 @@ export default function AdminKeywords() {
       />
 
       {/* Merge Reason Detail Popup */}
-      {reasonKeyword && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
-          onClick={() => setReasonKeyword(null)}
-        >
-          <div
-            className="glass-panel w-full max-w-md bg-surface border border-white/10 rounded-2xl shadow-2xl p-6 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <Info className="w-5 h-5 text-secondary flex-shrink-0" />
-                <h3 className="font-display font-bold text-on-surface text-base">Lý do gộp từ khóa</h3>
-              </div>
-              <button onClick={() => setReasonKeyword(null)} className="text-on-surface-variant hover:text-on-surface transition-colors">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      <MergeDetailsModal
+        keywordId={detailsKeywordId}
+        onClose={() => setDetailsKeywordId(null)}
+      />
 
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-on-surface">{reasonKeyword.name}</span>
-                <span className="text-on-surface-variant">→</span>
-                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-secondary/10 text-secondary border border-secondary/20">
-                  {reasonKeyword.merged_into?.name ?? "—"}
-                </span>
-              </div>
-
-              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 text-on-surface-variant leading-relaxed">
-                {reasonKeyword.merge_reason || <em className="text-on-surface-variant/50">Không có lý do được ghi lại.</em>}
-              </div>
-
-              <p className="text-[10px] text-on-surface-variant/50">
-                Gộp lúc: {reasonKeyword.deleted_at ? new Date(reasonKeyword.deleted_at).toLocaleString("vi-VN") : "—"}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Force Delete Modal */}
+      <ForceDeleteModal
+        isOpen={!!forceDeleteTarget}
+        onClose={() => setForceDeleteTarget(null)}
+        keywordName={forceDeleteTarget?.name || ""}
+        onConfirm={handleForceDeleteKeyword}
+      />
     </div>
   );
 }

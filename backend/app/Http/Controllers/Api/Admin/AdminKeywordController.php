@@ -128,31 +128,142 @@ class AdminKeywordController extends Controller
     public function restore($id)
     {
         $keyword = Keyword::onlyTrashed()->findOrFail($id);
-        $keyword->restore();
-        
-        // Clear merged_into_id and merge_reason if it was merged
-        if ($keyword->merged_into_id !== null) {
-            $keyword->merged_into_id = null;
-            $keyword->merge_reason = null;
-            $keyword->save();
-        }
+
+        DB::transaction(function () use ($keyword) {
+            $keyword->restore();
+            
+            // Nếu từ khóa này từng bị gộp, tiến hành "unmerge"
+            if ($keyword->merged_into_id !== null) {
+                $targetId = $keyword->merged_into_id;
+                
+                // 1. Đọc logs để biết bài báo/user nào đã bị ảnh hưởng
+                $logs = DB::table('keyword_merge_logs')
+                    ->where('source_keyword_id', $keyword->id)
+                    ->where('target_keyword_id', $targetId)
+                    ->get();
+                
+                // 2. Trả lại dữ liệu
+                foreach ($logs as $log) {
+                    if ($log->entity_type === 'paper') {
+                        if ($log->action === 'updated') {
+                            // Đã bị đổi ID -> Đổi ngược lại
+                            DB::table('keyword_paper')
+                                ->where('keyword_id', $targetId)
+                                ->where('paper_id', $log->entity_id)
+                                ->update(['keyword_id' => $keyword->id]);
+                        } else {
+                            // Bị xóa do trùng lặp -> Tạo lại
+                            DB::table('keyword_paper')->insertOrIgnore([
+                                'keyword_id' => $keyword->id,
+                                'paper_id' => $log->entity_id,
+                            ]);
+                        }
+                    } elseif ($log->entity_type === 'user') {
+                        if ($log->action === 'updated') {
+                            DB::table('user_keyword')
+                                ->where('keyword_id', $targetId)
+                                ->where('user_id', $log->entity_id)
+                                ->update(['keyword_id' => $keyword->id]);
+                        } else {
+                            DB::table('user_keyword')->insertOrIgnore([
+                                'keyword_id' => $keyword->id,
+                                'user_id' => $log->entity_id,
+                            ]);
+                        }
+                    }
+                }
+                
+                // 3. Xóa log
+                DB::table('keyword_merge_logs')
+                    ->where('source_keyword_id', $keyword->id)
+                    ->where('target_keyword_id', $targetId)
+                    ->delete();
+                
+                // 4. Xóa cờ gộp
+                $keyword->merged_into_id = null;
+                $keyword->merge_reason = null;
+                $keyword->save();
+
+                // 5. Tính lại xu hướng cho cả 2 từ khóa
+                $this->doRecalculateTrends($targetId);
+                $this->doRecalculateTrends($keyword->id);
+            }
+        });
 
         Cache::flush();
 
-        return response()->json(['message' => 'Đã khôi phục từ khóa thành công!', 'keyword' => $keyword]);
+        return response()->json(['message' => 'Đã khôi phục từ khóa và dữ liệu liên kết thành công!', 'keyword' => $keyword]);
     }
 
     /**
      * DELETE /api/admin/keywords/{id}/force
      */
-    public function forceDelete($id)
+    public function forceDelete(Request $request, $id)
     {
+        $request->validate([
+            'password' => 'required|string'
+        ]);
+
+        $user = $request->user();
+        if (!\Illuminate\Support\Facades\Hash::check($request->password, $user->password)) {
+            return response()->json(['message' => 'Mật khẩu không chính xác. Xóa thất bại!'], 403);
+        }
+
         $keyword = Keyword::onlyTrashed()->findOrFail($id);
         $keyword->forceDelete();
 
         Cache::flush();
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * GET /api/admin/keywords/{id}/merge-details
+     */
+    public function mergeDetails($id)
+    {
+        $sourceKeyword = Keyword::withTrashed()->findOrFail($id);
+        
+        if (!$sourceKeyword->merged_into_id) {
+            return response()->json(['message' => 'Từ khóa này chưa từng bị gộp.'], 400);
+        }
+
+        $targetKeyword = Keyword::withTrashed()->find($sourceKeyword->merged_into_id);
+        
+        // Count how many papers and users were actually moved according to logs
+        $papersMoved = DB::table('keyword_merge_logs')
+            ->where('source_keyword_id', $sourceKeyword->id)
+            ->where('target_keyword_id', $targetKeyword->id)
+            ->where('entity_type', 'paper')
+            ->count();
+            
+        $usersMoved = DB::table('keyword_merge_logs')
+            ->where('source_keyword_id', $sourceKeyword->id)
+            ->where('target_keyword_id', $targetKeyword->id)
+            ->where('entity_type', 'user')
+            ->count();
+
+        // If it's 0, it might be an old merge before logs were implemented, or just 0.
+        // We'll also return the current target's total papers for context.
+        $targetCurrentPapers = DB::table('keyword_paper')->where('keyword_id', $targetKeyword->id)->count();
+
+        return response()->json([
+            'source' => [
+                'id' => $sourceKeyword->id,
+                'name' => $sourceKeyword->name,
+                'slug' => $sourceKeyword->slug,
+            ],
+            'target' => [
+                'id' => $targetKeyword->id,
+                'name' => $targetKeyword->name,
+                'slug' => $targetKeyword->slug,
+                'current_papers_count' => $targetCurrentPapers,
+            ],
+            'merge_reason' => $sourceKeyword->merge_reason,
+            'papers_moved' => $papersMoved,
+            'users_moved' => $usersMoved,
+            'has_logs' => DB::table('keyword_merge_logs')->where('source_keyword_id', $sourceKeyword->id)->exists()
+        ]);
     }
 
     /**
@@ -172,12 +283,46 @@ class AdminKeywordController extends Controller
         $mergeReason = $request->input('merge_reason');
 
         DB::transaction(function () use ($targetId, $sourceIds, $mergeReason) {
-            // 1. Move papers from sources to target without duplication
-            $targetPaperIds = DB::table('keyword_paper')
-                ->where('keyword_id', $targetId)
-                ->pluck('paper_id')
-                ->toArray();
+            // 0. Lưu Log lịch sử (Merge Logs) để phục vụ Khôi phục (Unmerge)
+            $targetPaperIds = DB::table('keyword_paper')->where('keyword_id', $targetId)->pluck('paper_id')->toArray();
+            $targetUserIds = DB::table('user_keyword')->where('keyword_id', $targetId)->pluck('user_id')->toArray();
+            
+            $logs = [];
+            $now = now();
+            foreach ($sourceIds as $sourceId) {
+                $sourcePapers = DB::table('keyword_paper')->where('keyword_id', $sourceId)->pluck('paper_id');
+                foreach ($sourcePapers as $paperId) {
+                    $logs[] = [
+                        'source_keyword_id' => $sourceId,
+                        'target_keyword_id' => $targetId,
+                        'entity_type' => 'paper',
+                        'entity_id' => $paperId,
+                        'action' => in_array($paperId, $targetPaperIds) ? 'deleted' : 'updated',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+                
+                $sourceUsers = DB::table('user_keyword')->where('keyword_id', $sourceId)->pluck('user_id');
+                foreach ($sourceUsers as $userId) {
+                    $logs[] = [
+                        'source_keyword_id' => $sourceId,
+                        'target_keyword_id' => $targetId,
+                        'entity_type' => 'user',
+                        'entity_id' => $userId,
+                        'action' => in_array($userId, $targetUserIds) ? 'deleted' : 'updated',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+            }
+            if (!empty($logs)) {
+                foreach (array_chunk($logs, 500) as $chunk) {
+                    DB::table('keyword_merge_logs')->insert($chunk);
+                }
+            }
 
+            // 1. Move papers from sources to target without duplication
             // Update source papers that target doesn't have yet
             DB::table('keyword_paper')
                 ->whereIn('keyword_id', $sourceIds)
@@ -190,11 +335,6 @@ class AdminKeywordController extends Controller
                 ->delete();
 
             // 2. Move followers from sources to target without duplication
-            $targetUserIds = DB::table('user_keyword')
-                ->where('keyword_id', $targetId)
-                ->pluck('user_id')
-                ->toArray();
-
             DB::table('user_keyword')
                 ->whereIn('keyword_id', $sourceIds)
                 ->whereNotIn('user_id', $targetUserIds)

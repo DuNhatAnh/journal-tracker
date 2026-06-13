@@ -33,7 +33,9 @@ interface SearchResultsListProps {
   q?: string;
 }
 
-const HighlightText = ({ text, highlight }: { text: string; highlight?: string }) => {
+const HighlightText = ({ text, highlight }: { text: string | null | undefined; highlight?: string }) => {
+  // Guard: nếu text là null/undefined thì không render gì
+  if (text == null) return <></>;
   if (!highlight || !highlight.trim()) {
     return <>{text}</>;
   }
@@ -190,13 +192,13 @@ export function SearchResultsList({
                 </div>
               </div>
               <p className="text-sm text-secondary font-medium mb-4 text-left">
-                <HighlightText text={paper.authors?.map((a) => a.name).join(", ")} highlight={q} /> •{" "}
+                <HighlightText text={paper.authors?.map((a) => a.name).join(", ") ?? ""} highlight={q} /> •{" "}
                 <span className="text-on-surface">
-                  <HighlightText text={paper.journal?.name || paper.source} highlight={q} /> | {paper.published_year}
+                  <HighlightText text={paper.journal?.name || paper.source || ""} highlight={q} /> | {paper.published_year}
                 </span>
               </p>
               <p className="text-on-surface-variant text-sm line-clamp-3 mb-4 leading-relaxed text-left">
-                <HighlightText text={paper.abstract} highlight={q} />
+                <HighlightText text={paper.abstract ?? ""} highlight={q} />
               </p>
 
               {paper.keywords && paper.keywords.length > 0 && (
