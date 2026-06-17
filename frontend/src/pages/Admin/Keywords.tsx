@@ -149,6 +149,11 @@ export default function AdminKeywords() {
   };
 
   const handleRecalculateTrends = async (id: number, name: string) => {
+    const isConfirmed = window.confirm(
+      `CẢNH BÁO: TÍNH TOÁN LẠI XU HƯỚNG\n\nBạn đang yêu cầu tính toán lại dữ liệu cho từ khóa "${name}".\n\nLưu ý: Hệ thống thường TỰ ĐỘNG tính toán dữ liệu. Bạn CHỈ NÊN dùng chức năng này khi phát hiện biểu đồ hiển thị bị sai lệch hoặc thiếu sót rõ ràng do lỗi hệ thống.\n\nBạn có chắc chắn muốn tiếp tục tính toán lại không?`
+    );
+    if (!isConfirmed) return;
+
     const loadingToast = toast.loading(`Đang tính toán lại xu hướng cho "${name}"...`);
     try {
       await api.post(`/admin/keywords/${id}/recalculate-trends`);

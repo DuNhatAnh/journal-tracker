@@ -153,6 +153,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('sync-logs/{sync_log}', [ApiSourceController::class, 'showSyncLog']);
 
         // Keyword Management & Merge
+        Route::get('keywords/{id}/merge-details', [AdminKeywordController::class, 'mergeDetails']);
         Route::post('keywords/merge', [AdminKeywordController::class, 'merge']);
         Route::post('keywords/{id}/recalculate-trends', [AdminKeywordController::class, 'recalculateTrends']);
         Route::post('keywords/{id}/restore', [AdminKeywordController::class, 'restore']);

@@ -335,6 +335,28 @@ class AdminKeywordController extends Controller
                 ->delete();
 
             // 2. Move followers from sources to target without duplication
+            // Create notifications for followers before moving them
+            $targetKeywordName = Keyword::find($targetId)->name;
+            foreach ($sourceIds as $sourceId) {
+                $sourceKeyword = Keyword::find($sourceId);
+                if ($sourceKeyword) {
+                    $userIdsToNotify = DB::table('user_keyword')->where('keyword_id', $sourceId)->pluck('user_id');
+                    foreach ($userIdsToNotify as $userId) {
+                        \App\Models\Notification::create([
+                            'user_id' => $userId,
+                            'title' => 'Cập nhật từ khóa đang theo dõi',
+                            'content' => "Quản trị viên đã gộp từ khóa [{$sourceKeyword->name}] mà bạn đang theo dõi vào từ khóa [{$targetKeywordName}]. Bạn sẽ tiếp tục nhận thông báo từ từ khóa mới này.",
+                            'type' => 'system',
+                            'data' => [
+                                'merged_source' => $sourceKeyword->name,
+                                'merged_target' => $targetKeywordName,
+                                'target_id' => $targetId
+                            ]
+                        ]);
+                    }
+                }
+            }
+
             DB::table('user_keyword')
                 ->whereIn('keyword_id', $sourceIds)
                 ->whereNotIn('user_id', $targetUserIds)

@@ -391,10 +391,26 @@ class SyncPapersFromApi implements ShouldQueue
                     
                     if ($existing) {
                         $citationsOnApi = $item['cited_by_count'] ?? 0;
+                        
+                        // Cập nhật lại keywords bị thiếu do gộp/xóa nhầm
+                        $keywordIds = [];
+                        foreach (data_get($item, 'concepts', []) as $concept) {
+                            if (($concept['score'] ?? 0) > 0.3) {
+                                $name = $concept['display_name'];
+                                if (isset($resolvedKeywordIds[$name])) {
+                                    $keywordIds[] = $resolvedKeywordIds[$name];
+                                }
+                            }
+                        }
+                        if (!empty($keywordIds)) {
+                            // Chỉ thêm vào, không xóa các keyword hiện tại của bài báo
+                            $existing->keywords()->syncWithoutDetaching(array_unique($keywordIds));
+                        }
+
                         if ($existing->citations_count === $citationsOnApi) {
                             // Perfect match - skip writing to database and pivot tables entirely
                             $this->progressItems[$item['id']]['status'] = 'skipped';
-                            $this->progressItems[$item['id']]['reason'] = 'Dữ liệu đã trùng khớp hoàn toàn trong DB';
+                            $this->progressItems[$item['id']]['reason'] = 'Dữ liệu trùng khớp (Đã kiểm tra lại tags)';
                             $this->syncedCount++;
                             continue;
                         }
@@ -403,7 +419,7 @@ class SyncPapersFromApi implements ShouldQueue
                         $oldCitations = $existing->citations_count;
                         $existing->update(['citations_count' => $citationsOnApi]);
                         $this->progressItems[$item['id']]['status'] = 'success';
-                        $this->progressItems[$item['id']]['reason'] = 'Cập nhật số lượt trích dẫn (' . $oldCitations . ' -> ' . $citationsOnApi . ')';
+                        $this->progressItems[$item['id']]['reason'] = 'Cập nhật số lượt trích dẫn (' . $oldCitations . ' -> ' . $citationsOnApi . ') và tags';
                         $this->syncedCount++;
                         continue;
                     }

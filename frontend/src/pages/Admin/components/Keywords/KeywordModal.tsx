@@ -61,6 +61,17 @@ export default function KeywordModal({ isOpen, onClose, keyword, onSave }: Keywo
             </div>
           )}
 
+          <div className="p-4 bg-warning/10 border border-warning/20 rounded-xl flex items-start gap-3">
+            <span className="text-warning text-lg">⚠️</span>
+            <div className="text-xs text-on-surface leading-relaxed">
+              <strong className="text-warning block mb-1">CẢNH BÁO: Hạn chế chỉnh sửa tên từ khóa!</strong>
+              Dữ liệu từ khóa được đồng bộ từ nguồn học thuật chuẩn xác (OpenAlex). 
+              Bạn <strong>CHỈ NÊN</strong> chỉnh sửa nếu từ khóa bị sai lỗi chính tả, sai viết hoa/thường, hoặc dư khoảng trắng. 
+              <br/><br/>
+              Nếu bạn muốn đổi sang một khái niệm khác, hãy sử dụng tính năng <strong>Gộp từ khóa</strong> thay thế. Nếu không chắc chắn, vui lòng <strong>Dừng chỉnh sửa</strong>.
+            </div>
+          </div>
+
           <div className="space-y-2">
             <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">
               Tên từ khóa
