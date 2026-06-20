@@ -13,7 +13,11 @@ const chartBaseOptions = {
   chart: { background: "transparent", toolbar: { show: false }, animations: { enabled: true, speed: 800 } },
   theme: { mode: "dark" as const },
   grid: { borderColor: "rgba(255,255,255,0.07)", strokeDashArray: 4 },
-  tooltip: { theme: "dark" as const },
+  tooltip: {
+    theme: "dark" as const,
+    shared: true,
+    intersect: false,
+  },
 };
 
 export default function AdminCharts({ charts, chartsLoading }: AdminChartsProps) {
