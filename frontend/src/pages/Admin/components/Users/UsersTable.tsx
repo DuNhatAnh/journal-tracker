@@ -1,5 +1,5 @@
 import React from "react";
-import { Edit2, Trash2 } from "lucide-react";
+import { Edit2, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { UserItem } from "../../types";
 
 type UsersTableProps = {
@@ -27,6 +27,16 @@ export default function UsersTable({
   handleOpenEditModal,
   handleDeleteUser,
 }: UsersTableProps) {
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 10;
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, roleFilter]);
+
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
   if (loading) {
     return (
       <div className="space-y-4">
@@ -74,7 +84,7 @@ export default function UsersTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5 text-sm">
-            {filteredUsers.map((user) => (
+            {currentUsers.map((user) => (
               <tr key={user.id} className="hover:bg-white/[0.01] transition-all">
                 <td className="px-6 py-4 font-bold text-on-surface">{user.name}</td>
                 <td className="px-6 py-4 text-on-surface-variant">{user.email}</td>
@@ -124,6 +134,52 @@ export default function UsersTable({
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="px-6 py-4 border-t border-white/5 bg-white/[0.02] flex items-center justify-between">
+          <div className="text-sm text-on-surface-variant">
+            Hiển thị <span className="font-bold text-on-surface">{startIndex + 1}</span> - <span className="font-bold text-on-surface">{Math.min(startIndex + itemsPerPage, filteredUsers.length)}</span> trong <span className="font-bold text-on-surface">{filteredUsers.length}</span> người dùng
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="p-2 rounded-lg bg-surface border border-white/10 text-on-surface hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Trang đầu"
+            >
+              <ChevronsLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-lg bg-surface border border-white/10 text-on-surface hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Trang trước"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-sm font-medium text-on-surface px-2">
+              Trang {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-lg bg-surface border border-white/10 text-on-surface hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Trang sau"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-lg bg-surface border border-white/10 text-on-surface hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Trang cuối"
+            >
+              <ChevronsRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -50,7 +50,7 @@ export function Layout() {
     <div className="flex h-screen overflow-hidden bg-background">
       {showRoleModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-lg p-6">
-          <div className="glass-panel p-8 rounded-3xl max-w-lg w-full space-y-6 border border-outline-variant/30 shadow-2xl relative z-10 animate-fade-in">
+          <div className="glass-panel p-8 rounded-3xl max-w-3xl w-full mx-4 space-y-6 border border-outline-variant/30 shadow-2xl relative z-10 animate-fade-in">
             <div className="text-center space-y-3">
               <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-primary/10 text-primary mb-2">
                 <Logo size={48} />
@@ -67,25 +67,25 @@ export function Layout() {
               </div>
             )}
 
-            <div className="grid gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Sinh viên */}
               <button
                 type="button"
                 onClick={() => setSelectedRole("student")}
-                className={`flex gap-4 p-4 rounded-2xl border-2 text-left transition-all ${
+                className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 text-center transition-all ${
                   selectedRole === "student"
                     ? "border-primary bg-primary/5 shadow-md shadow-primary/5"
                     : "border-outline-variant/30 bg-surface-container-low/50 hover:bg-surface-container-high/50"
                 }`}
               >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
                   selectedRole === "student" ? "bg-primary/20 text-primary" : "bg-secondary/10 text-secondary"
                 }`}>
-                  <GraduationCap className="w-5 h-5" />
+                  <GraduationCap className="w-6 h-6" />
                 </div>
-                <div className="flex-1">
+                <div>
                   <h4 className="font-bold text-on-surface text-sm">Sinh viên</h4>
-                  <p className="text-xs text-on-surface-variant mt-1">Dành cho việc tìm kiếm tài liệu học tập, làm tiểu luận, lưu trữ bài báo yêu thích.</p>
+                  <p className="text-[11px] text-on-surface-variant mt-1.5 leading-relaxed">Tìm tài liệu học tập, làm tiểu luận, lưu bài báo.</p>
                 </div>
               </button>
 
@@ -93,20 +93,20 @@ export function Layout() {
               <button
                 type="button"
                 onClick={() => setSelectedRole("lecturer")}
-                className={`flex gap-4 p-4 rounded-2xl border-2 text-left transition-all ${
+                className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 text-center transition-all ${
                   selectedRole === "lecturer"
                     ? "border-primary bg-primary/5 shadow-md shadow-primary/5"
                     : "border-outline-variant/30 bg-surface-container-low/50 hover:bg-surface-container-high/50"
                 }`}
               >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
                   selectedRole === "lecturer" ? "bg-primary/20 text-primary" : "bg-secondary/10 text-secondary"
                 }`}>
-                  <BookOpen className="w-5 h-5" />
+                  <BookOpen className="w-6 h-6" />
                 </div>
-                <div className="flex-1">
+                <div>
                   <h4 className="font-bold text-on-surface text-sm">Giảng viên</h4>
-                  <p className="text-xs text-on-surface-variant mt-1">Hỗ trợ tìm kiếm tài liệu giảng dạy, lưu bài báo chuyên ngành phục vụ bài giảng.</p>
+                  <p className="text-[11px] text-on-surface-variant mt-1.5 leading-relaxed">Tìm tài liệu giảng dạy, lưu bài báo chuyên ngành.</p>
                 </div>
               </button>
 
@@ -114,20 +114,20 @@ export function Layout() {
               <button
                 type="button"
                 onClick={() => setSelectedRole("researcher")}
-                className={`flex gap-4 p-4 rounded-2xl border-2 text-left transition-all ${
+                className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 text-center transition-all ${
                   selectedRole === "researcher"
                     ? "border-primary bg-primary/5 shadow-md shadow-primary/5"
                     : "border-outline-variant/30 bg-surface-container-low/50 hover:bg-surface-container-high/50"
                 }`}
               >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
                   selectedRole === "researcher" ? "bg-primary/20 text-primary" : "bg-primary/10 text-primary"
                 }`}>
-                  <Award className="w-5 h-5" />
+                  <Award className="w-6 h-6" />
                 </div>
-                <div className="flex-1">
+                <div>
                   <h4 className="font-bold text-on-surface text-sm">Nhà nghiên cứu</h4>
-                  <p className="text-xs text-on-surface-variant mt-1">Truy cập đầy đủ tính năng: Xem Xu hướng (Trending) bài báo khoa học và Theo dõi (Following) tác giả/journal.</p>
+                  <p className="text-[11px] text-on-surface-variant mt-1.5 leading-relaxed">Đầy đủ tính năng Xem Xu hướng & Theo dõi chuyên gia.</p>
                 </div>
               </button>
             </div>

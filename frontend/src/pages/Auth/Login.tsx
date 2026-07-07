@@ -10,6 +10,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -21,8 +22,12 @@ export default function Login() {
 
     const params = new URLSearchParams(window.location.search);
     const errorParam = params.get("error");
+    const messageParam = params.get("message");
     if (errorParam) {
       setError(errorParam);
+    }
+    if (messageParam) {
+      setSuccessMsg(messageParam);
     }
   }, [navigate]);
 
@@ -55,10 +60,10 @@ export default function Login() {
   };
 
   const handleGoogleLogin = () => {
-    const redirectUrl = window.location.origin.includes(':3000')
-      ? window.location.origin.replace(':3000', ':8000') + '/api/auth/google/redirect'
-      : '/api/auth/google/redirect';
-    window.location.href = redirectUrl;
+    // Luôn chuyển hướng đến absolute URL của backend để tránh lỗi proxy của Vite 
+    // giữ lại redirect URI của Google và gây lỗi CSP/CORS
+    // Không dùng VITE_API_URL vì biến này đang trỏ tới 'backend:8000' (chỉ nội bộ Docker mới hiểu)
+    window.location.href = 'http://localhost:8001/api/auth/google/redirect';
   };
 
   return (
@@ -92,6 +97,11 @@ export default function Login() {
             {error && (
               <div className="p-3 text-xs bg-error-container/30 border border-error/50 text-error rounded-xl font-medium animate-shake">
                 ⚠️ {error}
+              </div>
+            )}
+            {successMsg && (
+              <div className="p-3 text-xs bg-green-500/10 border border-green-500/50 text-green-500 rounded-xl font-medium">
+                ✅ {successMsg}
               </div>
             )}
 
@@ -144,7 +154,7 @@ export default function Login() {
             <button 
               type="button" 
               onClick={handleGoogleLogin}
-              className="w-full bg-white/5 border border-white/10 py-3 rounded-xl font-display text-xs font-bold uppercase tracking-widest hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+              className="w-full bg-surface-container-low border border-outline-variant/30 py-3 rounded-xl font-display text-xs font-bold uppercase tracking-widest hover:bg-surface-container-high transition-all flex items-center justify-center gap-2 text-on-surface"
             >
               <Chrome className="w-4 h-4" /> Đăng nhập bằng Google
             </button>

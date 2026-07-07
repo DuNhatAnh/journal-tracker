@@ -72,6 +72,9 @@ export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingAvatar, setDeletingAvatar] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   // Check if profile has unsaved changes
   const profileHasChanges = editingProfile && (
@@ -270,6 +273,21 @@ export default function Settings() {
       toast.error('Không thể xóa ảnh. Vui lòng thử lại.', { position: 'top-center' });
     } finally {
       setDeletingAvatar(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== "XOA TAI KHOAN") return;
+    try {
+      setDeletingAccount(true);
+      await api.delete('/user/account');
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/login?message=" + encodeURIComponent("Tài khoản của bạn đã được xoá vĩnh viễn.");
+    } catch (err: any) {
+      toast.error("Không thể xoá tài khoản. Vui lòng thử lại.", { position: "top-center" });
+      setDeletingAccount(false);
+      setShowDeleteModal(false);
     }
   };
 
@@ -541,6 +559,32 @@ export default function Settings() {
           Cập nhật mật khẩu
         </button>
       </div>
+
+      <section className="glass-panel p-10 rounded-2xl border border-error/30 bg-error/5 mt-8">
+        <header className="border-b border-error/20 pb-6 flex items-start justify-between">
+          <div>
+            <h3 className="font-display text-2xl font-bold text-error">Vùng nguy hiểm</h3>
+            <p className="text-error/70 text-sm mt-2">Cảnh báo: Hành động này không thể hoàn tác.</p>
+          </div>
+        </header>
+        <div className="pt-6 flex items-center justify-between">
+          <div className="max-w-sm">
+            <h4 className="font-bold text-on-surface">Xoá tài khoản vĩnh viễn</h4>
+            <p className="text-on-surface-variant text-sm mt-1">Xoá toàn bộ thông tin cá nhân, lịch sử và các bài báo đã lưu của bạn khỏi hệ thống.</p>
+          </div>
+          <button 
+            type="button"
+            onClick={() => {
+              setDeleteConfirmText("");
+              setShowDeleteModal(true);
+            }}
+            className="px-6 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest text-error border border-error/30 hover:bg-error/10 flex items-center gap-2 shadow-lg transition-all"
+          >
+            <Trash2 className="w-4 h-4" />
+            Xoá tài khoản
+          </button>
+        </div>
+      </section>
     </div>
   );
 
@@ -609,6 +653,67 @@ export default function Settings() {
                 className="px-6 py-3 gradient-btn rounded-xl text-[10px] font-bold uppercase tracking-widest text-white shadow-xl"
               >
                 Lưu & rời đi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account Modal */}
+      {showDeleteModal && (
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => !deletingAccount && setShowDeleteModal(false)}
+        >
+          <div className="glass-panel p-8 rounded-2xl max-w-md w-full mx-4 space-y-6 border border-error/20 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 text-error">
+              <Trash2 className="w-8 h-8 p-1.5 bg-error/10 rounded-lg" />
+              <h3 className="font-display text-xl font-bold">Xác nhận xoá tài khoản</h3>
+            </div>
+            
+            <div className="space-y-4">
+              <p className="text-on-surface-variant text-sm leading-relaxed">
+                Hành động này <strong className="text-error">không thể hoàn tác</strong>. Dữ liệu của bạn bao gồm bài viết đã lưu, lịch sử và thông tin cá nhân sẽ bị xoá vĩnh viễn khỏi hệ thống.
+              </p>
+              
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant pl-1">
+                  Nhập <strong className="text-error">XOA TAI KHOAN</strong> để tiếp tục:
+                </label>
+                <input 
+                  type="text"
+                  name="confirm_delete_account_input"
+                  id="confirm_delete_account_input"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck="false"
+                  value={deleteConfirmText}
+                  onChange={e => setDeleteConfirmText(e.target.value)}
+                  disabled={deletingAccount}
+                  placeholder="XOA TAI KHOAN"
+                  className="w-full bg-error/5 border border-error/20 rounded-xl px-4 py-3 text-sm focus:ring-1 focus:ring-error focus:border-error outline-none transition-all placeholder:text-error/30 text-error font-bold"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                disabled={deletingAccount}
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteConfirmText("");
+                }}
+                className="px-6 py-3 glass-panel rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant disabled:opacity-50"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                disabled={deletingAccount || deleteConfirmText !== "XOA TAI KHOAN"}
+                onClick={handleDeleteAccount}
+                className="px-6 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest text-white bg-error hover:bg-error/90 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all"
+              >
+                {deletingAccount ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Xoá vĩnh viễn
               </button>
             </div>
           </div>

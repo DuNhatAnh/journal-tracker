@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Auth\Events\Registered;
 
 class AuthController extends Controller
 {
@@ -29,6 +30,8 @@ class AuthController extends Controller
             'password' => Hash::make($validated['password']),
             'role'     => $validated['role'],
         ]);
+
+        $user->sendEmailVerificationNotification();
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -56,6 +59,13 @@ class AuthController extends Controller
 
         $user  = Auth::user();
         
+        if (!$user->hasVerifiedEmail()) {
+            Auth::logout();
+            throw ValidationException::withMessages([
+                'email' => 'Tài khoản của bạn chưa được xác thực. Vui lòng kiểm tra email để kích hoạt.',
+            ]);
+        }
+
         if (!in_array($user->role, ['admin', 'researcher', 'lecturer', 'student'])) {
             Auth::logout();
             throw ValidationException::withMessages([
@@ -160,5 +170,31 @@ class AuthController extends Controller
         ]);
 
         return response()->json(['message' => 'Đổi mật khẩu thành công.']);
+    }
+
+    /**
+     * DELETE /api/user/account
+     */
+    public function deleteAccount(Request $request)
+    {
+        $user = $request->user();
+
+        // Xoá mềm (nếu user dùng SoftDeletes) hoặc xoá cứng.
+        // Ở đây user xác nhận xoá cứng.
+        
+        // Xóa file avatar khỏi storage nếu có
+        if ($user->avatar) {
+            $relativePath = ltrim(str_replace('/storage/', '', $user->avatar), '/');
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($relativePath);
+        }
+
+        // Đăng xuất và huỷ token
+        $user->tokens()->delete();
+        Auth::guard('web')->logout();
+
+        // Xoá user
+        $user->delete();
+
+        return response()->json(['message' => 'Tài khoản đã được xoá vĩnh viễn.']);
     }
 }

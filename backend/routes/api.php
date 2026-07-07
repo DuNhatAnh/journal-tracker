@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\GoogleAuthController;
+use App\Http\Controllers\Api\Auth\VerificationController;
 use App\Http\Controllers\Api\PaperController;
 use App\Http\Controllers\Api\JournalController;
 use App\Http\Controllers\Api\KeywordController;
@@ -27,6 +28,8 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login',    [AuthController::class, 'login']);
 Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirectToGoogle']);
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'handleGoogleCallback']);
+Route::get('/email/verify/{id}/{hash}', [VerificationController::class, 'verify'])->name('verification.verify');
+Route::post('/email/resend', [VerificationController::class, 'resend'])->name('verification.send');
 Route::get('/public/trends', [TrendController::class, 'publicTrends']);
 
 
@@ -48,6 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/profile', [App\Http\Controllers\Api\Auth\AuthController::class, 'updateProfile']);
     Route::delete('/avatar', [App\Http\Controllers\Api\Auth\AuthController::class, 'deleteAvatar']);
     Route::post('/password', [App\Http\Controllers\Api\Auth\AuthController::class, 'changePassword']);
+    Route::delete('/user/account', [App\Http\Controllers\Api\Auth\AuthController::class, 'deleteAccount']);
 
     // Dashboard
     Route::prefix('dashboard')->group(function () {

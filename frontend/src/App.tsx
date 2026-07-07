@@ -10,6 +10,7 @@ import Dashboard from "./pages/Academic/Dashboard";
 import Login from "./pages/Auth/Login";
 import Register from "./pages/Auth/Register";
 import SSOCallback from "./pages/Auth/SSOCallback";
+import VerifyEmail from "./pages/Auth/VerifyEmail";
 import Search from "./pages/Shared/Search";
 import Trending from "./pages/Researcher/Trending";
 import Bookmarks from "./pages/Academic/Bookmarks";
@@ -39,6 +40,7 @@ const router = createBrowserRouter(
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/sso-callback" element={<SSOCallback />} />
+      <Route path="/email/verify/:id/:hash" element={<VerifyEmail />} />
       <Route element={<Layout />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/search" element={<Search />} />

@@ -70,9 +70,9 @@ class ApiSourceController extends Controller
     {
         $apiSource = ApiSource::findOrFail($id);
         
-        $field = $request->input('field', 'deep learning');
+        $field = $request->input('field') ?? '';
         $pages = (int) $request->input('pages', 1);
-        $years = $request->input('years', '');
+        $years = $request->input('years') ?? '';
         $startPage = (int) $request->input('start_page', 1);
 
         $syncLog = \App\Models\SyncLog::create([

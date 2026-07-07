@@ -13,6 +13,7 @@ export default function Register() {
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [role, setRole] = useState("lecturer");
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -28,7 +29,7 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const response = await api.post<{ token: string; user: any }>("/register", {
+      const response = await api.post<{ message: string }>("/register", {
         name,
         email,
         password,
@@ -36,9 +37,7 @@ export default function Register() {
         role,
       });
 
-      localStorage.setItem("token", response.token);
-      localStorage.setItem("user", JSON.stringify(response.user));
-      navigate("/dashboard");
+      setSuccess(true);
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Không thể đăng ký vào lúc này.");
@@ -72,106 +71,129 @@ export default function Register() {
           <p className="text-on-surface-variant font-medium text-center">Tạo tài khoản mới để theo dõi xu hướng xuất bản.</p>
         </div>
 
-        <form onSubmit={handleRegister} className="glass-panel p-8 rounded-2xl space-y-6">
-          {error && (
-            <div className="p-3 text-xs bg-error-container/30 border border-error/50 text-error rounded-xl font-medium animate-shake">
-              ⚠️ {error}
+        {success ? (
+          <div className="glass-panel p-8 rounded-2xl space-y-6 text-center animate-fade-in">
+            <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto text-primary mb-4">
+              <Mail className="w-8 h-8" />
             </div>
-          )}
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest pl-1">Họ tên</label>
-              <div className="relative group">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline group-focus-within:text-primary transition-colors" />
-                <input
-                  type="text"
-                  required
-                  placeholder="Nguyễn Văn A"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-surface-container-low/50 border-2 border-outline-variant/30 rounded-xl py-3 pl-10 pr-4 text-on-surface focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-sans"
-                />
+            <h2 className="font-display text-2xl font-bold text-on-surface">Đăng ký thành công!</h2>
+            <p className="text-on-surface-variant text-sm leading-relaxed">
+              Một email xác thực đã được gửi đến hòm thư <span className="font-bold text-primary">{email}</span>. 
+              Vui lòng kiểm tra email và bấm vào đường dẫn đính kèm để kích hoạt tài khoản của bạn.
+            </p>
+            <div className="pt-4">
+              <Link to="/login" className="gradient-btn py-3 px-6 rounded-xl font-display font-bold text-sm uppercase tracking-widest text-on-primary inline-flex items-center gap-2 group">
+                Đi tới trang Đăng nhập
+                <ArrowLeft className="w-4 h-4 rotate-180 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleRegister} className="glass-panel p-8 rounded-2xl space-y-6" autoComplete="off">
+            {error && (
+              <div className="p-3 text-xs bg-error-container/30 border border-error/50 text-error rounded-xl font-medium animate-shake">
+                ⚠️ {error}
               </div>
-            </div>
+            )}
 
-            <div className="space-y-2">
-              <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest pl-1">Email</label>
-              <div className="relative group">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline group-focus-within:text-primary transition-colors" />
-                <input
-                  type="email"
-                  required
-                  placeholder="name@university.edu"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-surface-container-low/50 border-2 border-outline-variant/30 rounded-xl py-3 pl-10 pr-4 text-on-surface focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-sans"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4">
+            <div className="space-y-4">
               <div className="space-y-2">
-                <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest pl-1">Mật khẩu</label>
+                <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest pl-1">Họ tên</label>
                 <div className="relative group">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline group-focus-within:text-primary transition-colors" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline group-focus-within:text-primary transition-colors" />
                   <input
-                    type="password"
+                    type="text"
                     required
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="off"
+                    placeholder="Nguyễn Văn A"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                     className="w-full bg-surface-container-low/50 border-2 border-outline-variant/30 rounded-xl py-3 pl-10 pr-4 text-on-surface focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-sans"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest pl-1">Xác nhận mật khẩu</label>
+                <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest pl-1">Email</label>
                 <div className="relative group">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline group-focus-within:text-primary transition-colors" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline group-focus-within:text-primary transition-colors" />
                   <input
-                    type="password"
+                    type="email"
                     required
-                    placeholder="••••••••"
-                    value={passwordConfirmation}
-                    onChange={(e) => setPasswordConfirmation(e.target.value)}
+                    autoComplete="off"
+                    placeholder="name@university.edu"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-surface-container-low/50 border-2 border-outline-variant/30 rounded-xl py-3 pl-10 pr-4 text-on-surface focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-sans"
                   />
                 </div>
               </div>
+
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest pl-1">Mật khẩu</label>
+                  <div className="relative group">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline group-focus-within:text-primary transition-colors" />
+                    <input
+                      type="password"
+                      required
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full bg-surface-container-low/50 border-2 border-outline-variant/30 rounded-xl py-3 pl-10 pr-4 text-on-surface focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-sans"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest pl-1">Xác nhận mật khẩu</label>
+                  <div className="relative group">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline group-focus-within:text-primary transition-colors" />
+                    <input
+                      type="password"
+                      required
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      value={passwordConfirmation}
+                      onChange={(e) => setPasswordConfirmation(e.target.value)}
+                      className="w-full bg-surface-container-low/50 border-2 border-outline-variant/30 rounded-xl py-3 pl-10 pr-4 text-on-surface focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-sans"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest pl-1">Vai trò</label>
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  className="w-full bg-surface-container-low/50 border-2 border-outline-variant/30 rounded-xl py-3 px-4 text-on-surface focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-sans"
+                >
+                  <option value="lecturer">Giảng viên</option>
+                  <option value="student">Sinh viên</option>
+                  <option value="researcher">Nhà nghiên cứu</option>
+                </select>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest pl-1">Vai trò</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full bg-surface-container-low/50 border-2 border-outline-variant/30 rounded-xl py-3 px-4 text-on-surface focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-sans"
-              >
-                <option value="lecturer">Giảng viên</option>
-                <option value="student">Sinh viên</option>
-                <option value="researcher">Nhà nghiên cứu</option>
-              </select>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full gradient-btn py-4 rounded-xl font-display font-bold uppercase tracking-widest text-on-primary flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
+              <ChevronLeft className="w-4 h-4 -rotate-180" />
+            </button>
+
+            <div className="text-center text-sm text-on-surface-variant">
+              Đã có tài khoản?{' '}
+              <Link to="/login" className="font-semibold text-primary hover:text-primary/80 transition-colors">
+                Đăng nhập ngay
+              </Link>
             </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full gradient-btn py-4 rounded-xl font-display font-bold uppercase tracking-widest text-on-primary flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
-            <ChevronLeft className="w-4 h-4 -rotate-180" />
-          </button>
-
-          <div className="text-center text-sm text-on-surface-variant">
-            Đã có tài khoản?{' '}
-            <Link to="/login" className="font-semibold text-primary hover:text-primary/80 transition-colors">
-              Đăng nhập ngay
-            </Link>
-          </div>
-        </form>
+          </form>
+        )}
 
         {/* Guide Card (Floating next to the form on large screens, stacked below on mobile) */}
         <div className="w-full lg:w-[320px] xl:w-[350px] mt-8 lg:mt-0 lg:absolute lg:left-[calc(100%+32px)] lg:top-1/2 lg:-translate-y-1/2 z-10">
