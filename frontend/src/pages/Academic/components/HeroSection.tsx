@@ -1,25 +1,28 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { DashboardData } from "../types";
-import { api } from "@/src/lib/api";
+import { useApiQuery } from "../../../hooks/useApiQuery";
+
+interface TrendingApiResponse {
+  trending_topics: any[];
+}
 
 export function HeroSection() {
+  const { data, loading } = useApiQuery<TrendingApiResponse>('/dashboard/trending', { persist: true });
   const [trendingTopics, setTrendingTopics] = useState<DashboardData['trendingTopics'] | null>(null);
 
   useEffect(() => {
-    api.get<{trending_topics: any[]}>('/dashboard/trending')
-      .then(res => {
-        const mapped = (res.trending_topics || []).map(t => ({
-          id: t.id,
-          name: t.keyword?.name || "Chủ đề",
-          papers: `${t.paper_count ?? 0}`,
-          change: (t.growth_rate ?? 0) >= 0 ? `+${t.growth_rate}%` : `${t.growth_rate}%`,
-          data: t.chart_data || [0, 0, 0, 0, 0, 0, 0]
-        }));
-        setTrendingTopics(mapped);
-      })
-      .catch(err => console.error(err));
-  }, []);
+    if (data) {
+      const mapped = (data.trending_topics || []).map(t => ({
+        id: t.id,
+        name: t.keyword?.name || "Chủ đề",
+        papers: `${t.paper_count ?? 0}`,
+        change: (t.growth_rate ?? 0) >= 0 ? `+${t.growth_rate}%` : `${t.growth_rate}%`,
+        data: t.chart_data || [0, 0, 0, 0, 0, 0, 0]
+      }));
+      setTrendingTopics(mapped);
+    }
+  }, [data]);
 
   return (
     <section className="text-center space-y-6 py-8">

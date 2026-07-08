@@ -20,4 +20,9 @@ if ! grep -q "APP_KEY=base64" .env && [ -z "$APP_KEY" ]; then
 fi
 
 # Execute the main CMD
-exec "$@"
+if [ "$1" = "web" ]; then
+    echo "Starting Supervisor (Nginx + PHP-FPM)..."
+    exec /usr/bin/supervisord -c /etc/supervisord.conf
+else
+    exec "$@"
+fi

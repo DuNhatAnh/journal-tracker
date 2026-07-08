@@ -124,7 +124,7 @@ export default function Search() {
         newIds.delete(keywordId);
         setFollowedKeywordIds(newIds);
         
-        const updatedData = { keywords: Array.from(newIds).map(id => ({ id })) };
+        const updatedData = { keywords: Array.from(newIds).map((id: number) => ({ id })) };
         setFollowingStatusData(updatedData);
         queryCache.set("/following/status", updatedData);
 
@@ -134,7 +134,7 @@ export default function Search() {
         const newIds = new Set(followedKeywordIds).add(keywordId);
         setFollowedKeywordIds(newIds);
 
-        const updatedData = { keywords: Array.from(newIds).map(id => ({ id })) };
+        const updatedData = { keywords: Array.from(newIds).map((id: number) => ({ id })) };
         setFollowingStatusData(updatedData);
         queryCache.set("/following/status", updatedData);
 

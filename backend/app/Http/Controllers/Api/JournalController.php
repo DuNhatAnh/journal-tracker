@@ -51,6 +51,7 @@ class JournalController extends Controller
         $user = Auth::user();
         $user->followedJournals()->syncWithoutDetaching([$journal->id]);
         \Illuminate\Support\Facades\Cache::forget("user." . $user->id . ".following_status");
+        \Illuminate\Support\Facades\Cache::forget("dash.recommended." . $user->id);
 
         return response()->json(['message' => 'Đã theo dõi tạp chí.', 'is_followed' => true]);
     }
@@ -63,6 +64,7 @@ class JournalController extends Controller
         $user = Auth::user();
         $user->followedJournals()->detach($journal->id);
         \Illuminate\Support\Facades\Cache::forget("user." . $user->id . ".following_status");
+        \Illuminate\Support\Facades\Cache::forget("dash.recommended." . $user->id);
 
         return response()->json(['message' => 'Đã bỏ theo dõi tạp chí.', 'is_followed' => false]);
     }

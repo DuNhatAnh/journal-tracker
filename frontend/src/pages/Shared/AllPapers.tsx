@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Loader2, Quote, Bookmark, BookmarkPlus, ExternalLink, X, ArrowLeft, Filter } from "lucide-react";
 import { cn, cleanTitle } from "@/src/lib/utils";

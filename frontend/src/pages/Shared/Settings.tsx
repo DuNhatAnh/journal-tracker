@@ -1,6 +1,6 @@
 import { User, Bell, Palette, ShieldCheck, Mail, Lock, Smartphone, Github, Loader2, Trash2, Eye, EyeOff, Edit2 } from "lucide-react";
 import { cn } from "@/src/lib/utils";
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { api } from "@/src/lib/api";
 import { useBlocker } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -182,7 +182,7 @@ export default function Settings() {
       
       const formData = new FormData();
       Object.entries(profile).forEach(([key, value]) => {
-        if (value && key !== 'avatar') formData.append(key, value);
+        if (value && key !== 'avatar') formData.append(key, value as string);
       });
       
       if (avatarFile) {

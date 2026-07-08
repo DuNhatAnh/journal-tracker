@@ -110,6 +110,7 @@ class BookmarkController extends Controller
 
         Cache::forget("dash.bookmarks_new." . $user->id);
         Cache::forget("dash.bookmarks." . $user->id);
+        Cache::forget("dash.recommended." . $user->id);
 
         return response()->json($bookmark->load('paper'), 201);
     }
@@ -143,6 +144,7 @@ class BookmarkController extends Controller
 
         \Illuminate\Support\Facades\Cache::forget("dash.bookmarks_new." . auth()->id());
         \Illuminate\Support\Facades\Cache::forget("dash.bookmarks." . auth()->id());
+        \Illuminate\Support\Facades\Cache::forget("dash.recommended." . auth()->id());
 
         return response()->json(['message' => 'Đã xóa bookmark.']);
     }
@@ -162,6 +164,7 @@ class BookmarkController extends Controller
 
         \Illuminate\Support\Facades\Cache::forget("dash.bookmarks_new." . auth()->id());
         \Illuminate\Support\Facades\Cache::forget("dash.bookmarks." . auth()->id());
+        \Illuminate\Support\Facades\Cache::forget("dash.recommended." . auth()->id());
 
         return response()->json(['message' => 'Đã xóa bookmark.']);
     }
@@ -184,17 +187,20 @@ class BookmarkController extends Controller
         }
 
         // Filter by paper fields (citations, publication year)
-        $query->whereHas('paper', function ($q) use ($request) {
-            if ($request->filled('min_citations')) {
-                $q->where('citations_count', '>=', $request->min_citations);
-            }
-            if ($request->filled('start_year')) {
-                $q->where('published_year', '>=', $request->start_year);
-            }
-            if ($request->filled('end_year')) {
-                $q->where('published_year', '<=', $request->end_year);
-            }
-        });
+        $hasPaperFilters = $request->filled('min_citations') || $request->filled('start_year') || $request->filled('end_year');
+        if ($hasPaperFilters) {
+            $query->whereHas('paper', function ($q) use ($request) {
+                if ($request->filled('min_citations')) {
+                    $q->where('citations_count', '>=', $request->min_citations);
+                }
+                if ($request->filled('start_year')) {
+                    $q->where('published_year', '>=', $request->start_year);
+                }
+                if ($request->filled('end_year')) {
+                    $q->where('published_year', '<=', $request->end_year);
+                }
+            });
+        }
 
         // Filter by search query (matching title, journal name, authors, or personal note)
         if ($request->filled('search')) {

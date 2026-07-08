@@ -272,7 +272,8 @@ class DashboardController extends Controller
 
         $bookmarkedPaperIds = $this->getBookmarkedPaperIds($user);
 
-        $recommendedPapers = Cache::remember("dash.recommended.{$user->id}", 5, function () use ($user, $bookmarkedPaperIds) {
+        $ttl = config('dashboard.recommended_cache_ttl', 300);
+        $recommendedPapers = Cache::remember("dash.recommended.{$user->id}", $ttl, function () use ($user, $bookmarkedPaperIds) {
             $followedKeywordIds = $user->followedKeywords()->pluck('id');
             $followedAuthorIds = $user->followedAuthors()->pluck('id');
             $followedJournalIds = $user->followedJournals()->pluck('id');

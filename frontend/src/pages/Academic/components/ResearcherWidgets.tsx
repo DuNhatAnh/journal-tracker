@@ -2,21 +2,29 @@ import { useEffect, useState } from "react";
 import Chart from "react-apexcharts";
 import { Sparkles, BookOpen } from "lucide-react";
 import { DashboardData, PaperDetail } from "../types";
-import { api } from "@/src/lib/api";
+import { useApiQuery } from "../../../hooks/useApiQuery";
 
 interface AiInsightsWidgetProps {
   onSelectPaper: (paper: PaperDetail) => void;
   onOpenAiReview: (papers: PaperDetail[]) => void;
 }
 
+interface RecommendedApiResponse {
+  recommended_papers: DashboardData['recommendedPapers'];
+}
+
 export function AiInsightsWidget({ onSelectPaper, onOpenAiReview }: AiInsightsWidgetProps) {
+  const { data, loading } = useApiQuery<RecommendedApiResponse>('/dashboard/recommended', {
+    persist: true,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
   const [recommendedPapers, setRecommendedPapers] = useState<DashboardData['recommendedPapers'] | null>(null);
 
   useEffect(() => {
-    api.get<{recommended_papers: DashboardData['recommendedPapers']}>('/dashboard/recommended')
-      .then(res => setRecommendedPapers(res.recommended_papers))
-      .catch(err => console.error(err));
-  }, []);
+    if (data) {
+      setRecommendedPapers(data.recommended_papers);
+    }
+  }, [data]);
 
   if (!recommendedPapers) return (
     <section className="glass-panel-intense rounded-2xl p-8 relative overflow-hidden group border-t-2 border-primary/50 animate-pulse">
@@ -74,14 +82,22 @@ export function AiInsightsWidget({ onSelectPaper, onOpenAiReview }: AiInsightsWi
   );
 }
 
+interface FieldsDistributionApiResponse {
+  fields_distribution: DashboardData['fieldsDistribution'];
+}
+
 export function TopicsDistributionWidget() {
+  const { data, loading } = useApiQuery<FieldsDistributionApiResponse>('/dashboard/fields', {
+    persist: true,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
   const [distribution, setDistribution] = useState<DashboardData['fieldsDistribution'] | null>(null);
 
   useEffect(() => {
-    api.get<{fields_distribution: DashboardData['fieldsDistribution']}>('/dashboard/fields')
-      .then(res => setDistribution(res.fields_distribution))
-      .catch(err => console.error(err));
-  }, []);
+    if (data) {
+      setDistribution(data.fields_distribution);
+    }
+  }, [data]);
 
   if (!distribution) return (
     <section className="space-y-4 animate-pulse">

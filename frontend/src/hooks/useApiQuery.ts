@@ -35,20 +35,6 @@ class ApiCacheMap extends Map<string, CacheEntry> {
 // In-memory RAM cache for API responses (ApiCacheMap preserves order for LRU)
 export const queryCache = new ApiCacheMap();
 
-// Clear localStorage api cache on fresh page load (F5 / App initialization)
-try {
-  const keysToRemove: string[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith("api_cache:")) {
-      keysToRemove.push(key);
-    }
-  }
-  keysToRemove.forEach(key => localStorage.removeItem(key));
-} catch (err) {
-  console.error("Error clearing localStorage cache on app initialization:", err);
-}
-
 interface UseApiQueryOptions {
   enabled?: boolean;
   ttl?: number;        // Custom TTL in milliseconds

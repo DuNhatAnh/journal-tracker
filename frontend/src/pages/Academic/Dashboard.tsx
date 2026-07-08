@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Navigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "@/src/lib/api";
@@ -6,9 +6,9 @@ import { api } from "@/src/lib/api";
 import { PaperDetail } from "./types";
 import { useBookmark } from "../../hooks/useBookmark";
 
-import { PaperDetailModal } from "./components/PaperDetailModal";
-import { JournalDetailModal } from "./components/JournalDetailModal";
-import { AiReviewModal } from "./components/AiReviewModal";
+const PaperDetailModal = lazy(() => import("./components/PaperDetailModal").then(module => ({ default: module.PaperDetailModal })));
+const JournalDetailModal = lazy(() => import("./components/JournalDetailModal").then(module => ({ default: module.JournalDetailModal })));
+const AiReviewModal = lazy(() => import("./components/AiReviewModal").then(module => ({ default: module.AiReviewModal })));
 import { HeroSection } from "./components/HeroSection";
 import { StatsGrid } from "./components/StatsGrid";
 import { TrendingTopics } from "./components/TrendingTopics";
@@ -128,32 +128,34 @@ export default function Dashboard() {
   return (
     <div className="space-y-12 pb-20">
       {/* Modals */}
-      {selectedPaper && (
-        <PaperDetailModal
-          paper={selectedPaper}
-          onClose={() => setSelectedPaper(null)}
-          bookmarkedIds={bookmarkedIds}
-          loadingIds={loadingIds}
-          bookmark={bookmark}
-          followedKeywordIds={followedKeywordIds}
-          followingKeywordIds={followingKeywordIds}
-          toggleFollowKeyword={toggleFollowKeyword}
-        />
-      )}
+      <Suspense fallback={null}>
+        {selectedPaper && (
+          <PaperDetailModal
+            paper={selectedPaper}
+            onClose={() => setSelectedPaper(null)}
+            bookmarkedIds={bookmarkedIds}
+            loadingIds={loadingIds}
+            bookmark={bookmark}
+            followedKeywordIds={followedKeywordIds}
+            followingKeywordIds={followingKeywordIds}
+            toggleFollowKeyword={toggleFollowKeyword}
+          />
+        )}
 
-      {selectedJournal && (
-        <JournalDetailModal
-          journal={selectedJournal}
-          onClose={() => setSelectedJournal(null)}
-        />
-      )}
+        {selectedJournal && (
+          <JournalDetailModal
+            journal={selectedJournal}
+            onClose={() => setSelectedJournal(null)}
+          />
+        )}
 
-      {showAiReview && (
-        <AiReviewModal 
-          papers={aiReviewPapers} 
-          onClose={() => setShowAiReview(false)} 
-        />
-      )}
+        {showAiReview && (
+          <AiReviewModal 
+            papers={aiReviewPapers} 
+            onClose={() => setShowAiReview(false)} 
+          />
+        )}
+      </Suspense>
 
       {/* Hero Section */}
       <HeroSection />
