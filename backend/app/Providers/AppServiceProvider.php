@@ -11,7 +11,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(\App\Interfaces\EmbeddingServiceInterface::class, \App\Services\Ai\GeminiService::class);
+        $this->app->singleton(\App\Interfaces\LlmServiceInterface::class, \App\Services\Ai\GeminiService::class);
     }
 
     /**

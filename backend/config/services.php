@@ -21,4 +21,11 @@ return [
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect'      => env('GOOGLE_REDIRECT_URI'),
     ],
+
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+        'embedding_model' => env('GEMINI_EMBEDDING_MODEL', 'gemini-embedding-001'),
+        'chat_model' => env('GEMINI_CHAT_MODEL', 'gemini-2.5-flash'),
+        'embedding_dimensions' => env('GEMINI_EMBEDDING_DIMENSIONS', 768),
+    ],
 ];

@@ -59,6 +59,11 @@ class ResearchPaper extends Model
         return $this->hasMany(Bookmark::class, 'paper_id');
     }
 
+    public function paperChunks()
+    {
+        return $this->hasMany(PaperChunk::class, 'paper_id');
+    }
+
     // ─── Scopes ─────────────────────────────────────────────────────────────────
 
     public function scopeByYear($query, int $year)
