@@ -169,3 +169,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('settings', [AdminSettingsController::class, 'saveSettings']);
     });
 });
+
+Route::post('/chat', [\App\Http\Controllers\ChatController::class, 'chat']);
+
