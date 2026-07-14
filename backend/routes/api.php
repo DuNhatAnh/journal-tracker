@@ -17,7 +17,6 @@ use App\Http\Controllers\Api\Admin\AdminUserController;
 use App\Http\Controllers\Api\Admin\ApiSourceController;
 use App\Http\Controllers\Api\Admin\AdminDashboardController;
 use App\Http\Controllers\Api\Admin\AdminKeywordController;
-use App\Http\Controllers\Api\Admin\AdminSettingsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -165,8 +164,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('keywords', AdminKeywordController::class)->only(['index', 'update', 'destroy']);
 
         // System Settings
-        Route::get('settings', [AdminSettingsController::class, 'getSettings']);
-        Route::put('settings', [AdminSettingsController::class, 'saveSettings']);
+        Route::get('settings', [\App\Http\Controllers\Api\Admin\SystemSettingsController::class, 'getSettings']);
+        Route::put('settings', [\App\Http\Controllers\Api\Admin\SystemSettingsController::class, 'saveSettings']);
+
+        // AI Settings
+        Route::get('settings/ai', [\App\Http\Controllers\AdminSettingsController::class, 'getAiSettings']);
+        Route::get('settings/ai/models', [\App\Http\Controllers\AdminSettingsController::class, 'getModels']);
+        Route::post('settings/ai/test', [\App\Http\Controllers\AdminSettingsController::class, 'testConnection']);
+        Route::post('settings/ai', [\App\Http\Controllers\AdminSettingsController::class, 'updateAiSettings']);
+        Route::delete('settings/ai', [\App\Http\Controllers\AdminSettingsController::class, 'deleteAiSettings']);
     });
 });
 

@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
  
-class AdminSettingsController extends Controller
+class SystemSettingsController extends Controller
 {
     private function getSettingsPath()
     {

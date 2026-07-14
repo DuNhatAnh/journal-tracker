@@ -26,6 +26,7 @@ import AdminUsers from "./pages/Admin/Users";
 import AdminSync from "./pages/Admin/Sync";
 import AdminKeywords from "./pages/Admin/Keywords";
 import AdminSettings from "./pages/Admin/Settings"; // Import Admin settings & schedules
+import AdminAiSettings from "./pages/Admin/AiSettings"; // Import AI Settings
 
 const LoadingScreen = () => (
   <div className="flex h-screen w-full items-center justify-center bg-surface">
@@ -59,6 +60,7 @@ const router = createBrowserRouter(
         <Route path="/admin/sync" element={<AdminSync />} />
         <Route path="/admin/keywords" element={<AdminKeywords />} />
         <Route path="/admin/settings" element={<AdminSettings />} />
+        <Route path="/admin/settings/ai" element={<AdminAiSettings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </>
