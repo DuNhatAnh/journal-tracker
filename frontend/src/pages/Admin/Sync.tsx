@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import React, { useEffect, useState, useRef } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { Plus } from "lucide-react";
 import { api } from "@/src/lib/api";
 import { ApiSource, SyncLog, PaginatedLogs } from "./types";
@@ -9,8 +10,10 @@ import SourceModal from "./components/Sync/SourceModal";
 import SyncDetailModal from "./components/Sync/SyncDetailModal";
 
 export default function AdminSync() {
+  const navigate = useNavigate();
   const [sources, setSources] = useState<ApiSource[]>([]);
   const [logs, setLogs] = useState<SyncLog[]>([]);
+  const prevLogsRef = useRef<SyncLog[]>([]);
   const [logsPagination, setLogsPagination] = useState({ current: 1, last: 1, total: 0 });
   const [loadingSources, setLoadingSources] = useState(true);
   const [loadingLogs, setLoadingLogs] = useState(true);
@@ -54,6 +57,20 @@ export default function AdminSync() {
     };
   }, [logs, logsPagination.current]);
 
+  // Watch for log state transitions (running -> success)
+  useEffect(() => {
+    const currentLogs = prevLogsRef.current;
+    if (currentLogs.length > 0 && logs.length > 0) {
+      logs.forEach(newLog => {
+        const oldLog = currentLogs.find(l => l.id === newLog.id);
+        if (oldLog && oldLog.status === "running" && newLog.status === "success") {
+          triggerAutoIndexWorkflow(newLog);
+        }
+      });
+    }
+    prevLogsRef.current = logs;
+  }, [logs]);
+
   // Auto-polling for active detail modal if the target log is running
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -96,6 +113,60 @@ export default function AdminSync() {
       setActionError(err.message || "Không thể tải danh sách nguồn API.");
     } finally {
       setLoadingSources(false);
+    }
+  };
+
+  const triggerAutoIndexWorkflow = async (completedLog: SyncLog) => {
+    console.log("triggerAutoIndexWorkflow called for log:", completedLog);
+    try {
+      const statsRes = await api.get<any>("/admin/settings/ai/indexing-stats").catch((err) => {
+        console.error("API Error fetching indexing stats:", err);
+        return null;
+      });
+      console.log("Indexing stats result:", statsRes);
+      if (statsRes && statsRes.unchunked_papers > 0) {
+        toast((t) => (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm font-medium text-on-surface">
+              ✅ Đã tải thành công {completedLog.papers_synced} bài báo.
+            </p>
+            <p className="text-xs text-on-surface-variant">
+              Có <strong className="text-error">{statsRes.unchunked_papers}</strong> bài báo chưa được cắt chunk (chuẩn hóa vector). Bạn có muốn chuyển sang trang Quản lý RAG để thực hiện cắt luôn không?
+            </p>
+            <div className="flex justify-end gap-2 mt-2">
+              <button 
+                onClick={() => toast.dismiss(t.id)} 
+                className="px-3 py-1.5 text-xs font-bold text-on-surface-variant hover:bg-white/5 rounded-lg transition-colors"
+              >
+                Bỏ qua
+              </button>
+              <button 
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  navigate("/admin/settings/ai?auto_index=true");
+                }} 
+                className="px-3 py-1.5 text-xs font-bold bg-primary text-on-primary rounded-lg shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:scale-105 transition-all"
+              >
+                Đồng ý cắt ngay
+              </button>
+            </div>
+          </div>
+        ), {
+          duration: 10000,
+          position: "bottom-right",
+          style: {
+            background: "#1c1c1e",
+            border: "1px solid rgba(255,255,255,0.1)",
+            color: "#fff",
+            maxWidth: "350px",
+            padding: "16px"
+          }
+        });
+      } else {
+        toast.success(`✅ Đã tải thành công ${completedLog.papers_synced} bài báo.`);
+      }
+    } catch (e) {
+      toast.success(`✅ Đã tải thành công ${completedLog.papers_synced} bài báo.`);
     }
   };
 

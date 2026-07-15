@@ -169,14 +169,13 @@ class SyncPapersFromApi implements ShouldQueue
             }
 
             $totalLimit = $this->maxPages; // actually total articles requested
-            $limitEach  = max(1, (int) floor($totalLimit / 2));
+            $limitTopCited = max(1, (int) ceil($totalLimit / 2));
+            $limitRecent   = max(1, $totalLimit - $limitTopCited);
             
-            // Maximum per-page allowed by OpenAlex is 200. We'll stick to max 100 for safety.
-            $pagesEach = (int) ceil($limitEach / 100);
-
             // Step 2: TOP CITED PAPERS
-            $remainingToFetch = $limitEach;
-            $endPage = $this->startPage + $pagesEach - 1;
+            $remainingToFetch = $limitTopCited;
+            $pagesEachTop = (int) ceil($limitTopCited / 100);
+            $endPage = $this->startPage + $pagesEachTop - 1;
             for ($page = $this->startPage; $page <= $endPage; $page++) {
                 if ($this->isCancelled()) return;
                 
@@ -198,13 +197,21 @@ class SyncPapersFromApi implements ShouldQueue
                 );
 
                 if (empty($data['results'])) break;
-                $this->processBatch($data['results']);
+                
+                // Chia nhỏ mảng kết quả thành các lô 10 bài để cập nhật tiến độ liên tục (vd: 10 - 10 - 5)
+                $chunks = array_chunk($data['results'], 10);
+                foreach ($chunks as $chunk) {
+                    if ($this->isCancelled()) return;
+                    $this->processBatch($chunk);
+                }
+                
                 usleep(200000); // 200ms
             }
 
             // Step 3: RECENT PAPERS
-            $remainingToFetch = $limitEach;
-            $endPage = $this->startPage + $pagesEach - 1;
+            $remainingToFetch = $limitRecent;
+            $pagesEachRecent = (int) ceil($limitRecent / 100);
+            $endPage = $this->startPage + $pagesEachRecent - 1;
             for ($page = $this->startPage; $page <= $endPage; $page++) {
                 if ($this->isCancelled()) return;
 
@@ -226,7 +233,14 @@ class SyncPapersFromApi implements ShouldQueue
                 );
 
                 if (empty($data['results'])) break;
-                $this->processBatch($data['results']);
+                
+                // Chia nhỏ mảng kết quả thành các lô 10 bài để cập nhật tiến độ liên tục (vd: 10 - 10 - 5)
+                $chunks = array_chunk($data['results'], 10);
+                foreach ($chunks as $chunk) {
+                    if ($this->isCancelled()) return;
+                    $this->processBatch($chunk);
+                }
+                
                 usleep(200000);
             }
 

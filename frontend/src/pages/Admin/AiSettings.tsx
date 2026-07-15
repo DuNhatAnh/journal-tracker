@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
 import toast from "react-hot-toast";
 import { Loader2 } from "lucide-react";
@@ -8,6 +9,7 @@ import { AiRagPanel } from "../../components/Admin/AiSettings/AiRagPanel";
 import { AiStatusPanel } from "../../components/Admin/AiSettings/AiStatusPanel";
 import { AiTipsPanel } from "../../components/Admin/AiSettings/AiTipsPanel";
 import { AiRecentActivities } from "../../components/Admin/AiSettings/AiRecentActivities";
+import { AiChunkViewerModal } from "../../components/Admin/AiSettings/AiChunkViewerModal";
 
 export interface AiModelsWhitelist {
   gemini: {
@@ -34,28 +36,30 @@ export interface AiSettings {
 }
 
 export default function AiSettingsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [isChunkViewerOpen, setIsChunkViewerOpen] = useState(false);
 
   // Initialize from cache if available
   const [models, setModels] = useState<AiModelsWhitelist | null>(() => {
     const cached = localStorage.getItem("ai_models_cache");
     return cached ? JSON.parse(cached) : null;
   });
-  
+
   const [settings, setSettings] = useState<AiSettings | null>(() => {
     const cached = localStorage.getItem("ai_settings_cache");
     return cached ? JSON.parse(cached) : null;
   });
-  
+
   const [indexingStats, setIndexingStats] = useState<{
-    total_papers: number, 
-    chunked_papers: number, 
+    total_papers: number,
+    chunked_papers: number,
     unchunked_papers: number,
     total_chunks?: number,
-    recent_activities?: {time: string, message: string, type: string}[],
+    recent_activities?: { time: string, message: string, type: string }[],
     is_running?: boolean
   } | null>(() => {
     const cached = localStorage.getItem("ai_stats_cache");
@@ -67,7 +71,7 @@ export default function AiSettingsPage() {
     const cached = localStorage.getItem("ai_settings_cache");
     return cached ? JSON.parse(cached).driver : "gemini";
   });
-  
+
   const [indexLimit, setIndexLimit] = useState<string>("100");
   const [indexing, setIndexing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -78,9 +82,9 @@ export default function AiSettingsPage() {
     const cachedSettings = localStorage.getItem("ai_settings_cache");
     const cachedModels = localStorage.getItem("ai_models_cache");
     if (cachedSettings && cachedModels) {
-       const parsedS = JSON.parse(cachedSettings);
-       const parsedM = JSON.parse(cachedModels);
-       return parsedS.chat_model || parsedM[parsedS.driver]?.default_chat_model || "";
+      const parsedS = JSON.parse(cachedSettings);
+      const parsedM = JSON.parse(cachedModels);
+      return parsedS.chat_model || parsedM[parsedS.driver]?.default_chat_model || "";
     }
     return "";
   });
@@ -88,14 +92,14 @@ export default function AiSettingsPage() {
     const cachedSettings = localStorage.getItem("ai_settings_cache");
     const cachedModels = localStorage.getItem("ai_models_cache");
     if (cachedSettings && cachedModels) {
-       const parsedS = JSON.parse(cachedSettings);
-       const parsedM = JSON.parse(cachedModels);
-       return parsedS.embedding_model || parsedM[parsedS.driver]?.default_embedding_model || "";
+      const parsedS = JSON.parse(cachedSettings);
+      const parsedM = JSON.parse(cachedModels);
+      return parsedS.embedding_model || parsedM[parsedS.driver]?.default_embedding_model || "";
     }
     return "";
   });
   const [showApiKey, setShowApiKey] = useState(false);
-  
+
   // Connection Status (null = not tested yet)
   const [connectionStatus, setConnectionStatus] = useState<"valid" | "invalid" | "rate_limited" | null>(null);
   const [connectionMessage, setConnectionMessage] = useState("");
@@ -112,27 +116,34 @@ export default function AiSettingsPage() {
 
       setModels(modelsRes);
       localStorage.setItem("ai_models_cache", JSON.stringify(modelsRes));
-      
+
       setSettings(settingsRes);
       localStorage.setItem("ai_settings_cache", JSON.stringify(settingsRes));
-      
+
       if (statsRes) {
         setIndexingStats(statsRes);
         localStorage.setItem("ai_stats_cache", JSON.stringify(statsRes));
-        
+
         // Automatically stop auto-refresh if no jobs are running in backend
         if (statsRes.is_running === false && statsRes.unchunked_papers > 0) {
-           setAutoRefresh(false);
+          setAutoRefresh(false);
+
+          if (searchParams.get("auto_index") === "true") {
+            setTimeout(() => {
+              handleStartIndexing();
+            }, 500);
+            setSearchParams({}); // Clear param
+          }
         }
       }
 
       // Initialize form
       setDriver(settingsRes.driver);
-      
+
       // Update models if not already set by cache or if cache was empty
       setChatModel(settingsRes.chat_model || modelsRes[settingsRes.driver].default_chat_model);
       setEmbeddingModel(settingsRes.embedding_model || modelsRes[settingsRes.driver].default_embedding_model);
-      
+
       setApiKey(""); // Don't prefill api key
     } catch (err: any) {
       toast.error("Lỗi khi tải cấu hình AI: " + err.message);
@@ -205,7 +216,7 @@ export default function AiSettingsPage() {
       setTesting(true);
       setConnectionStatus(null);
       const payload = preparePayload();
-      
+
       const res = await api.post<{ message: string; status: string }>("/admin/settings/ai/test", payload);
       setConnectionStatus("valid");
       setConnectionMessage(res.message);
@@ -227,7 +238,7 @@ export default function AiSettingsPage() {
     try {
       setSaving(true);
       const payload = preparePayload();
-      
+
       await api.post("/admin/settings/ai", payload);
       toast.success("Đã lưu cấu hình AI thành công!");
       await fetchSettings();
@@ -255,14 +266,10 @@ export default function AiSettingsPage() {
   };
 
   const handleStartIndexing = async () => {
-    if (!indexLimit || isNaN(Number(indexLimit)) || Number(indexLimit) <= 0) {
-      toast.error("Vui lòng nhập số lượng hợp lệ.");
-      return;
-    }
     try {
       setIndexing(true);
-      const res = await api.post<any>("/admin/settings/ai/start-indexing", { limit: Number(indexLimit) });
-      toast.success(res.message || "Đã đẩy job vào Queue!");
+      const res = await api.post<any>("/admin/settings/ai/start-indexing");
+      toast.success(res.message || "Đã đẩy toàn bộ vào Queue!");
       setAutoRefresh(true);
       await fetchStatsOnly();
     } catch (err: any) {
@@ -305,8 +312,8 @@ export default function AiSettingsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           <AiProviderSelector driver={driver} onDriverChange={handleDriverChange} />
-          
-          <AiConnectionForm 
+
+          <AiConnectionForm
             driver={driver}
             apiKey={apiKey}
             setApiKey={setApiKey}
@@ -323,23 +330,22 @@ export default function AiSettingsPage() {
             handleSave={handleSave}
             saving={saving}
           />
-          
-          <AiRagPanel 
+
+          <AiRagPanel
             indexingStats={indexingStats}
-            indexLimit={indexLimit}
-            setIndexLimit={setIndexLimit}
             indexing={indexing}
             handleStartIndexing={handleStartIndexing}
             handleStopIndexing={handleStopIndexing}
             autoRefresh={autoRefresh}
             setAutoRefresh={setAutoRefresh}
             loading={loading}
+            onOpenChunkViewer={() => setIsChunkViewerOpen(true)}
           />
         </div>
 
         {/* Action Panel */}
         <div className="space-y-6">
-          <AiStatusPanel 
+          <AiStatusPanel
             connectionStatus={connectionStatus}
             connectionMessage={connectionMessage}
             settings={settings}
@@ -353,13 +359,18 @@ export default function AiSettingsPage() {
 
           <AiTipsPanel driver={driver} />
 
-          <AiRecentActivities 
+          <AiRecentActivities
             activities={indexingStats?.recent_activities}
             activityPage={activityPage}
             setActivityPage={setActivityPage}
           />
         </div>
       </div>
+      
+      <AiChunkViewerModal 
+        isOpen={isChunkViewerOpen} 
+        onClose={() => setIsChunkViewerOpen(false)} 
+      />
     </div>
   );
 }

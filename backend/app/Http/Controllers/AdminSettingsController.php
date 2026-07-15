@@ -11,7 +11,8 @@ class AdminSettingsController extends Controller
 {
     public function __construct(
         private readonly AdminSettingsService $adminSettingsService
-    ) {}
+    ) {
+    }
 
     /**
      * Get current AI Settings.
@@ -19,7 +20,7 @@ class AdminSettingsController extends Controller
     public function getAiSettings(): JsonResponse
     {
         $settings = $this->adminSettingsService->getAiSettings();
-        
+
         return response()->json($settings);
     }
 
@@ -29,7 +30,7 @@ class AdminSettingsController extends Controller
     public function getModels(): JsonResponse
     {
         $models = $this->adminSettingsService->getModelsWhitelist();
-        
+
         return response()->json($models);
     }
 
@@ -39,10 +40,10 @@ class AdminSettingsController extends Controller
     public function testConnection(UpdateAiSettingsRequest $request): JsonResponse
     {
         $validated = $request->validated();
-        
+
         try {
             $this->adminSettingsService->testConnection($validated['driver'], $validated);
-            
+
             return response()->json([
                 'message' => 'Connection successful',
                 'status' => 'valid'
@@ -66,10 +67,10 @@ class AdminSettingsController extends Controller
         try {
             // 1. Test Connection
             $this->adminSettingsService->testConnection($validated['driver'], $validated);
-            
+
             // 2. Save Settings
             $this->adminSettingsService->saveAiSettings($validated['driver'], $validated);
-            
+
             return response()->json([
                 'message' => 'AI Settings updated successfully',
                 'status' => 'valid'
@@ -89,7 +90,7 @@ class AdminSettingsController extends Controller
     public function deleteAiSettings(): JsonResponse
     {
         $this->adminSettingsService->resetAiSettings();
-        
+
         return response()->json([
             'message' => 'AI Settings reset successfully'
         ]);
@@ -104,9 +105,9 @@ class AdminSettingsController extends Controller
         $chunkedPapers = \Illuminate\Support\Facades\DB::table('paper_chunks')
             ->distinct('paper_id')
             ->count('paper_id');
-        
+
         $totalChunks = \Illuminate\Support\Facades\DB::table('paper_chunks')->count();
-            
+
         // Fetch recent failed jobs
         $failedJobs = \Illuminate\Support\Facades\DB::table('failed_jobs')
             ->where('payload', 'like', '%IndexPaperForRag%')
@@ -154,7 +155,7 @@ class AdminSettingsController extends Controller
         }
 
         // Sort by time descending
-        usort($activities, function($a, $b) {
+        usort($activities, function ($a, $b) {
             return strtotime($b['time']) - strtotime($a['time']);
         });
 
@@ -179,18 +180,10 @@ class AdminSettingsController extends Controller
      */
     public function startIndexing(\Illuminate\Http\Request $request): JsonResponse
     {
-        $request->validate([
-            'limit' => 'nullable|integer|min:1|max:5000'
-        ]);
-
-        $limit = $request->input('limit', 0);
-        
-        \Illuminate\Support\Facades\Artisan::call('papers:reindex', [
-            '--limit' => $limit
-        ]);
+        \Illuminate\Support\Facades\Artisan::call('papers:reindex');
 
         return response()->json([
-            'message' => "Đã đưa " . ($limit > 0 ? $limit : "tất cả") . " bài báo vào hàng đợi xử lý thành công!"
+            'message' => "Đã đưa tất cả bài báo chưa cắt vào hàng đợi xử lý thành công!"
         ]);
     }
 
@@ -208,5 +201,60 @@ class AdminSettingsController extends Controller
         return response()->json([
             'message' => 'Đã dừng toàn bộ tiến trình cắt bài (Xóa hàng đợi thành công).'
         ]);
+    }
+
+    public function chunkedPapers(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
+    {
+        $query = \Illuminate\Support\Facades\DB::table('research_papers')
+            ->select('id', 'title')
+            ->selectSub(function ($q) {
+                $q->selectRaw('count(*)')
+                  ->from('paper_chunks')
+                  ->whereColumn('paper_chunks.paper_id', 'research_papers.id');
+            }, 'chunk_count')
+            ->selectSub(function ($q) {
+                $q->selectRaw('max(created_at)')
+                  ->from('paper_chunks')
+                  ->whereColumn('paper_chunks.paper_id', 'research_papers.id');
+            }, 'last_chunked_at')
+            ->whereExists(function ($q) {
+                $q->select(\Illuminate\Support\Facades\DB::raw(1))
+                  ->from('paper_chunks')
+                  ->whereColumn('paper_chunks.paper_id', 'research_papers.id');
+            })
+            ->orderByDesc('last_chunked_at')
+            ->limit(20);
+            
+        $papers = $query->get();
+
+        return response()->json($papers);
+    }
+    
+    public function paperChunks($paperId): \Illuminate\Http\JsonResponse
+    {
+        $chunks = \Illuminate\Support\Facades\DB::table('paper_chunks')
+            ->where('paper_id', $paperId)
+            ->orderBy('id')
+            ->get();
+            
+        // Limit embedding array size for frontend display
+        $chunks->transform(function ($chunk, $index) {
+            $embedding = json_decode($chunk->embedding ?? '[]', true);
+            if (is_array($embedding)) {
+                $chunk->embedding_preview = array_slice($embedding, 0, 5);
+                $chunk->embedding_dimensions = count($embedding);
+            } else {
+                $str = trim((string)$chunk->embedding, '[]');
+                $arr = explode(',', $str);
+                $chunk->embedding_preview = array_map('floatval', array_slice($arr, 0, 5));
+                $chunk->embedding_dimensions = count($arr);
+            }
+            unset($chunk->embedding);
+            $chunk->chunk_index = $index + 1;
+            $chunk->chunk_text = $chunk->content;
+            return $chunk;
+        });
+
+        return response()->json($chunks);
     }
 }

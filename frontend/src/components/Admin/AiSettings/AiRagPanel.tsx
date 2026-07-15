@@ -6,25 +6,24 @@ interface IndexingStats {
   chunked_papers: number;
   unchunked_papers: number;
   total_chunks?: number;
-  recent_activities?: {time: string, message: string, type: string}[];
+  recent_activities?: { time: string, message: string, type: string }[];
   is_running?: boolean;
 }
 
 interface Props {
   indexingStats: IndexingStats | null;
-  indexLimit: string;
-  setIndexLimit: (limit: string) => void;
   indexing: boolean;
   handleStartIndexing: () => void;
   handleStopIndexing: () => void;
   autoRefresh: boolean;
   setAutoRefresh: (val: boolean) => void;
   loading: boolean;
+  onOpenChunkViewer?: () => void;
 }
 
 export const AiRagPanel = memo(function AiRagPanel({
-  indexingStats, indexLimit, setIndexLimit, indexing,
-  handleStartIndexing, handleStopIndexing, autoRefresh, setAutoRefresh, loading
+  indexingStats, indexing,
+  handleStartIndexing, handleStopIndexing, autoRefresh, setAutoRefresh, loading, onOpenChunkViewer
 }: Props) {
   if (!indexingStats) return null;
 
@@ -38,7 +37,7 @@ export const AiRagPanel = memo(function AiRagPanel({
           Tiến độ cắt bài báo thành các Chunk để nhúng Vector (AI Search).
         </p>
       </div>
-      
+
       <div className="space-y-4">
         <div className="flex justify-between items-center text-sm">
           <span className="text-on-surface-variant">Tổng số bài báo gốc:</span>
@@ -50,41 +49,30 @@ export const AiRagPanel = memo(function AiRagPanel({
         </div>
         <div className="flex justify-between items-center text-sm">
           <span className="text-green-500">Đã cắt thành công:</span>
-          <span className="font-bold text-green-500">{indexingStats.chunked_papers}</span>
+          <div className="flex items-center gap-3">
+            <span className="font-bold text-green-500">{indexingStats.chunked_papers}</span>
+            <button 
+              onClick={onOpenChunkViewer}
+              className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-md hover:bg-primary/20 transition-colors font-medium"
+            >
+              Xem dữ liệu Vector
+            </button>
+          </div>
         </div>
         <div className="flex justify-between items-center text-sm">
           <span className="text-orange-500">Chưa được cắt:</span>
           <span className="font-bold text-orange-500">{indexingStats.unchunked_papers}</span>
         </div>
-        
+
         <div className="w-full bg-surface-container rounded-full h-2.5 mt-2 overflow-hidden">
-          <div 
-            className="bg-primary h-2.5 rounded-full transition-all duration-500" 
+          <div
+            className="bg-primary h-2.5 rounded-full transition-all duration-500"
             style={{ width: `${Math.min(100, (indexingStats.chunked_papers / Math.max(1, indexingStats.total_papers)) * 100)}%` }}
           ></div>
         </div>
       </div>
 
       <div className="pt-4 border-t border-outline-variant/20 space-y-3">
-        <div className="space-y-2">
-          <label className="text-sm font-bold text-on-surface">Số lượng bài muốn cắt</label>
-          <select
-            value={indexLimit}
-            onChange={(e) => setIndexLimit(e.target.value)}
-            className="w-full px-4 py-3 bg-surface-container rounded-xl border border-outline-variant/50 focus:border-primary outline-none transition-all"
-          >
-            <option value="10">10 bài</option>
-            <option value="20">20 bài</option>
-            <option value="30">30 bài</option>
-            <option value="50">50 bài</option>
-            <option value="100">100 bài</option>
-            <option value="200">200 bài</option>
-            <option value="1000">1000 bài</option>
-          </select>
-          <p className="text-xs text-on-surface-variant">
-            Chọn số lượng phù hợp để tránh quá tải hạn mức API Key miễn phí.
-          </p>
-        </div>
         <button
           onClick={handleStartIndexing}
           disabled={indexing || indexingStats.unchunked_papers === 0}

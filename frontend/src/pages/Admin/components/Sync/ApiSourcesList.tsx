@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Settings, Play, Edit2, Trash2, Loader2 } from "lucide-react";
+import { Settings, Play, Edit2, Trash2, Loader2, Info } from "lucide-react";
 import { ApiSource } from "../../types";
 import { api } from "@/src/lib/api";
 
@@ -99,7 +99,7 @@ export default function ApiSourcesList({
                       <span className="inline-block w-2.5 h-2.5 rounded-full bg-tertiary" />
                     </h4>
                     <span className="font-mono text-xs text-on-surface-variant break-all">{source.api_url}</span>
-                    
+
                     <div className="flex gap-2 mt-3">
                       <button
                         onClick={() => handleOpenEditModal(source)}
@@ -117,7 +117,7 @@ export default function ApiSourcesList({
                       </button>
                     </div>
                   </div>
-                  
+
                   {/* Active badge - display only, no toggle */}
                   <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase bg-tertiary/10 text-tertiary">
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse" />
@@ -127,7 +127,7 @@ export default function ApiSourcesList({
 
                 <div className="border-t border-white/5 pt-4 space-y-4">
                   <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Đồng bộ thủ công</p>
-                  
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Lĩnh vực (Domain)</label>
@@ -141,7 +141,15 @@ export default function ApiSourcesList({
                     </div>
 
                     <div className="space-y-1 relative">
-                      <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Từ khóa</label>
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Từ khóa</label>
+                        <div className="relative group/tooltip flex items-center justify-center">
+                          <Info className="w-3.5 h-3.5 text-on-surface-variant/70 cursor-help hover:text-primary transition-colors" />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2.5 bg-surface border border-outline-variant/30 rounded-lg shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 z-50 text-[10px] text-on-surface-variant leading-relaxed pointer-events-none">
+                            💡 <span className="font-semibold text-primary">Lưu ý:</span> Nếu không chọn hoặc nhập từ khóa, hệ thống sẽ tải theo nguyên tắc: từ các khái niệm hàng đầu đến bài báo được trích dẫn nhiều nhất và các bài báo gần đây mà không cần lọc theo từ khóa.
+                          </div>
+                        </div>
+                      </div>
                       <input
                         type="text"
                         value={params.field}
@@ -179,13 +187,6 @@ export default function ApiSourcesList({
                           )}
                         </div>
                       )}
-
-                      {/* Note for empty field */}
-                      {!params.field.trim() && (
-                        <p className="text-[10px] text-on-surface-variant/80 mt-1.5 leading-relaxed bg-white/5 p-2.5 rounded-lg border border-white/5">
-                          💡 <span className="font-semibold text-primary">Lưu ý:</span> Nếu không chọn hoặc nhập từ khóa, hệ thống sẽ tải theo nguyên tắc: từ các khái niệm hàng đầu đến bài báo được trích dẫn nhiều nhất và các bài báo gần đây mà không cần lọc theo từ khóa.
-                        </p>
-                      )}
                     </div>
 
                     <div className="space-y-1">
@@ -222,13 +223,12 @@ export default function ApiSourcesList({
                         onChange={(e) => handleParamChange(source.id, "pages", parseInt(e.target.value) || 50)}
                         className="w-full px-3 py-[9px] text-xs rounded-lg bg-surface-container border border-outline text-on-surface outline-none focus:border-primary/50 cursor-pointer"
                       >
+                        <option value="25" className="bg-surface text-on-surface">25 bài</option>
                         <option value="50" className="bg-surface text-on-surface">50 bài</option>
                         <option value="100" className="bg-surface text-on-surface">100 bài</option>
+                        <option value="125" className="bg-surface text-on-surface">125 bài</option>
                         <option value="150" className="bg-surface text-on-surface">150 bài</option>
                         <option value="200" className="bg-surface text-on-surface">200 bài</option>
-                        <option value="300" className="bg-surface text-on-surface">300 bài</option>
-                        <option value="500" className="bg-surface text-on-surface">500 bài</option>
-                        <option value="1000" className="bg-surface text-on-surface">1000 bài</option>
                       </select>
                     </div>
 

@@ -31,13 +31,23 @@ export function Sidebar() {
 
   const adminSections = [
     {
-      title: "HỆ THỐNG",
+      title: "TỔNG QUAN",
       items: [
-        { icon: LayoutDashboard, label: "Tổng quan hệ thống", path: "/admin/dashboard" },
-        { icon: Users, label: "Quản lý người dùng", path: "/admin/users" },
+        { icon: LayoutDashboard, label: "Bảng điều khiển", path: "/admin/dashboard" },
+      ]
+    },
+    {
+      title: "QUẢN LÝ DỮ LIỆU",
+      items: [
         { icon: RefreshCw, label: "Đồng bộ API", path: "/admin/sync" },
         { icon: Tag, label: "Quản lý từ khóa", path: "/admin/keywords" },
-        { icon: SlidersHorizontal, label: "Cấu hình hệ thống", path: "/admin/settings" },
+      ]
+    },
+    {
+      title: "HỆ THỐNG & CẤU HÌNH",
+      items: [
+        { icon: Users, label: "Quản lý người dùng", path: "/admin/users" },
+        { icon: SlidersHorizontal, label: "Cấu hình chung", path: "/admin/settings" },
         { icon: Cpu, label: "Cấu hình AI (LLM)", path: "/admin/settings/ai" },
       ]
     }

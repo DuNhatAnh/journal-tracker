@@ -103,4 +103,24 @@ class IndexPaperForRag implements ShouldQueue
         // Delay 5 giây để tránh bị dính Rate Limit của Gemini (15 requests / phút)
         sleep(5);
     }
+
+    /**
+     * Handle a job failure.
+     *
+     * @param  \Throwable  $exception
+     * @return void
+     */
+    public function failed(\Throwable $exception)
+    {
+        $msg = $exception->getMessage();
+        if (str_contains($msg, '429') || str_contains($msg, 'Quota') || str_contains($msg, '404') || str_contains($msg, '401') || str_contains($msg, '403')) {
+            // Hết quota hoặc model không tồn tại -> Hủy luôn hàng đợi (xóa các job còn lại)
+            try {
+                \Illuminate\Support\Facades\Artisan::call('queue:clear');
+            } catch (\Exception $e) {
+                // Fallback for database queue driver just in case
+                \Illuminate\Support\Facades\DB::table('jobs')->delete();
+            }
+        }
+    }
 }

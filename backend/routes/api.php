@@ -24,7 +24,34 @@ use App\Http\Controllers\Api\Admin\AdminKeywordController;
 |--------------------------------------------------------------------------
 */
 Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login',    [AuthController::class, 'login']);
+Route::get('/test-query', function () {
+    try {
+        $perPage = 5;
+        $query = \Illuminate\Support\Facades\DB::table('research_papers')
+            ->select('id', 'title')
+            ->selectSub(function ($q) {
+                $q->selectRaw('count(*)')
+                  ->from('paper_chunks')
+                  ->whereColumn('paper_chunks.paper_id', 'research_papers.id');
+            }, 'chunk_count')
+            ->selectSub(function ($q) {
+                $q->selectRaw('max(created_at)')
+                  ->from('paper_chunks')
+                  ->whereColumn('paper_chunks.paper_id', 'research_papers.id');
+            }, 'last_chunked_at')
+            ->whereExists(function ($q) {
+                $q->select(\Illuminate\Support\Facades\DB::raw(1))
+                  ->from('paper_chunks')
+                  ->whereColumn('paper_chunks.paper_id', 'research_papers.id');
+            })
+            ->orderByDesc('last_chunked_at');
+        return $query->paginate($perPage);
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()]);
+    }
+});
+
+Route::post('/login', [AuthController::class, 'login']);
 Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirectToGoogle']);
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'handleGoogleCallback']);
 Route::get('/email/verify/{id}/{hash}', [VerificationController::class, 'verify'])->name('verification.verify');
@@ -40,8 +67,8 @@ Route::get('/public/trends', [TrendController::class, 'publicTrends']);
 Route::middleware('auth:sanctum')->group(function () {
 
     // Auth
-    Route::post('/logout',  [AuthController::class, 'logout']);
-    Route::get('/me',       [AuthController::class, 'me']);
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/me', [AuthController::class, 'me']);
     Route::post('/auth/select-role', [GoogleAuthController::class, 'selectRole']);
 
     // Settings & Profile
@@ -54,85 +81,85 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Dashboard
     Route::prefix('dashboard')->group(function () {
-        Route::get('/stats',       [DashboardController::class, 'stats']);
-        Route::get('/bookmarks',   [DashboardController::class, 'bookmarks']);
-        Route::get('/trending',    [DashboardController::class, 'trending']);
-        Route::get('/recent',      [DashboardController::class, 'recent']);
+        Route::get('/stats', [DashboardController::class, 'stats']);
+        Route::get('/bookmarks', [DashboardController::class, 'bookmarks']);
+        Route::get('/trending', [DashboardController::class, 'trending']);
+        Route::get('/recent', [DashboardController::class, 'recent']);
         Route::get('/recommended', [DashboardController::class, 'recommended']);
-        Route::get('/journals',    [DashboardController::class, 'journals']);
-        Route::get('/fields',      [DashboardController::class, 'fields']);
-        Route::post('/ai-review',  [\App\Http\Controllers\Api\AiController::class, 'review']);
+        Route::get('/journals', [DashboardController::class, 'journals']);
+        Route::get('/fields', [DashboardController::class, 'fields']);
+        Route::post('/ai-review', [\App\Http\Controllers\Api\AiController::class, 'review']);
     });
 
     // Research Papers
     Route::prefix('papers')->group(function () {
-        Route::get('/',         [PaperController::class, 'index']);
-        Route::get('/search',   [PaperController::class, 'search']);
-        Route::get('/{paper}',  [PaperController::class, 'show']);
+        Route::get('/', [PaperController::class, 'index']);
+        Route::get('/search', [PaperController::class, 'search']);
+        Route::get('/{paper}', [PaperController::class, 'show']);
     });
 
     // Journals
     Route::prefix('journals')->group(function () {
-        Route::get('/',                              [JournalController::class, 'index']);
-        Route::get('/feed',                          [JournalController::class, 'feed']);
-        Route::get('/{journal}',                     [JournalController::class, 'show']);
-        Route::post('/{journal}/follow',             [JournalController::class, 'follow']);
-        Route::delete('/{journal}/follow',           [JournalController::class, 'unfollow']);
+        Route::get('/', [JournalController::class, 'index']);
+        Route::get('/feed', [JournalController::class, 'feed']);
+        Route::get('/{journal}', [JournalController::class, 'show']);
+        Route::post('/{journal}/follow', [JournalController::class, 'follow']);
+        Route::delete('/{journal}/follow', [JournalController::class, 'unfollow']);
     });
 
     // Keywords
     Route::prefix('keywords')->group(function () {
-        Route::get('/',           [KeywordController::class, 'index']);
-        Route::get('/{keyword}',  [KeywordController::class, 'show']);
+        Route::get('/', [KeywordController::class, 'index']);
+        Route::get('/{keyword}', [KeywordController::class, 'show']);
     });
 
     // Trends
     Route::prefix('trends')->middleware('role:researcher,admin')->group(function () {
-        Route::get('/',           [TrendController::class, 'index']);
-        Route::get('/trending',   [TrendController::class, 'trending']);
-        Route::get('/author/{author}/history',  [TrendController::class, 'authorHistory']);
-        Route::get('/author/{author}/network',  [TrendController::class, 'authorNetwork']);
+        Route::get('/', [TrendController::class, 'index']);
+        Route::get('/trending', [TrendController::class, 'trending']);
+        Route::get('/author/{author}/history', [TrendController::class, 'authorHistory']);
+        Route::get('/author/{author}/network', [TrendController::class, 'authorNetwork']);
         Route::get('/author/{author}/journals', [TrendController::class, 'authorJournals']);
-        Route::get('/author/{author}/papers',   [TrendController::class, 'authorPapers']);
-        Route::get('/{keyword}',  [TrendController::class, 'show']);
-        Route::get('/{keyword}/history',  [TrendController::class, 'history']);
-        Route::get('/{keyword}/network',  [TrendController::class, 'network']);
+        Route::get('/author/{author}/papers', [TrendController::class, 'authorPapers']);
+        Route::get('/{keyword}', [TrendController::class, 'show']);
+        Route::get('/{keyword}/history', [TrendController::class, 'history']);
+        Route::get('/{keyword}/network', [TrendController::class, 'network']);
         Route::get('/{keyword}/journals', [TrendController::class, 'journals']);
-        Route::get('/{keyword}/papers',   [TrendController::class, 'papers']);
+        Route::get('/{keyword}/papers', [TrendController::class, 'papers']);
     });
 
     // Bookmarks
     Route::prefix('bookmarks')->group(function () {
-        Route::get('/',              [BookmarkController::class, 'index']);
-        Route::get('/export',        [BookmarkController::class, 'export'])->middleware('role:researcher,admin');
-        Route::post('/',             [BookmarkController::class, 'store']);
+        Route::get('/', [BookmarkController::class, 'index']);
+        Route::get('/export', [BookmarkController::class, 'export'])->middleware('role:researcher,admin');
+        Route::post('/', [BookmarkController::class, 'store']);
         Route::delete('/paper/{paper_id}', [BookmarkController::class, 'destroyByPaperId']);
-        Route::put('/{bookmark}',    [BookmarkController::class, 'update']);
+        Route::put('/{bookmark}', [BookmarkController::class, 'update']);
         Route::delete('/{bookmark}', [BookmarkController::class, 'destroy']);
     });
 
     // Following
     Route::prefix('following')->group(function () {
-        Route::get('/status',        [FollowingController::class, 'index']);
-        Route::post('/keywords',     [FollowingController::class, 'followKeyword']);
+        Route::get('/status', [FollowingController::class, 'index']);
+        Route::post('/keywords', [FollowingController::class, 'followKeyword']);
         Route::delete('/keywords/{keyword}', [FollowingController::class, 'unfollowKeyword']);
 
-        Route::get('/feed',          [FollowingController::class, 'feed']);
-        Route::get('/search',        [FollowingController::class, 'search']);
-        Route::post('/journals',     [FollowingController::class, 'followJournal']);
+        Route::get('/feed', [FollowingController::class, 'feed']);
+        Route::get('/search', [FollowingController::class, 'search']);
+        Route::post('/journals', [FollowingController::class, 'followJournal']);
         Route::delete('/journals/{journal}', [FollowingController::class, 'unfollowJournal']);
-        Route::post('/authors',      [FollowingController::class, 'followAuthor']);
+        Route::post('/authors', [FollowingController::class, 'followAuthor']);
         Route::delete('/authors/{author}', [FollowingController::class, 'unfollowAuthor']);
     });
 
     // Notifications
     Route::prefix('notifications')->group(function () {
-        Route::get('/',           [NotificationController::class, 'index']);
+        Route::get('/', [NotificationController::class, 'index']);
         Route::get('/unread-count', [NotificationController::class, 'unreadCount']);
-        Route::delete('/read',    [NotificationController::class, 'deleteRead']);
+        Route::delete('/read', [NotificationController::class, 'deleteRead']);
         Route::post('/delete-multiple', [NotificationController::class, 'deleteMultiple']);
-        Route::patch('/{id}/read',[NotificationController::class, 'markRead']);
-        Route::post('/read-all',  [NotificationController::class, 'markAllRead']);
+        Route::patch('/{id}/read', [NotificationController::class, 'markRead']);
+        Route::post('/read-all', [NotificationController::class, 'markAllRead']);
     });
 
     /*
@@ -142,11 +169,11 @@ Route::middleware('auth:sanctum')->group(function () {
     */
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         // Admin Dashboard Stats & Charts
-        Route::get('stats',  [AdminDashboardController::class, 'stats']);
+        Route::get('stats', [AdminDashboardController::class, 'stats']);
         Route::get('charts', [AdminDashboardController::class, 'charts']);
 
         // User Management
-        Route::apiResource('users',       AdminUserController::class);
+        Route::apiResource('users', AdminUserController::class);
 
         // API Source Management & Sync
         Route::apiResource('api-sources', ApiSourceController::class);
@@ -171,6 +198,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('settings/ai', [\App\Http\Controllers\AdminSettingsController::class, 'getAiSettings']);
         Route::get('settings/ai/models', [\App\Http\Controllers\AdminSettingsController::class, 'getModels']);
         Route::get('settings/ai/indexing-stats', [\App\Http\Controllers\AdminSettingsController::class, 'indexingStats']);
+        Route::get('settings/ai/chunked-papers', [\App\Http\Controllers\AdminSettingsController::class, 'chunkedPapers']);
+        Route::get('settings/ai/paper-chunks/{paperId}', [\App\Http\Controllers\AdminSettingsController::class, 'paperChunks']);
         Route::post('settings/ai/start-indexing', [\App\Http\Controllers\AdminSettingsController::class, 'startIndexing']);
         Route::post('settings/ai/stop-indexing', [\App\Http\Controllers\AdminSettingsController::class, 'stopIndexing']);
         Route::post('settings/ai/test', [\App\Http\Controllers\AdminSettingsController::class, 'testConnection']);
