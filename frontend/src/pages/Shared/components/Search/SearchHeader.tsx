@@ -1,5 +1,4 @@
-import React from "react";
-import { Search, User, Book } from "lucide-react";
+import { Search, User, Book, Bot, List, Network } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { AutocompleteInput } from "@/src/components/ui/AutocompleteInput";
 
@@ -16,6 +15,11 @@ interface SearchHeaderProps {
   q: string;
   fetchGlobalSuggestions: (query: string) => Promise<any[]>;
   onSelectSuggestion: (item: any) => void;
+  // New props
+  searchMode: "keyword" | "semantic";
+  onSearchModeChange: (mode: "keyword" | "semantic") => void;
+  viewMode: "list" | "tree";
+  onViewModeChange: (mode: "list" | "tree") => void;
 }
 
 export function SearchHeader({
@@ -31,7 +35,16 @@ export function SearchHeader({
   q,
   fetchGlobalSuggestions,
   onSelectSuggestion,
+  searchMode,
+  onSearchModeChange,
+  viewMode,
+  onViewModeChange,
 }: SearchHeaderProps) {
+  const userStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+  const user = userStr ? JSON.parse(userStr) : null;
+  const role = user?.role || "student";
+  const isResearcher = role === "researcher" || role === "admin";
+
   const selectedKeywords = keyword
     .split(",")
     .map((k) => k.trim())
@@ -42,7 +55,9 @@ export function SearchHeader({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary mb-2">
-            Tìm thấy {totalResults.toLocaleString()} bài báo khoa học
+            {searchMode === "keyword" 
+              ? `Tìm thấy ${totalResults.toLocaleString()} bài báo khoa học` 
+              : "Kết quả đối chiếu tương đồng AI"}
           </div>
           {q ? (
             <h2 className="font-display text-3xl font-bold">
@@ -50,22 +65,90 @@ export function SearchHeader({
             </h2>
           ) : (
             <h2 className="font-display text-3xl font-bold">
-              Khám phá <span className="gradient-text">bài báo mới nhất</span>
+              Khám phá <span className="gradient-text">bài báo khoa học</span>
             </h2>
           )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-            SẮP XẾP:
-          </span>
-          <select
-            value={sort}
-            onChange={(e) => onSortChange(e.target.value)}
-            className="bg-transparent border-none text-xs font-bold text-primary focus:ring-0 outline-none"
-          >
-            <option value="relevance">Độ liên quan / Mới nhất</option>
-            <option value="citations">Trích dẫn nhiều nhất</option>
-          </select>
+        
+        {/* Right Controls Container */}
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          {/* Tab 1: Search Mode Switcher (Only visible to researchers) */}
+          {isResearcher && (
+            <div className="flex gap-1.5 p-1 bg-surface-container rounded-2xl border border-outline-variant/30">
+              <button
+                type="button"
+                onClick={() => onSearchModeChange("keyword")}
+                className={cn(
+                  "py-1.5 px-3.5 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all cursor-pointer flex items-center gap-1.5",
+                  searchMode === "keyword"
+                    ? "bg-primary text-on-primary shadow-md"
+                    : "text-on-surface-variant hover:text-on-surface"
+                )}
+              >
+                <Search className="w-3.5 h-3.5" />
+                Từ khóa
+              </button>
+              <button
+                type="button"
+                onClick={() => onSearchModeChange("semantic")}
+                className={cn(
+                  "py-1.5 px-3.5 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all cursor-pointer flex items-center gap-1.5",
+                  searchMode === "semantic"
+                    ? "bg-primary text-on-primary shadow-md"
+                    : "text-on-surface-variant hover:text-on-surface"
+                )}
+              >
+                <Bot className="w-3.5 h-3.5" />
+                Tương đồng AI
+              </button>
+            </div>
+          )}
+
+          {/* Tab 2: Layout Style Switcher OR Sorting select */}
+          {(!isResearcher || searchMode === "keyword") ? (
+            <div className="flex items-center gap-1.5 bg-surface-container py-1.5 px-3.5 rounded-2xl border border-outline-variant/30">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mr-1">
+                Sắp xếp:
+              </span>
+              <select
+                value={sort}
+                onChange={(e) => onSortChange(e.target.value)}
+                className="bg-transparent border-none text-[10px] font-black uppercase tracking-wide text-primary focus:ring-0 outline-none cursor-pointer p-0"
+              >
+                <option value="relevance">Độ liên quan / Mới nhất</option>
+                <option value="citations">Trích dẫn nhiều nhất</option>
+              </select>
+            </div>
+          ) : (
+            <div className="flex gap-1.5 p-1 bg-surface-container rounded-2xl border border-outline-variant/30">
+              <button
+                type="button"
+                onClick={() => onViewModeChange("list")}
+                className={cn(
+                  "py-1.5 px-3.5 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all cursor-pointer flex items-center gap-1.5",
+                  viewMode === "list"
+                    ? "bg-secondary text-on-secondary shadow-md"
+                    : "text-on-surface-variant hover:text-on-surface"
+                )}
+              >
+                <List className="w-3.5 h-3.5" />
+                Danh sách
+              </button>
+              <button
+                type="button"
+                onClick={() => onViewModeChange("tree")}
+                className={cn(
+                  "py-1.5 px-3.5 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all cursor-pointer flex items-center gap-1.5",
+                  viewMode === "tree"
+                    ? "bg-secondary text-on-secondary shadow-md"
+                    : "text-on-surface-variant hover:text-on-surface"
+                )}
+              >
+                <Network className="w-3.5 h-3.5" />
+                Dạng cây
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -74,7 +157,11 @@ export function SearchHeader({
           value={searchInput}
           onChange={setSearchInput}
           icon={<Search className="w-4 h-4" />}
-          placeholder='Tìm kiếm (Hỗ trợ AND, OR, NOT, "cụm từ") hoặc nhập để tìm...'
+          placeholder={
+            searchMode === "semantic"
+              ? "Nhập ý tưởng nghiên cứu, câu hỏi khoa học hoặc một đoạn abstract để đối chiếu tương đồng AI..."
+              : 'Tìm kiếm (Hỗ trợ AND, OR, NOT, "cụm từ") hoặc nhập để tìm...'
+          }
           fetchSuggestions={fetchGlobalSuggestions}
           onKeyDown={(e) => {
             if (e.key === "Enter") {

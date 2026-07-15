@@ -2,7 +2,7 @@
 
 return [
     'default_top_k' => 5,
-    'default_min_similarity' => 0.7,
+    'default_min_similarity' => 0.55,
     'max_top_k' => 20,
     
     // System Prompt Template

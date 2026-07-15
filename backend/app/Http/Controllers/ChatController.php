@@ -17,9 +17,18 @@ class ChatController extends Controller
      */
     public function chat(ChatRequest $request): JsonResponse
     {
-        $question = $request->validated()['question'];
+        $validated = $request->validated();
+        $question = $validated['question'];
+        $scope = $validated['scope'] ?? 'all';
+        $userId = auth()->id();
 
-        $ragResponse = $this->ragService->generateAnswer($question);
+        $ragResponse = $this->ragService->generateAnswer(
+            question: $question,
+            topK: null,
+            threshold: null,
+            scope: $scope,
+            userId: $userId
+        );
 
         $citationsArray = array_map(function ($citation) {
             return [

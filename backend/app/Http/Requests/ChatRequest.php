@@ -23,6 +23,7 @@ class ChatRequest extends FormRequest
     {
         return [
             'question' => ['required', 'string', 'min:3', 'max:5000'],
+            'scope' => ['nullable', 'string', 'in:all,bookmarked'],
         ];
     }
 }

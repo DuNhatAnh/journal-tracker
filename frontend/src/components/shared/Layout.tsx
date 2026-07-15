@@ -158,7 +158,7 @@ export function Layout() {
             </div>
             
             {/* Footer */}
-            <footer className="mt-16 border-t border-outline-variant/20 pt-8 pb-12 text-center md:text-left relative z-20">
+            <footer className="mt-6 border-t border-outline-variant/20 pt-8 pb-12 text-center md:text-left relative z-20">
               <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                 <div className="space-y-2">
                   <div className="flex items-center justify-center md:justify-start gap-2">

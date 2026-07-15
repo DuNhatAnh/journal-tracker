@@ -8,16 +8,19 @@ use App\Interfaces\RetrievalServiceInterface;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
+use App\Interfaces\LlmServiceInterface;
+
 class RetrievalService implements RetrievalServiceInterface
 {
     public function __construct(
-        private readonly EmbeddingServiceInterface $embeddingService
+        private readonly EmbeddingServiceInterface $embeddingService,
+        private readonly LlmServiceInterface $llmService
     ) {}
 
     /**
      * @inheritDoc
      */
-    public function search(string $query, int $topK = 5, float $minSimilarity = 0.0): array
+    public function search(string $query, int $topK = 5, float $minSimilarity = 0.0, ?string $scope = 'all', ?int $userId = null): array
     {
         if (trim($query) === '') {
             throw new InvalidArgumentException('Search query cannot be empty.');
@@ -31,12 +34,34 @@ class RetrievalService implements RetrievalServiceInterface
             throw new InvalidArgumentException('minSimilarity must be between 0.0 and 1.0.');
         }
 
+        // Detect if query is in Vietnamese and translate it to English for cross-lingual vector search
+        $searchQuery = $query;
+        if ($this->isVietnamese($query)) {
+            try {
+                $prompt = "Translate the following Vietnamese academic search query into a clean, search-optimized English keyword or phrase. Return ONLY the translated English search phrase, without any explanations, introductory text, or quotation marks:\n\n" . $query;
+                $translationResponse = $this->llmService->generate($prompt);
+                $translatedText = trim($translationResponse->content);
+                $translatedText = trim($translatedText, "\"'\"“‘’”");
+                if ($translatedText !== '') {
+                    $searchQuery = $translatedText;
+                }
+            } catch (\Exception $e) {
+                // Fallback to original query on translation error
+            }
+        }
+
         // Generate embedding for the query
-        $queryVector = $this->embeddingService->getEmbedding($query);
+        $queryVector = $this->embeddingService->getEmbedding($searchQuery);
         $vectorString = '[' . implode(',', $queryVector) . ']';
 
         if (DB::connection()->getDriverName() === 'sqlite') {
-            $allChunks = DB::table('paper_chunks')->get();
+            $dbQuery = DB::table('paper_chunks');
+            if ($scope === 'bookmarked' && $userId !== null) {
+                $dbQuery->join('bookmarks', 'paper_chunks.paper_id', '=', 'bookmarks.paper_id')
+                        ->where('bookmarks.user_id', $userId)
+                        ->select('paper_chunks.*');
+            }
+            $allChunks = $dbQuery->get();
             $results = [];
             foreach ($allChunks as $chunk) {
                 // In SQLite, embedding is stored as JSON string
@@ -52,11 +77,17 @@ class RetrievalService implements RetrievalServiceInterface
         } else {
             // Query pgvector using Cosine Distance (<=>)
             // Cosine Similarity = 1 - Cosine Distance
-            $results = DB::table('paper_chunks')
-                ->select('id', 'paper_id', 'content')
-                ->selectRaw('1 - (embedding <=> ?::vector) as similarity', [$vectorString])
-                ->whereRaw('1 - (embedding <=> ?::vector) >= ?', [$vectorString, $minSimilarity])
-                ->orderByRaw('embedding <=> ?::vector', [$vectorString])
+            $dbQuery = DB::table('paper_chunks');
+            if ($scope === 'bookmarked' && $userId !== null) {
+                $dbQuery->join('bookmarks', 'paper_chunks.paper_id', '=', 'bookmarks.paper_id')
+                        ->where('bookmarks.user_id', $userId);
+            }
+
+            $results = $dbQuery
+                ->select('paper_chunks.id', 'paper_chunks.paper_id', 'paper_chunks.content')
+                ->selectRaw('1 - (paper_chunks.embedding <=> ?::vector) as similarity', [$vectorString])
+                ->whereRaw('1 - (paper_chunks.embedding <=> ?::vector) >= ?', [$vectorString, $minSimilarity])
+                ->orderByRaw('paper_chunks.embedding <=> ?::vector', [$vectorString])
                 ->limit($topK)
                 ->get()
                 ->toArray();
@@ -74,6 +105,11 @@ class RetrievalService implements RetrievalServiceInterface
         }
 
         return $retrievalResults;
+    }
+
+    private function isVietnamese(string $text): bool
+    {
+        return (bool) preg_match('/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ]/u', $text);
     }
 
     private function calculateCosineSimilarity(array $vecA, array $vecB): float

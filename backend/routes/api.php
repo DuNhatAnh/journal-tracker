@@ -162,11 +162,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/read-all', [NotificationController::class, 'markAllRead']);
     });
 
+    // Chat RAG
+    Route::post('/chat', [\App\Http\Controllers\ChatController::class, 'chat']);
+    Route::post('/explore', [\App\Http\Controllers\ResearchExplorerController::class, 'explore']);
+
     /*
     |--------------------------------------------------------------------------
     | Admin-only Routes
     |--------------------------------------------------------------------------
-    */
+    |*/
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         // Admin Dashboard Stats & Charts
         Route::get('stats', [AdminDashboardController::class, 'stats']);
@@ -207,6 +211,4 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('settings/ai', [\App\Http\Controllers\AdminSettingsController::class, 'deleteAiSettings']);
     });
 });
-
-Route::post('/chat', [\App\Http\Controllers\ChatController::class, 'chat']);
 

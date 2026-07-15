@@ -24,7 +24,7 @@ class RagService implements RagServiceInterface
     /**
      * @inheritDoc
      */
-    public function generateAnswer(string $question, ?int $topK = null, ?float $threshold = null): RagResponse
+    public function generateAnswer(string $question, ?int $topK = null, ?float $threshold = null, ?string $scope = 'all', ?int $userId = null): RagResponse
     {
         // 1. Resolve configuration
         $usedTopK = $topK ?? config('rag.default_top_k', 5);
@@ -37,7 +37,7 @@ class RagService implements RagServiceInterface
         }
 
         // 2. Retrieval
-        $retrievalResults = $this->retrievalService->search($question, $usedTopK, $usedThreshold);
+        $retrievalResults = $this->retrievalService->search($question, $usedTopK, $usedThreshold, $scope, $userId);
 
         // 3. Short-circuit if no chunks found
         if (empty($retrievalResults)) {

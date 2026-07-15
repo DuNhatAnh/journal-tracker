@@ -13,8 +13,19 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(\App\Interfaces\EmbeddingServiceInterface::class, \App\Services\Ai\GeminiService::class);
-        $this->app->singleton(\App\Interfaces\LlmServiceInterface::class, \App\Services\Ai\GeminiService::class);
+        $this->app->singleton(\App\Interfaces\EmbeddingServiceInterface::class, function ($app) {
+            $driver = config('services.ai.driver', 'gemini');
+            return $driver === 'ollama'
+                ? $app->make(\App\Services\Ai\OllamaService::class)
+                : $app->make(\App\Services\Ai\GeminiService::class);
+        });
+
+        $this->app->singleton(\App\Interfaces\LlmServiceInterface::class, function ($app) {
+            $driver = config('services.ai.driver', 'gemini');
+            return $driver === 'ollama'
+                ? $app->make(\App\Services\Ai\OllamaService::class)
+                : $app->make(\App\Services\Ai\GeminiService::class);
+        });
         $this->app->singleton(RetrievalServiceInterface::class, RetrievalService::class);
         $this->app->singleton(\App\Interfaces\PaperRepositoryInterface::class, \App\Repositories\PaperRepository::class);
         $this->app->singleton(\App\Interfaces\PromptBuilderInterface::class, \App\Services\PromptBuilderService::class);
