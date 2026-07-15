@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { api } from "../../lib/api";
 import toast from "react-hot-toast";
-import { Cpu, Server, Save, RotateCcw, Eye, EyeOff, CheckCircle2, AlertCircle, XCircle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { AiProviderSelector } from "../../components/Admin/AiSettings/AiProviderSelector";
+import { AiConnectionForm } from "../../components/Admin/AiSettings/AiConnectionForm";
+import { AiRagPanel } from "../../components/Admin/AiSettings/AiRagPanel";
+import { AiStatusPanel } from "../../components/Admin/AiSettings/AiStatusPanel";
+import { AiTipsPanel } from "../../components/Admin/AiSettings/AiTipsPanel";
+import { AiRecentActivities } from "../../components/Admin/AiSettings/AiRecentActivities";
 
 export interface AiModelsWhitelist {
   gemini: {
@@ -33,50 +39,136 @@ export default function AiSettingsPage() {
   const [testing, setTesting] = useState(false);
   const [resetting, setResetting] = useState(false);
 
-  const [models, setModels] = useState<AiModelsWhitelist | null>(null);
-  const [settings, setSettings] = useState<AiSettings | null>(null);
+  // Initialize from cache if available
+  const [models, setModels] = useState<AiModelsWhitelist | null>(() => {
+    const cached = localStorage.getItem("ai_models_cache");
+    return cached ? JSON.parse(cached) : null;
+  });
+  
+  const [settings, setSettings] = useState<AiSettings | null>(() => {
+    const cached = localStorage.getItem("ai_settings_cache");
+    return cached ? JSON.parse(cached) : null;
+  });
+  
+  const [indexingStats, setIndexingStats] = useState<{
+    total_papers: number, 
+    chunked_papers: number, 
+    unchunked_papers: number,
+    total_chunks?: number,
+    recent_activities?: {time: string, message: string, type: string}[],
+    is_running?: boolean
+  } | null>(() => {
+    const cached = localStorage.getItem("ai_stats_cache");
+    return cached ? JSON.parse(cached) : null;
+  });
 
   // Form State
-  const [driver, setDriver] = useState<"gemini" | "ollama">("gemini");
+  const [driver, setDriver] = useState<"gemini" | "ollama">(() => {
+    const cached = localStorage.getItem("ai_settings_cache");
+    return cached ? JSON.parse(cached).driver : "gemini";
+  });
+  
+  const [indexLimit, setIndexLimit] = useState<string>("100");
+  const [indexing, setIndexing] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("http://localhost:11434");
-  const [chatModel, setChatModel] = useState("");
-  const [embeddingModel, setEmbeddingModel] = useState("");
+  const [chatModel, setChatModel] = useState<string>(() => {
+    const cachedSettings = localStorage.getItem("ai_settings_cache");
+    const cachedModels = localStorage.getItem("ai_models_cache");
+    if (cachedSettings && cachedModels) {
+       const parsedS = JSON.parse(cachedSettings);
+       const parsedM = JSON.parse(cachedModels);
+       return parsedS.chat_model || parsedM[parsedS.driver]?.default_chat_model || "";
+    }
+    return "";
+  });
+  const [embeddingModel, setEmbeddingModel] = useState<string>(() => {
+    const cachedSettings = localStorage.getItem("ai_settings_cache");
+    const cachedModels = localStorage.getItem("ai_models_cache");
+    if (cachedSettings && cachedModels) {
+       const parsedS = JSON.parse(cachedSettings);
+       const parsedM = JSON.parse(cachedModels);
+       return parsedS.embedding_model || parsedM[parsedS.driver]?.default_embedding_model || "";
+    }
+    return "";
+  });
   const [showApiKey, setShowApiKey] = useState(false);
   
   // Connection Status (null = not tested yet)
   const [connectionStatus, setConnectionStatus] = useState<"valid" | "invalid" | "rate_limited" | null>(null);
   const [connectionMessage, setConnectionMessage] = useState("");
+  const [activityPage, setActivityPage] = useState(1);
 
   const fetchSettings = async () => {
     try {
-      const [modelsRes, settingsRes] = await Promise.all([
+      setLoading(true);
+      const [modelsRes, settingsRes, statsRes] = await Promise.all([
         api.get<AiModelsWhitelist>("/admin/settings/ai/models"),
-        api.get<AiSettings>("/admin/settings/ai")
+        api.get<AiSettings>("/admin/settings/ai"),
+        api.get<any>("/admin/settings/ai/indexing-stats").catch(() => null)
       ]);
 
       setModels(modelsRes);
+      localStorage.setItem("ai_models_cache", JSON.stringify(modelsRes));
+      
       setSettings(settingsRes);
+      localStorage.setItem("ai_settings_cache", JSON.stringify(settingsRes));
+      
+      if (statsRes) {
+        setIndexingStats(statsRes);
+        localStorage.setItem("ai_stats_cache", JSON.stringify(statsRes));
+        
+        // Automatically stop auto-refresh if no jobs are running in backend
+        if (statsRes.is_running === false && statsRes.unchunked_papers > 0) {
+           setAutoRefresh(false);
+        }
+      }
 
       // Initialize form
       setDriver(settingsRes.driver);
+      
+      // Update models if not already set by cache or if cache was empty
       setChatModel(settingsRes.chat_model || modelsRes[settingsRes.driver].default_chat_model);
       setEmbeddingModel(settingsRes.embedding_model || modelsRes[settingsRes.driver].default_embedding_model);
-      setApiKey(""); // Don't prefill api key
       
-      if (settingsRes.driver === "ollama") {
-        // base url could be fetched if backend provides it, otherwise default
-      }
+      setApiKey(""); // Don't prefill api key
     } catch (err: any) {
-      toast.error(err.message || "Không thể tải cấu hình AI.");
+      toast.error("Lỗi khi tải cấu hình AI: " + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStatsOnly = async () => {
+    try {
+      const statsRes = await api.get<any>("/admin/settings/ai/indexing-stats");
+      setIndexingStats(statsRes);
+      localStorage.setItem("ai_stats_cache", JSON.stringify(statsRes));
+      if (statsRes.is_running === false && statsRes.unchunked_papers > 0) {
+        setAutoRefresh(false);
+      }
+      if (statsRes.unchunked_papers === 0) {
+        setAutoRefresh(false);
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
   useEffect(() => {
     fetchSettings();
   }, []);
+
+  // Poll for indexing stats
+  useEffect(() => {
+    let interval: any;
+    if (autoRefresh) {
+      interval = setInterval(fetchStatsOnly, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [autoRefresh]);
 
   // Handle Driver Change
   const handleDriverChange = (newDriver: "gemini" | "ollama") => {
@@ -100,12 +192,6 @@ export default function AiSettingsPage() {
         payload.api_key = apiKey;
       } else if (!settings?.api_key_configured) {
         throw new Error("Vui lòng nhập API Key cho Gemini.");
-      } else {
-        // If it's configured and we didn't enter a new one, we might need a dummy one for validation if backend requires it, 
-        // wait, the backend rules say `api_key` is required if driver is gemini!
-        // But we hide it. So to test/save without changing, we actually can't unless the backend allows omitting it. 
-        // Let's assume user MUST enter it if they want to save/test, or we prompt them.
-        throw new Error("Vì lý do bảo mật, vui lòng nhập lại API Key để Test/Save cấu hình.");
       }
     } else if (driver === "ollama") {
       payload.base_url = baseUrl;
@@ -168,16 +254,47 @@ export default function AiSettingsPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const handleStartIndexing = async () => {
+    if (!indexLimit || isNaN(Number(indexLimit)) || Number(indexLimit) <= 0) {
+      toast.error("Vui lòng nhập số lượng hợp lệ.");
+      return;
+    }
+    try {
+      setIndexing(true);
+      const res = await api.post<any>("/admin/settings/ai/start-indexing", { limit: Number(indexLimit) });
+      toast.success(res.message || "Đã đẩy job vào Queue!");
+      setAutoRefresh(true);
+      await fetchStatsOnly();
+    } catch (err: any) {
+      toast.error(err.message || "Lỗi khi bắt đầu Indexing.");
+    } finally {
+      setIndexing(false);
+    }
+  };
+
+  const handleStopIndexing = async () => {
+    try {
+      setIndexing(true);
+      const res = await api.post<any>("/admin/settings/ai/stop-indexing");
+      toast.success(res.message || "Đã dừng tiến trình ngầm!");
+      setAutoRefresh(false);
+      await fetchStatsOnly();
+    } catch (err: any) {
+      toast.error(err.message || "Lỗi khi dừng tiến trình.");
+    } finally {
+      setIndexing(false);
+    }
+  };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-12">
+    <div className="space-y-8 animate-fade-in pb-12 relative">
+      {/* Lớp màng mỏng thông báo đang đồng bộ ngầm nếu cần */}
+      {loading && !models && (
+        <div className="absolute top-0 right-0 flex items-center gap-2 text-xs text-primary bg-primary/10 px-3 py-1.5 rounded-full font-medium">
+          <Loader2 className="w-3 h-3 animate-spin" /> Đang đồng bộ...
+        </div>
+      )}
+
       <div>
         <h1 className="text-3xl font-display font-black text-on-background tracking-tight">Cấu hình AI (LLM)</h1>
         <p className="text-on-surface-variant mt-2 max-w-2xl">
@@ -187,195 +304,60 @@ export default function AiSettingsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
+          <AiProviderSelector driver={driver} onDriverChange={handleDriverChange} />
           
-          {/* Driver Selection */}
-          <div className="glass-panel p-6 rounded-2xl border border-outline-variant/30">
-            <h2 className="text-lg font-bold text-on-surface mb-4 flex items-center gap-2">
-              <Server className="w-5 h-5 text-primary" /> Provider (Driver)
-            </h2>
-            <div className="grid grid-cols-2 gap-4">
-              <label 
-                className={`relative flex cursor-pointer rounded-xl border-2 p-4 transition-all ${
-                  driver === 'gemini' ? 'border-primary bg-primary/5' : 'border-outline-variant/30 hover:bg-surface-container'
-                }`}
-                onClick={() => handleDriverChange("gemini")}
-              >
-                <div className="flex w-full items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="text-sm">
-                      <p className={`font-bold ${driver === 'gemini' ? 'text-primary' : 'text-on-surface'}`}>Google Gemini</p>
-                      <p className="text-on-surface-variant text-xs mt-1">Sử dụng API của Google (Khuyên dùng)</p>
-                    </div>
-                  </div>
-                  <div className={`h-5 w-5 rounded-full border flex items-center justify-center ${driver === 'gemini' ? 'border-primary' : 'border-outline-variant'}`}>
-                    {driver === 'gemini' && <div className="h-2.5 w-2.5 rounded-full bg-primary" />}
-                  </div>
-                </div>
-              </label>
-
-              <label 
-                className={`relative flex cursor-pointer rounded-xl border-2 p-4 transition-all ${
-                  driver === 'ollama' ? 'border-primary bg-primary/5' : 'border-outline-variant/30 hover:bg-surface-container'
-                }`}
-                onClick={() => handleDriverChange("ollama")}
-              >
-                <div className="flex w-full items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="text-sm">
-                      <p className={`font-bold ${driver === 'ollama' ? 'text-primary' : 'text-on-surface'}`}>Ollama (Local)</p>
-                      <p className="text-on-surface-variant text-xs mt-1">Chạy model local (Llama3, Mistral...)</p>
-                    </div>
-                  </div>
-                  <div className={`h-5 w-5 rounded-full border flex items-center justify-center ${driver === 'ollama' ? 'border-primary' : 'border-outline-variant'}`}>
-                    {driver === 'ollama' && <div className="h-2.5 w-2.5 rounded-full bg-primary" />}
-                  </div>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {/* Configuration Form */}
-          <div className="glass-panel p-6 rounded-2xl border border-outline-variant/30 space-y-6">
-            <h2 className="text-lg font-bold text-on-surface flex items-center gap-2">
-              <Cpu className="w-5 h-5 text-primary" /> Thông số kết nối
-            </h2>
-
-            {driver === "gemini" && (
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-on-surface">API Key</label>
-                <div className="relative">
-                  <input
-                    type={showApiKey ? "text" : "password"}
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder={settings?.driver === 'gemini' && settings.api_key_configured ? "(Đã cấu hình. Nhập key mới để thay đổi)" : "AIzaSy..."}
-                    className="w-full px-4 py-3 bg-surface-container rounded-xl border border-outline-variant/50 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all pr-24"
-                  />
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const text = await navigator.clipboard.readText();
-                        setApiKey(text);
-                      }}
-                      className="p-1.5 text-xs font-bold text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                    >
-                      PASTE
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="p-2 text-on-surface-variant hover:text-primary transition-colors"
-                    >
-                      {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {driver === "ollama" && (
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-on-surface">Ollama Base URL</label>
-                <input
-                  type="text"
-                  value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  placeholder="http://localhost:11434"
-                  className="w-full px-4 py-3 bg-surface-container rounded-xl border border-outline-variant/50 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                />
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-on-surface">Chat Model</label>
-                <select
-                  value={chatModel}
-                  onChange={(e) => setChatModel(e.target.value)}
-                  className="w-full px-4 py-3 bg-surface-container rounded-xl border border-outline-variant/50 focus:border-primary outline-none"
-                >
-                  {models?.[driver].chat_models.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-on-surface">Embedding Model</label>
-                <select
-                  value={embeddingModel}
-                  onChange={(e) => setEmbeddingModel(e.target.value)}
-                  className="w-full px-4 py-3 bg-surface-container rounded-xl border border-outline-variant/50 focus:border-primary outline-none"
-                >
-                  {models?.[driver].embedding_models.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
+          <AiConnectionForm 
+            driver={driver}
+            apiKey={apiKey}
+            setApiKey={setApiKey}
+            showApiKey={showApiKey}
+            setShowApiKey={setShowApiKey}
+            baseUrl={baseUrl}
+            setBaseUrl={setBaseUrl}
+            chatModel={chatModel}
+            setChatModel={setChatModel}
+            embeddingModel={embeddingModel}
+            setEmbeddingModel={setEmbeddingModel}
+            models={models}
+            settings={settings}
+            handleSave={handleSave}
+            saving={saving}
+          />
+          
+          <AiRagPanel 
+            indexingStats={indexingStats}
+            indexLimit={indexLimit}
+            setIndexLimit={setIndexLimit}
+            indexing={indexing}
+            handleStartIndexing={handleStartIndexing}
+            handleStopIndexing={handleStopIndexing}
+            autoRefresh={autoRefresh}
+            setAutoRefresh={setAutoRefresh}
+            loading={loading}
+          />
         </div>
 
         {/* Action Panel */}
         <div className="space-y-6">
-          <div className="glass-panel p-6 rounded-2xl border border-outline-variant/30 space-y-6">
-            <div>
-              <h2 className="text-lg font-bold text-on-surface">Trạng thái</h2>
-              <div className="mt-4 flex items-start gap-3">
-                {connectionStatus === "valid" && <CheckCircle2 className="w-6 h-6 text-green-500 flex-shrink-0" />}
-                {connectionStatus === "invalid" && <XCircle className="w-6 h-6 text-error flex-shrink-0" />}
-                {connectionStatus === "rate_limited" && <AlertCircle className="w-6 h-6 text-orange-500 flex-shrink-0" />}
-                {!connectionStatus && <Server className="w-6 h-6 text-on-surface-variant flex-shrink-0" />}
-                
-                <div>
-                  <p className={`font-bold ${
-                    connectionStatus === "valid" ? "text-green-500" :
-                    connectionStatus === "invalid" ? "text-error" :
-                    connectionStatus === "rate_limited" ? "text-orange-500" :
-                    "text-on-surface-variant"
-                  }`}>
-                    {connectionStatus === "valid" ? "Connected" :
-                     connectionStatus === "invalid" ? "Invalid / Error" :
-                     connectionStatus === "rate_limited" ? "Rate Limited (429)" :
-                     "Chưa kiểm tra"}
-                  </p>
-                  <p className="text-xs text-on-surface-variant mt-1">
-                    {connectionMessage || (settings?.configured ? "Hệ thống đang sử dụng cấu hình đã lưu." : "Hệ thống chưa được cấu hình AI.")}
-                  </p>
-                </div>
-              </div>
-            </div>
+          <AiStatusPanel 
+            connectionStatus={connectionStatus}
+            connectionMessage={connectionMessage}
+            settings={settings}
+            testing={testing}
+            saving={saving}
+            resetting={resetting}
+            handleTestConnection={handleTestConnection}
+            handleSave={handleSave}
+            handleReset={handleReset}
+          />
 
-            <div className="pt-6 border-t border-outline-variant/20 space-y-3">
-              <button
-                onClick={handleTestConnection}
-                disabled={testing || saving}
-                className="w-full py-3 rounded-xl border-2 border-primary text-primary font-bold hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Server className="w-4 h-4" />}
-                Test Connection
-              </button>
-              
-              <button
-                onClick={handleSave}
-                disabled={testing || saving}
-                className="w-full py-3 rounded-xl bg-primary text-on-primary font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Save Settings
-              </button>
+          <AiTipsPanel driver={driver} />
 
-              <button
-                onClick={handleReset}
-                disabled={testing || saving || resetting}
-                className="w-full py-3 rounded-xl bg-error/10 text-error font-bold hover:bg-error/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-4"
-              >
-                {resetting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-                Reset to Default
-              </button>
-            </div>
-          </div>
+          <AiRecentActivities 
+            activities={indexingStats?.recent_activities}
+            activityPage={activityPage}
+            setActivityPage={setActivityPage}
+          />
         </div>
       </div>
     </div>

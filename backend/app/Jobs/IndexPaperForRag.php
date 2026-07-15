@@ -99,5 +99,8 @@ class IndexPaperForRag implements ShouldQueue
             // Batch Insert toàn bộ
             $db->table('paper_chunks')->insert($insertData);
         });
+
+        // Delay 5 giây để tránh bị dính Rate Limit của Gemini (15 requests / phút)
+        sleep(5);
     }
 }

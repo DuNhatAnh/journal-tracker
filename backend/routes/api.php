@@ -170,6 +170,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // AI Settings
         Route::get('settings/ai', [\App\Http\Controllers\AdminSettingsController::class, 'getAiSettings']);
         Route::get('settings/ai/models', [\App\Http\Controllers\AdminSettingsController::class, 'getModels']);
+        Route::get('settings/ai/indexing-stats', [\App\Http\Controllers\AdminSettingsController::class, 'indexingStats']);
+        Route::post('settings/ai/start-indexing', [\App\Http\Controllers\AdminSettingsController::class, 'startIndexing']);
+        Route::post('settings/ai/stop-indexing', [\App\Http\Controllers\AdminSettingsController::class, 'stopIndexing']);
         Route::post('settings/ai/test', [\App\Http\Controllers\AdminSettingsController::class, 'testConnection']);
         Route::post('settings/ai', [\App\Http\Controllers\AdminSettingsController::class, 'updateAiSettings']);
         Route::delete('settings/ai', [\App\Http\Controllers\AdminSettingsController::class, 'deleteAiSettings']);

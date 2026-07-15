@@ -37,7 +37,7 @@ class AdminSettingsService
     public function testConnection(string $driver, array $config): void
     {
         if ($driver === 'gemini') {
-            $this->testGeminiConnection($config['api_key']);
+            $this->testGeminiConnection($config['api_key'] ?? config('rag.gemini_api_key'));
         } elseif ($driver === 'ollama') {
             $this->testOllamaConnection($config['base_url'] ?? config('rag.ollama_base_url'), $config['chat_model']);
         } else {
@@ -55,7 +55,9 @@ class AdminSettingsService
         ];
 
         if ($driver === 'gemini') {
-            $envData['GEMINI_API_KEY'] = $config['api_key'];
+            if (!empty($config['api_key'])) {
+                $envData['GEMINI_API_KEY'] = $config['api_key'];
+            }
             $envData['GEMINI_CHAT_MODEL'] = $config['chat_model'];
             $envData['GEMINI_EMBEDDING_MODEL'] = $config['embedding_model'];
         } elseif ($driver === 'ollama') {
@@ -152,5 +154,6 @@ class AdminSettingsService
     private function clearConfigCache(): void
     {
         Artisan::call('optimize:clear');
+        Artisan::call('queue:restart');
     }
 }

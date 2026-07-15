@@ -53,7 +53,12 @@ class UpdateAiSettingsRequest extends FormRequest
         ];
 
         if ($driver === 'gemini') {
-            $rules['api_key'] = ['required', 'string'];
+            $isConfigured = !empty(config('rag.gemini_api_key'));
+            if ($isConfigured) {
+                $rules['api_key'] = ['nullable', 'string'];
+            } else {
+                $rules['api_key'] = ['required', 'string'];
+            }
         } elseif ($driver === 'ollama') {
             $rules['base_url'] = ['nullable', 'string', 'url'];
             // API key is not required for standard local Ollama
