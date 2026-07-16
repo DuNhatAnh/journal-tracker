@@ -166,6 +166,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Chat RAG
     Route::post('/chat', [\App\Http\Controllers\ChatController::class, 'chat']);
     Route::post('/explore', [\App\Http\Controllers\ResearchExplorerController::class, 'explore']);
+    Route::post('/compare', [\App\Http\Controllers\Api\CompareController::class, 'compare']);
 
     /*
     |--------------------------------------------------------------------------

@@ -28,6 +28,8 @@ interface PaperDetailsSidebarProps {
   bookmarkLoadingIds: Set<number>;
   onBookmark: (paperId: number) => void;
   onExploreFromSeed?: (paperId: number) => void;
+  isInComparison?: boolean;
+  onToggleComparison?: () => void;
 }
 
 export const PaperDetailsSidebar: React.FC<PaperDetailsSidebarProps> = ({
@@ -36,6 +38,8 @@ export const PaperDetailsSidebar: React.FC<PaperDetailsSidebarProps> = ({
   bookmarkLoadingIds,
   onBookmark,
   onExploreFromSeed,
+  isInComparison = false,
+  onToggleComparison,
 }) => {
   const [summary, setSummary] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
@@ -435,6 +439,20 @@ export const PaperDetailsSidebar: React.FC<PaperDetailsSidebarProps> = ({
             >
               <span>{isBookmarked ? "⭐️ Đã lưu bài báo" : "☆ Lưu bài báo này"}</span>
             </button>
+
+            {onToggleComparison && (
+              <button
+                type="button"
+                onClick={onToggleComparison}
+                className={`w-full py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-98 border ${
+                  isInComparison
+                    ? "bg-warning/25 border-warning text-warning hover:bg-warning/35"
+                    : "bg-surface-container hover:bg-surface-container-high border-outline-variant/35 text-on-surface hover:text-primary"
+                }`}
+              >
+                <span>{isInComparison ? "⚖️ Đã thêm vào so sánh (Click để xóa)" : "⚖️ So sánh bài báo này"}</span>
+              </button>
+            )}
 
             {paperToShow.doi && (
               <a
