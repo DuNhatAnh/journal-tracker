@@ -15,6 +15,7 @@ interface Paper {
   citations_count: number;
   source: string;
   doi?: string;
+  url?: string;
   authors: Author[];
   keywords?: { id: number; name: string }[];
   journal?: { id: number; name: string };
@@ -228,9 +229,42 @@ export function SearchResultsList({
                 >
                   XEM CHI TIẾT
                 </button>
-                <button className="px-6 py-2.5 rounded-full bg-primary text-[10px] font-bold uppercase tracking-widest text-white shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:bg-primary/90 transition">
-                  TẢI XUỐNG PDF
-                </button>
+                {/* PDF / Link button */}
+                {(() => {
+                  const paperLink = paper.url || (paper.doi ? `https://doi.org/${paper.doi}` : null);
+                  const isPdf = paper.url?.toLowerCase().includes('.pdf');
+                  const label = !paperLink
+                    ? "KHÔNG CÓ LIÊN KẾT"
+                    : isPdf
+                    ? "TẢI XUỐNG PDF"
+                      : paper.url
+                        ? "XEM BÀI BÁO"
+                        : "XEM NGUỒN (DOI)";
+
+                  if (!paperLink) {
+                    return (
+                      <button
+                        disabled
+                        className="px-6 py-2.5 rounded-full bg-white/5 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 cursor-not-allowed border border-white/5"
+                        title="Bài báo này không có đường dẫn truy cập"
+                      >
+                        {label}
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <a
+                      href={paperLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-6 py-2.5 rounded-full bg-primary text-[10px] font-bold uppercase tracking-widest text-white shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:bg-primary/90 transition inline-flex items-center gap-1.5"
+                      title={isPdf ? "Tải xuống bài báo dạng PDF" : "Xem bài báo tại trang nguồn"}
+                    >
+                      {label}
+                    </a>
+                  );
+                })()}
               </div>
             </article>
           ))}

@@ -421,6 +421,17 @@ class SyncPapersFromApi implements ShouldQueue
                             $existing->keywords()->syncWithoutDetaching(array_unique($keywordIds));
                         }
 
+                        // Cập nhật URL nếu hiện tại đang trống
+                        if (is_null($existing->url)) {
+                            $paperUrl = data_get($item, 'best_oa_location.pdf_url')
+                                ?? data_get($item, 'primary_location.pdf_url')
+                                ?? data_get($item, 'best_oa_location.landing_page_url')
+                                ?? data_get($item, 'primary_location.landing_page_url');
+                            if ($paperUrl) {
+                                $existing->update(['url' => $paperUrl]);
+                            }
+                        }
+
                         if ($existing->citations_count === $citationsOnApi) {
                             // Perfect match - skip writing to database and pivot tables entirely
                             $this->progressItems[$item['id']]['status'] = 'skipped';
@@ -447,6 +458,12 @@ class SyncPapersFromApi implements ShouldQueue
                     $abstractIndex = data_get($item, 'abstract_inverted_index');
                     $abstract = is_array($abstractIndex) ? OpenAlexService::decodeAbstract($abstractIndex) : null;
 
+                    // Ưu tiên PDF trực tiếp (best_oa_location > primary_location), sau đó dùng landing_page_url
+                    $paperUrl = data_get($item, 'best_oa_location.pdf_url')
+                        ?? data_get($item, 'primary_location.pdf_url')
+                        ?? data_get($item, 'best_oa_location.landing_page_url')
+                        ?? data_get($item, 'primary_location.landing_page_url');
+
                     $paper = ResearchPaper::create([
                         'source_id'       => $item['id'],
                         'title'           => $item['title'] ?? 'Untitled',
@@ -455,6 +472,7 @@ class SyncPapersFromApi implements ShouldQueue
                         'journal_id'      => $journalId,
                         'citations_count' => $item['cited_by_count'] ?? 0,
                         'doi'             => $item['doi'] ?? null,
+                        'url'             => $paperUrl,
                         'source'          => $this->source,
                     ]);
 

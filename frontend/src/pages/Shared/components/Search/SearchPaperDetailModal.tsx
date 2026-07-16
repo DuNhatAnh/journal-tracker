@@ -15,6 +15,7 @@ interface Paper {
   citations_count: number;
   source: string;
   doi?: string;
+  url?: string;
   authors: Author[];
   keywords?: { id: number; name: string }[];
   journal?: { id: number; name: string };
@@ -184,12 +185,17 @@ export function SearchPaperDetailModal({
               )}
             </button>
             <a
-              href={paper.doi ? `https://doi.org/${paper.doi}` : "#"}
+              href={paper.url || (paper.doi ? `https://doi.org/${paper.doi}` : '#')}
               target="_blank"
               rel="noopener noreferrer"
               className="px-5 py-2.5 rounded-xl gradient-btn text-xs font-bold uppercase tracking-widest text-white flex items-center gap-2"
             >
-              Xem Nguồn Gốc <ExternalLink className="w-4 h-4" />
+              {paper.url
+                ? paper.url.toLowerCase().includes('.pdf')
+                  ? 'Tải PDF'
+                  : 'Xem Bài Báo'
+                : 'Xem Nguồn Gốc'}
+              <ExternalLink className="w-4 h-4" />
             </a>
           </div>
         </div>

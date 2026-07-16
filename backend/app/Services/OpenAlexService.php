@@ -78,7 +78,7 @@ class OpenAlexService
                 'page'       => $page,
                 'per-page'   => $perPage,
                 'sort'       => $sort,
-                'select'     => 'id,title,abstract_inverted_index,publication_year,primary_location,authorships,concepts,topics,cited_by_count,doi',
+                'select'     => 'id,title,abstract_inverted_index,publication_year,primary_location,best_oa_location,authorships,concepts,topics,cited_by_count,doi',
                 'mailto'     => $this->email,
             ];
 

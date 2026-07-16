@@ -14,6 +14,7 @@ interface Paper {
   citations_count: number;
   source: string;
   doi?: string;
+  url?: string;
   authors: Author[];
   keywords?: { id: number; name: string }[];
   journal?: { id: number; name: string };
@@ -126,6 +127,19 @@ export const PaperDetailsSidebar: React.FC<PaperDetailsSidebarProps> = ({
             className="w-full py-2.5 rounded-2xl text-xs font-bold bg-surface-container hover:bg-surface-container-high border border-outline-variant/35 text-on-surface transition-all flex items-center justify-center gap-1.5 shadow-sm hover:text-primary active:scale-98"
           >
             <span>🔗 Mở liên kết DOI</span>
+          </a>
+        )}
+
+        {/* Direct PDF or landing page link */}
+        {paperToShow.url && (
+          <a
+            href={paperToShow.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            download={paperToShow.url.toLowerCase().includes('.pdf') ? true : undefined}
+            className="w-full py-2.5 rounded-2xl text-xs font-bold bg-primary text-white hover:bg-primary/90 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-98 shadow-[0_0_12px_rgba(37,99,235,0.25)]"
+          >
+            <span>{paperToShow.url.toLowerCase().includes('.pdf') ? '📄 Tải xuống PDF' : '📎 Xem bài báo'}</span>
           </a>
         )}
       </div>

@@ -26,6 +26,7 @@ interface Paper {
   citations_count: number;
   source: string;
   doi?: string;
+  url?: string;
   authors: Author[];
   keywords?: { id: number; name: string }[];
   journal?: { id: number; name: string };
