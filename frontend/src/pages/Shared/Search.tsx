@@ -122,6 +122,8 @@ export default function Search() {
   // Custom graph visual modes
   const [colorMode, setColorMode] = useState<"year" | "topic" | "monochrome">("year");
   const [sizeMode, setSizeMode] = useState<"citations" | "uniform">("citations");
+  const [layoutMode, setLayoutMode] = useState<"force" | "timeline">("force");
+  const [draftLoading, setDraftLoading] = useState(false);
 
   const filteredNodes = useMemo(() => {
     return semanticNodes.filter(node => {
@@ -283,6 +285,54 @@ export default function Search() {
     } catch (err: any) {
       console.error(err);
       toast.error("Không thể mở rộng chủ đề.");
+    } finally {
+      setSemanticLoading(false);
+    }
+  };
+
+  const handleExploreFromSeed = async (paperId: number) => {
+    setSemanticLoading(true);
+    try {
+      const response = await api.post<{
+        success: boolean;
+        data: {
+          nodes: any[];
+          links: any[];
+        };
+      }>("/explore", { paper_id: paperId });
+
+      if (response.success && response.data) {
+        const width = 800;
+        const height = 720;
+        const formattedNodes = response.data.nodes.map((node: any, idx: number) => {
+          const angle = (idx * 2 * Math.PI) / (response.data.nodes.length || 1);
+          const radius = node.type === "root" ? 0 : (node.type === "topic" ? 110 : 210);
+          return {
+            ...node,
+            x: width / 2 + Math.cos(angle) * radius,
+            y: height / 2 + Math.sin(angle) * radius,
+            vx: 0,
+            vy: 0
+          };
+        });
+
+        setSemanticNodes(formattedNodes);
+        setSemanticLinks(response.data.links);
+        setPan({ x: 0, y: 0 });
+        setZoom(1);
+        setActiveSubView("graph");
+        
+        // Find seed paper metadata to select it
+        const seedNode = response.data.nodes.find((n: any) => n.id === `paper_${paperId}`);
+        if (seedNode && seedNode.metadata) {
+          setSelectedPaper(mapNodeMetadataToPaper(seedNode.metadata));
+        }
+        
+        toast.success("Đã vẽ sơ đồ tương đồng lấy bài báo làm gốc!");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Không thể vẽ bản đồ từ bài báo này.");
     } finally {
       setSemanticLoading(false);
     }
@@ -520,6 +570,108 @@ export default function Search() {
     setSearchParams({ q: searchInput, mode: searchMode, view, year, author, journal, keyword, sort, page: "1" });
   };
 
+  const loadPdfJs = (): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      if ((window as any).pdfjsLib) {
+        resolve((window as any).pdfjsLib);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js";
+      script.onload = () => {
+        const pdfjsLib = (window as any).pdfjsLib;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
+        resolve(pdfjsLib);
+      };
+      script.onerror = () => reject(new Error("Không thể tải thư viện PDF.js từ CDN"));
+      document.head.appendChild(script);
+    });
+  };
+
+  const extractTextFromPdf = async (file: File): Promise<string> => {
+    const pdfjsLib = await loadPdfJs();
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    
+    let text = "";
+    const numPages = Math.min(pdf.numPages, 10);
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map((item: any) => item.str).join(" ");
+      text += pageText + "\n\n";
+    }
+    return text;
+  };
+
+  const extractTextFromTxt = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string || "");
+      reader.onerror = () => reject(new Error("Không thể đọc file TXT"));
+      reader.readAsText(file);
+    });
+  };
+
+  const handleDraftFileSelect = async (file: File) => {
+    setDraftLoading(true);
+    const toastId = toast.loading(`Đang đọc file ${file.name}...`);
+    try {
+      let text = "";
+      if (file.type === "text/plain") {
+        text = await extractTextFromTxt(file);
+      } else if (file.type === "application/pdf") {
+        text = await extractTextFromPdf(file);
+      }
+
+      if (!text.trim()) {
+        throw new Error("Không thể trích xuất văn bản từ tài liệu này.");
+      }
+
+      const truncatedText = text.slice(0, 20000);
+      toast.loading("Đang phân tích và đối chiếu tài liệu nháp...", { id: toastId });
+      
+      const response = await api.post<{
+        success: boolean;
+        data: {
+          nodes: any[];
+          links: any[];
+        };
+      }>("/explore", { query: truncatedText });
+
+      if (response.success && response.data) {
+        const width = 800;
+        const height = 720;
+        const formattedNodes = response.data.nodes.map((node: any, idx: number) => {
+          const angle = (idx * 2 * Math.PI) / (response.data.nodes.length || 1);
+          const radius = node.type === "root" ? 0 : (node.type === "topic" ? 110 : 210);
+          return {
+            ...node,
+            x: width / 2 + Math.cos(angle) * radius,
+            y: height / 2 + Math.sin(angle) * radius,
+            vx: 0,
+            vy: 0
+          };
+        });
+
+        setSemanticNodes(formattedNodes);
+        setSemanticLinks(response.data.links);
+        setPan({ x: 0, y: 0 });
+        setZoom(1);
+        
+        setSearchInput(`[Draft] ${file.name}`);
+        setSearchParams({ q: `[Draft] ${file.name}`, mode: "semantic", view: viewMode, page: "1" });
+        
+        toast.success("Đối chiếu tài liệu nháp thành công!", { id: toastId });
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Lỗi khi xử lý file nháp.", { id: toastId });
+    } finally {
+      setDraftLoading(false);
+    }
+  };
+
 
 
   return (
@@ -541,6 +693,8 @@ export default function Search() {
         onSearchModeChange={handleSearchModeChange}
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
+        onDraftFileSelect={handleDraftFileSelect}
+        draftLoading={draftLoading}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -654,6 +808,8 @@ export default function Search() {
                   sizeMode={sizeMode}
                   setSizeMode={setSizeMode}
                   semanticPapers={semanticPapers}
+                  layoutMode={layoutMode}
+                  setLayoutMode={setLayoutMode}
                 />
               ) : (
                 <PriorDerivativeWorksTable
@@ -757,6 +913,7 @@ export default function Search() {
             bookmarkedIds={bookmarkedIds}
             bookmarkLoadingIds={bookmarkLoadingIds}
             onBookmark={handleBookmark}
+            onExploreFromSeed={handleExploreFromSeed}
           />
         ) : (
           <SearchFilters

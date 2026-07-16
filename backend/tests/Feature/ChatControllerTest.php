@@ -14,6 +14,7 @@ class ChatControllerTest extends TestCase
     use RefreshDatabase;
 
     private $ragServiceMock;
+    private $llmServiceMock;
     private User $user;
 
     protected function setUp(): void
@@ -22,6 +23,9 @@ class ChatControllerTest extends TestCase
 
         $this->ragServiceMock = $this->createMock(RagServiceInterface::class);
         $this->app->instance(RagServiceInterface::class, $this->ragServiceMock);
+
+        $this->llmServiceMock = $this->createMock(\App\Interfaces\LlmServiceInterface::class);
+        $this->app->instance(\App\Interfaces\LlmServiceInterface::class, $this->llmServiceMock);
 
         $this->user = User::forceCreate([
             'name' => 'Researcher Test',
@@ -105,5 +109,47 @@ class ChatControllerTest extends TestCase
 
         $response->assertStatus(422)
             ->assertJsonStructure(['error' => ['details' => ['question']]]);
+    }
+
+    public function test_chat_targeted_to_paper_id()
+    {
+        $paper = \App\Models\ResearchPaper::forceCreate([
+            'title' => 'Attention Is All You Need',
+            'abstract' => 'Transformer architecture abstract...',
+            'published_year' => 2017,
+            'citations_count' => 100,
+            'source' => 'Semantic Scholar',
+        ]);
+
+        $chunk = \App\Models\PaperChunk::forceCreate([
+            'paper_id' => $paper->id,
+            'content' => 'This is a transformer chunk content.'
+        ]);
+
+        $this->llmServiceMock->expects($this->once())
+            ->method('generate')
+            ->with($this->callback(function ($prompt) use ($paper) {
+                return str_contains($prompt, $paper->title) && str_contains($prompt, 'This is a transformer chunk content.');
+            }))
+            ->willReturn(new \App\DTOs\LlmResponse("According to the paper, transformer chunk content is here.", "stop"));
+
+        $response = $this->actingAs($this->user)->postJson('/api/chat', [
+            'question' => "What is the chunk content?",
+            'paper_id' => $paper->id
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'data' => [
+                'answer' => "According to the paper, transformer chunk content is here.",
+                'hasContext' => true,
+                'maxSimilarity' => 1.0,
+                'retrievedChunks' => 1,
+            ]
+        ]);
+        
+        $response->assertJsonCount(1, 'data.citations');
+        $this->assertEquals('Attention Is All You Need', $response->json('data.citations.0.title'));
     }
 }

@@ -1,6 +1,8 @@
-import { Search, User, Book, Bot, List, Network } from "lucide-react";
+import React from "react";
+import { Search, User, Book, Bot, List, Network, UploadCloud, Loader2 } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { AutocompleteInput } from "@/src/components/ui/AutocompleteInput";
+import toast from "react-hot-toast";
 
 interface SearchHeaderProps {
   searchInput: string;
@@ -20,6 +22,8 @@ interface SearchHeaderProps {
   onSearchModeChange: (mode: "keyword" | "semantic") => void;
   viewMode: "list" | "tree";
   onViewModeChange: (mode: "list" | "tree") => void;
+  onDraftFileSelect?: (file: File) => void;
+  draftLoading?: boolean;
 }
 
 export function SearchHeader({
@@ -39,11 +43,31 @@ export function SearchHeader({
   onSearchModeChange,
   viewMode,
   onViewModeChange,
+  onDraftFileSelect,
+  draftLoading,
 }: SearchHeaderProps) {
   const userStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
   const user = userStr ? JSON.parse(userStr) : null;
   const role = user?.role || "student";
   const isResearcher = role === "researcher" || role === "admin";
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== "text/plain" && file.type !== "application/pdf") {
+        toast.error("Chỉ chấp nhận file định dạng .txt hoặc .pdf");
+        return;
+      }
+      if (onDraftFileSelect) {
+        onDraftFileSelect(file);
+      }
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const selectedKeywords = keyword
     .split(",")
@@ -100,6 +124,32 @@ export function SearchHeader({
               >
                 <Bot className="w-3.5 h-3.5" />
                 Tương đồng AI
+              </button>
+            </div>
+          )}
+
+          {/* Upload draft button */}
+          {isResearcher && searchMode === "semantic" && onDraftFileSelect && (
+            <div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".txt,.pdf"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={draftLoading}
+                className="py-2 px-3.5 rounded-2xl text-[10px] font-black uppercase tracking-wide transition-all cursor-pointer flex items-center gap-1.5 bg-secondary hover:bg-secondary/90 text-white shadow-md disabled:opacity-50 active:scale-98"
+              >
+                {draftLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <UploadCloud className="w-3.5 h-3.5" />
+                )}
+                {draftLoading ? "Đang xử lý..." : "Tải nháp đối chiếu (PDF/TXT)"}
               </button>
             </div>
           )}

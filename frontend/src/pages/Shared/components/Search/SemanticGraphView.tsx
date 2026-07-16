@@ -93,6 +93,8 @@ interface SemanticGraphViewProps {
   sizeMode: "citations" | "uniform";
   setSizeMode: (mode: "citations" | "uniform") => void;
   semanticPapers: Paper[];
+  layoutMode: "force" | "timeline";
+  setLayoutMode: (mode: "force" | "timeline") => void;
 }
 
 export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
@@ -136,6 +138,8 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
   sizeMode,
   setSizeMode,
   semanticPapers,
+  layoutMode,
+  setLayoutMode,
 }) => {
   const canvasRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -268,34 +272,92 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
             const fx = (dx / dist) * force;
             const fy = (dy / dist) * force;
 
-            if (nodeA.type !== "root" && nodeA.id !== draggedNode) {
+            if ((nodeA.type !== "root" || layoutMode === "timeline") && nodeA.id !== draggedNode) {
               nodeA.x += fx;
               nodeA.y += fy;
             }
-            if (nodeB.type !== "root" && nodeB.id !== draggedNode) {
+            if ((nodeB.type !== "root" || layoutMode === "timeline") && nodeB.id !== draggedNode) {
               nodeB.x -= fx;
               nodeB.y -= fy;
             }
           }
         });
 
-        // 3. Gravity pulling nodes toward the root node coordinates (symmetrical clustering)
-        const rootNode = nodes.find(n => n.type === "root");
-        const gravityCenterX = rootNode ? rootNode.x : centerX;
-        const gravityCenterY = rootNode ? rootNode.y : centerY;
+        // 3. Gravity or Timeline attraction
+        if (layoutMode === "timeline") {
+          const paperYears = nodes
+            .filter(n => (n.type === "paper" || n.metadata) && n.metadata?.publishedYear)
+            .map(n => n.metadata!.publishedYear);
+          const activeYears = Array.from(new Set(paperYears)).sort((a, b) => a - b);
+          const yearsList = activeYears.length > 0 ? activeYears : [2026];
+          const numYears = yearsList.length;
+          const availableWidth = width - 200;
 
-        nodes.forEach(node => {
-          if (node.type === "root" || node.id === draggedNode) return;
-          const dx = gravityCenterX - node.x;
-          const dy = gravityCenterY - node.y;
-          // Soft gravity pull
-          node.x += dx * 0.045 * alpha;
-          node.y += dy * 0.045 * alpha;
-        });
+          nodes.forEach(node => {
+            if (node.id === draggedNode) return;
+            
+            let targetX = centerX;
+            if (node.metadata && node.metadata.publishedYear) {
+              const yr = node.metadata.publishedYear;
+              const idx = yearsList.indexOf(yr);
+              targetX = numYears === 1
+                ? centerX
+                : 100 + (idx / (numYears - 1)) * availableWidth;
+            } else if (node.type === "topic") {
+              const connectedPapers = filteredLinks
+                .filter(l => {
+                  const srcId = typeof l.source === "object" ? (l.source as any).id : l.source;
+                  const tgtId = typeof l.target === "object" ? (l.target as any).id : l.target;
+                  return srcId === node.id || tgtId === node.id;
+                })
+                .map(l => {
+                  const srcId = typeof l.source === "object" ? (l.source as any).id : l.source;
+                  const tgtId = typeof l.target === "object" ? (l.target as any).id : l.target;
+                  const otherId = srcId === node.id ? tgtId : srcId;
+                  return nodeMap.get(otherId);
+                })
+                .filter(n => n && n.metadata && n.metadata.publishedYear);
+              
+              if (connectedPapers.length > 0) {
+                const totalIdx = connectedPapers.reduce((sum, p) => {
+                  const pYear = p!.metadata!.publishedYear;
+                  return sum + Math.max(0, yearsList.indexOf(pYear));
+                }, 0);
+                const avgIdx = totalIdx / connectedPapers.length;
+                targetX = numYears === 1
+                  ? centerX
+                  : 100 + (avgIdx / (numYears - 1)) * availableWidth;
+              } else {
+                targetX = centerX;
+              }
+            } else if (node.type === "root") {
+              targetX = 50;
+            }
+
+            node.x += (targetX - node.x) * 0.18 * alpha;
+            node.y += (centerY - node.y) * 0.045 * alpha;
+          });
+        } else {
+          const rootNode = nodes.find(n => n.type === "root");
+          const gravityCenterX = rootNode ? rootNode.x : centerX;
+          const gravityCenterY = rootNode ? rootNode.y : centerY;
+
+          nodes.forEach(node => {
+            if (node.type === "root" || node.id === draggedNode) return;
+            const dx = gravityCenterX - node.x;
+            const dy = gravityCenterY - node.y;
+            node.x += dx * 0.045 * alpha;
+            node.y += dy * 0.045 * alpha;
+          });
+        }
 
         // 4. Boundary Constraint Clamping (Defensive design)
         nodes.forEach(node => {
-          if (node.type === "root") return; // Keep root fixed at center
+          if (node.type === "root" && layoutMode === "force") {
+            node.x = centerX;
+            node.y = centerY;
+            return;
+          }
           node.x = Math.max(30, Math.min(width - 30, node.x));
           node.y = Math.max(30, Math.min(height - 30, node.y));
         });
@@ -303,7 +365,6 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
         return nodes;
       });
 
-      // Decay the alpha parameter to stabilize the graph over time - Increased decay rate to 0.965
       alpha *= 0.965;
       animationFrameId = requestAnimationFrame(tick);
     };
@@ -313,8 +374,7 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [semanticLinks, minYearFilter, minCitationsFilter, draggedNode, semanticNodes.length, simTrigger]);
+  }, [semanticLinks, minYearFilter, minCitationsFilter, draggedNode, semanticNodes.length, simTrigger, layoutMode]);
 
   const mapNodeMetadataToPaper = (meta: NodeMetadata): Paper => {
     return {
@@ -461,6 +521,8 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
           setColorMode={setColorMode}
           sizeMode={sizeMode}
           setSizeMode={setSizeMode}
+          layoutMode={layoutMode}
+          setLayoutMode={setLayoutMode}
           containerRef={controlsRef}
         />
       )}
@@ -485,6 +547,54 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
           onClick={() => setSelectedPaper(null)}
         >
           <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
+            
+            {/* Timeline View Background Grid */}
+            {layoutMode === "timeline" && (() => {
+              const paperYears = semanticNodes
+                .filter(n => (n.type === "paper" || n.metadata) && n.metadata?.publishedYear)
+                .map(n => n.metadata!.publishedYear);
+              const activeYears = Array.from(new Set(paperYears)).sort((a, b) => a - b);
+              const yearsList = activeYears.length > 0 ? activeYears : [2026];
+              const numYears = yearsList.length;
+              const width = containerRef.current?.clientWidth || 800;
+              const height = 720;
+              const availableWidth = width - 200;
+
+              return yearsList.map((yr, idx) => {
+                const x = numYears === 1
+                  ? width / 2
+                  : 100 + (idx / (numYears - 1)) * availableWidth;
+                return (
+                  <g key={`grid-${yr}`} className="opacity-35 pointer-events-none select-none">
+                    <line
+                      x1={x}
+                      y1={40}
+                      x2={x}
+                      y2={height - 40}
+                      stroke="#85929E"
+                      strokeWidth={1.2}
+                      strokeDasharray="4 4"
+                    />
+                    <text
+                      x={x}
+                      y={30}
+                      textAnchor="middle"
+                      className="text-[11px] font-black fill-on-surface"
+                    >
+                      {yr}
+                    </text>
+                    <text
+                      x={x}
+                      y={height - 20}
+                      textAnchor="middle"
+                      className="text-[11px] font-black fill-on-surface"
+                    >
+                      {yr}
+                    </text>
+                  </g>
+                );
+              });
+            })()}
             
             {/* Draw Links */}
             {filteredLinks.map((link, idx) => {
