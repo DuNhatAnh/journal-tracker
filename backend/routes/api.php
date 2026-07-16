@@ -89,6 +89,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/journals', [DashboardController::class, 'journals']);
         Route::get('/fields', [DashboardController::class, 'fields']);
         Route::post('/ai-review', [\App\Http\Controllers\Api\AiController::class, 'review']);
+        Route::post('/ai-summary', [\App\Http\Controllers\Api\AiController::class, 'summarizePaper']);
     });
 
     // Research Papers
@@ -165,6 +166,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Chat RAG
     Route::post('/chat', [\App\Http\Controllers\ChatController::class, 'chat']);
     Route::post('/explore', [\App\Http\Controllers\ResearchExplorerController::class, 'explore']);
+    Route::post('/compare', [\App\Http\Controllers\Api\CompareController::class, 'compare']);
 
     /*
     |--------------------------------------------------------------------------

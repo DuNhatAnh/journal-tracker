@@ -31,6 +31,8 @@ interface SearchPaperDetailModalProps {
   followingKeywordIds: Set<number>;
   onToggleFollowKeyword: (id: number, name: string) => void;
   q?: string;
+  isInComparison?: boolean;
+  onToggleComparison?: () => void;
 }
 
 const HighlightText = ({ text, highlight }: { text: string; highlight?: string }) => {
@@ -64,6 +66,8 @@ export function SearchPaperDetailModal({
   followingKeywordIds,
   onToggleFollowKeyword,
   q,
+  isInComparison = false,
+  onToggleComparison,
 }: SearchPaperDetailModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -157,7 +161,21 @@ export function SearchPaperDetailModal({
             </div>
           )}
 
-          <div className="flex justify-end gap-4 pt-4 border-t border-white/5">
+          <div className="flex flex-wrap justify-end gap-3 pt-4 border-t border-white/5">
+            {onToggleComparison && (
+              <button
+                type="button"
+                onClick={onToggleComparison}
+                className={cn(
+                  "px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border",
+                  isInComparison
+                    ? "bg-warning/25 border-warning text-warning hover:bg-warning/35"
+                    : "bg-surface-container hover:bg-surface-container-high border-white/10 text-on-surface hover:text-primary"
+                )}
+              >
+                {isInComparison ? "⚖️ Đã thêm so sánh" : "⚖️ So sánh bài báo"}
+              </button>
+            )}
             <button
               onClick={onClose}
               className="px-5 py-2.5 rounded-xl border border-white/10 text-xs font-bold uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface"

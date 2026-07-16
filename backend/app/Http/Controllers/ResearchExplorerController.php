@@ -20,39 +20,84 @@ class ResearchExplorerController extends Controller
     public function explore(Request $request): JsonResponse
     {
         $request->validate([
-            'query' => ['required', 'string', 'min:2', 'max:200'],
+            'query' => ['required_without:paper_id', 'string', 'min:2', 'max:20000'],
+            'paper_id' => ['required_without:query', 'integer', 'exists:research_papers,id'],
         ]);
 
-        $query = $request->input('query');
+        $paperId = $request->input('paper_id');
+        $seedPaper = null;
+
+        if ($paperId) {
+            $seedPaper = ResearchPaper::with(['keywords', 'authors'])->findOrFail($paperId);
+            $query = $seedPaper->title;
+            $searchQuery = $seedPaper->title . " " . $seedPaper->abstract;
+        } else {
+            $query = $request->input('query');
+            $searchQuery = $query;
+
+            if ($this->isVietnamese($query)) {
+                $searchQuery = $this->translateToEnglish($query);
+            }
+        }
 
         // 1. Search for related papers using vector embedding similarity search
         try {
             // Using a threshold of 0.38 to capture broad relationships
-            $retrievalResults = $this->retrievalService->search($query, 6, 0.38);
+            $retrievalResults = $this->retrievalService->search($searchQuery, 7, 0.38);
             $paperIds = array_map(fn($r) => $r->paperId, $retrievalResults);
+            if ($seedPaper) {
+                $paperIds = array_filter($paperIds, fn($id) => $id != $seedPaper->id);
+            }
         } catch (\Exception $e) {
             $paperIds = [];
         }
 
         // Fallback to text search if no matches found via vector similarity
         if (empty($paperIds)) {
-            $papers = ResearchPaper::search($query)->with(['keywords', 'authors'])->limit(6)->get();
+            $papersQuery = ResearchPaper::search($searchQuery);
+            if ($seedPaper) {
+                $papersQuery = $papersQuery->where('id', '!=', $seedPaper->id);
+            }
+            $papers = $papersQuery->with(['keywords', 'authors'])->limit(6)->get();
         } else {
-            $papers = ResearchPaper::whereIn('id', $paperIds)->with(['keywords', 'authors'])->get();
+            $papersQuery = ResearchPaper::whereIn('id', $paperIds);
+            if ($seedPaper) {
+                $papersQuery = $papersQuery->where('id', '!=', $seedPaper->id);
+            }
+            $papers = $papersQuery->with(['keywords', 'authors'])->get();
         }
 
         // 2. Build graph data structure
         $nodes = [];
         $links = [];
 
-        // Root Node (Search Query)
-        $rootId = 'root';
-        $nodes[] = [
-            'id' => $rootId,
-            'label' => $query,
-            'type' => 'root',
-            'val' => 30, // Size indicator
-        ];
+        // Root Node (Search Query or Seed Paper)
+        if ($seedPaper) {
+            $rootId = 'paper_' . $seedPaper->id;
+            $nodes[] = [
+                'id' => $rootId,
+                'label' => $seedPaper->title,
+                'type' => 'root',
+                'val' => 30, // Size indicator
+                'metadata' => [
+                    'id' => $seedPaper->id,
+                    'title' => $seedPaper->title,
+                    'publishedYear' => $seedPaper->published_year,
+                    'citationsCount' => $seedPaper->citations_count,
+                    'doi' => $seedPaper->doi,
+                    'abstract' => $seedPaper->abstract,
+                    'authors' => $seedPaper->authors->pluck('name')->toArray(),
+                ]
+            ];
+        } else {
+            $rootId = 'root';
+            $nodes[] = [
+                'id' => $rootId,
+                'label' => $query,
+                'type' => 'root',
+                'val' => 30, // Size indicator
+            ];
+        }
 
         // Fetch co-occurring keywords/topics in these papers
         $keywords = Keyword::whereHas('papers', function ($q) use ($papers) {
@@ -146,5 +191,32 @@ class ResearchExplorerController extends Controller
                 'links' => $links,
             ],
         ]);
+    }
+
+    private function isVietnamese(string $text): bool
+    {
+        return (bool) preg_match('/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ]/u', $text);
+    }
+
+    private function translateToEnglish(string $text): string
+    {
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(3)->get('https://translate.googleapis.com/translate_a/single', [
+                'client' => 'gtx',
+                'sl' => 'vi',
+                'tl' => 'en',
+                'dt' => 't',
+                'q' => $text
+            ]);
+            if ($response->successful()) {
+                $data = $response->json();
+                if (isset($data[0][0][0])) {
+                    return trim($data[0][0][0]);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fallback
+        }
+        return $text;
     }
 }

@@ -1,8 +1,10 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Network, Info, SlidersHorizontal } from "lucide-react";
+import { Network, Info, SlidersHorizontal, Download } from "lucide-react";
 import { GraphControlPanel } from "./GraphControlPanel";
 import { GraphCenterButton } from "./GraphCenterButton";
 import { GraphNodeTooltip } from "./GraphNodeTooltip";
+import { exportToBibTeX, exportToRIS } from "@/src/lib/citationUtils";
+import toast from "react-hot-toast";
 
 interface Author {
   id: number;
@@ -74,6 +76,7 @@ interface SemanticGraphViewProps {
   draggedNode: string | null;
   setDraggedNode: (n: string | null) => void;
   handleExpandNode: (node: GraphNode) => void;
+  expandedPaperIds: Set<number>;
   q: string;
   year: string;
   author: string;
@@ -86,6 +89,13 @@ interface SemanticGraphViewProps {
   setSimTrigger: React.Dispatch<React.SetStateAction<number>>;
   filteredNodes: GraphNode[];
   filteredLinks: GraphLink[];
+  colorMode: "year" | "topic" | "monochrome";
+  setColorMode: (mode: "year" | "topic" | "monochrome") => void;
+  sizeMode: "citations" | "uniform";
+  setSizeMode: (mode: "citations" | "uniform") => void;
+  semanticPapers: Paper[];
+  layoutMode: "force" | "timeline";
+  setLayoutMode: (mode: "force" | "timeline") => void;
 }
 
 export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
@@ -112,6 +122,7 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
   draggedNode,
   setDraggedNode,
   handleExpandNode,
+  expandedPaperIds,
   q,
   year,
   author,
@@ -124,6 +135,13 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
   setSimTrigger,
   filteredNodes,
   filteredLinks,
+  colorMode,
+  setColorMode,
+  sizeMode,
+  setSizeMode,
+  semanticPapers,
+  layoutMode,
+  setLayoutMode,
 }) => {
   const canvasRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -135,9 +153,13 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
   const controlsToggleBtnRef = useRef<HTMLButtonElement>(null);
   const [showControls, setShowControls] = useState(false);
 
-  // Click outside to close Legend or Controls Popups
+  const exportRef = useRef<HTMLDivElement>(null);
+  const exportToggleBtnRef = useRef<HTMLButtonElement>(null);
+  const [showExportOptions, setShowExportOptions] = useState(false);
+
+  // Click outside to close Legend or Controls or Export Popups
   useEffect(() => {
-    if (!showLegend && !showControls) return;
+    if (!showLegend && !showControls && !showExportOptions) return;
 
     const handleOutsideClick = (event: MouseEvent) => {
       const target = event.target as Node;
@@ -161,13 +183,23 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
           setShowControls(false);
         }
       }
+      if (showExportOptions) {
+        if (
+          exportRef.current && 
+          !exportRef.current.contains(target) &&
+          exportToggleBtnRef.current &&
+          !exportToggleBtnRef.current.contains(target)
+        ) {
+          setShowExportOptions(false);
+        }
+      }
     };
 
     document.addEventListener("mousedown", handleOutsideClick);
     return () => {
       document.removeEventListener("mousedown", handleOutsideClick);
     };
-  }, [showLegend, showControls]);
+  }, [showLegend, showControls, showExportOptions]);
 
   // Live Force-Directed Simulation Loop with Alpha Decay Damping
   useEffect(() => {
@@ -242,34 +274,92 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
             const fx = (dx / dist) * force;
             const fy = (dy / dist) * force;
 
-            if (nodeA.type !== "root" && nodeA.id !== draggedNode) {
+            if ((nodeA.type !== "root" || layoutMode === "timeline") && nodeA.id !== draggedNode) {
               nodeA.x += fx;
               nodeA.y += fy;
             }
-            if (nodeB.type !== "root" && nodeB.id !== draggedNode) {
+            if ((nodeB.type !== "root" || layoutMode === "timeline") && nodeB.id !== draggedNode) {
               nodeB.x -= fx;
               nodeB.y -= fy;
             }
           }
         });
 
-        // 3. Gravity pulling nodes toward the root node coordinates (symmetrical clustering)
-        const rootNode = nodes.find(n => n.type === "root");
-        const gravityCenterX = rootNode ? rootNode.x : centerX;
-        const gravityCenterY = rootNode ? rootNode.y : centerY;
+        // 3. Gravity or Timeline attraction
+        if (layoutMode === "timeline") {
+          const paperYears = nodes
+            .filter(n => (n.type === "paper" || n.metadata) && n.metadata?.publishedYear)
+            .map(n => n.metadata!.publishedYear);
+          const activeYears = Array.from(new Set(paperYears)).sort((a, b) => a - b);
+          const yearsList = activeYears.length > 0 ? activeYears : [2026];
+          const numYears = yearsList.length;
+          const availableWidth = width - 200;
 
-        nodes.forEach(node => {
-          if (node.type === "root" || node.id === draggedNode) return;
-          const dx = gravityCenterX - node.x;
-          const dy = gravityCenterY - node.y;
-          // Soft gravity pull
-          node.x += dx * 0.045 * alpha;
-          node.y += dy * 0.045 * alpha;
-        });
+          nodes.forEach(node => {
+            if (node.id === draggedNode) return;
+            
+            let targetX = centerX;
+            if (node.metadata && node.metadata.publishedYear) {
+              const yr = node.metadata.publishedYear;
+              const idx = yearsList.indexOf(yr);
+              targetX = numYears === 1
+                ? centerX
+                : 100 + (idx / (numYears - 1)) * availableWidth;
+            } else if (node.type === "topic") {
+              const connectedPapers = filteredLinks
+                .filter(l => {
+                  const srcId = typeof l.source === "object" ? (l.source as any).id : l.source;
+                  const tgtId = typeof l.target === "object" ? (l.target as any).id : l.target;
+                  return srcId === node.id || tgtId === node.id;
+                })
+                .map(l => {
+                  const srcId = typeof l.source === "object" ? (l.source as any).id : l.source;
+                  const tgtId = typeof l.target === "object" ? (l.target as any).id : l.target;
+                  const otherId = srcId === node.id ? tgtId : srcId;
+                  return nodeMap.get(otherId);
+                })
+                .filter(n => n && n.metadata && n.metadata.publishedYear);
+              
+              if (connectedPapers.length > 0) {
+                const totalIdx = connectedPapers.reduce((sum, p) => {
+                  const pYear = p!.metadata!.publishedYear;
+                  return sum + Math.max(0, yearsList.indexOf(pYear));
+                }, 0);
+                const avgIdx = totalIdx / connectedPapers.length;
+                targetX = numYears === 1
+                  ? centerX
+                  : 100 + (avgIdx / (numYears - 1)) * availableWidth;
+              } else {
+                targetX = centerX;
+              }
+            } else if (node.type === "root") {
+              targetX = 50;
+            }
+
+            node.x += (targetX - node.x) * 0.18 * alpha;
+            node.y += (centerY - node.y) * 0.045 * alpha;
+          });
+        } else {
+          const rootNode = nodes.find(n => n.type === "root");
+          const gravityCenterX = rootNode ? rootNode.x : centerX;
+          const gravityCenterY = rootNode ? rootNode.y : centerY;
+
+          nodes.forEach(node => {
+            if (node.type === "root" || node.id === draggedNode) return;
+            const dx = gravityCenterX - node.x;
+            const dy = gravityCenterY - node.y;
+            node.x += dx * 0.045 * alpha;
+            node.y += dy * 0.045 * alpha;
+          });
+        }
 
         // 4. Boundary Constraint Clamping (Defensive design)
         nodes.forEach(node => {
-          if (node.type === "root") return; // Keep root fixed at center
+          if (node.type === "root" && layoutMode === "force") {
+            node.x = centerX;
+            node.y = centerY;
+            return;
+          }
           node.x = Math.max(30, Math.min(width - 30, node.x));
           node.y = Math.max(30, Math.min(height - 30, node.y));
         });
@@ -277,7 +367,6 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
         return nodes;
       });
 
-      // Decay the alpha parameter to stabilize the graph over time - Increased decay rate to 0.965
       alpha *= 0.965;
       animationFrameId = requestAnimationFrame(tick);
     };
@@ -287,8 +376,7 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [semanticLinks, minYearFilter, minCitationsFilter, draggedNode, semanticNodes.length, simTrigger]);
+  }, [semanticLinks, minYearFilter, minCitationsFilter, draggedNode, semanticNodes.length, simTrigger, layoutMode]);
 
   const mapNodeMetadataToPaper = (meta: NodeMetadata): Paper => {
     return {
@@ -348,6 +436,72 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
     }
   };
 
+  const handleExportPNG = () => {
+    if (!canvasRef.current) return;
+    try {
+      const svgElement = canvasRef.current;
+      const clonedSvg = svgElement.cloneNode(true) as SVGSVGElement;
+      
+      const gElement = clonedSvg.querySelector("g");
+      if (gElement) {
+        gElement.setAttribute("transform", "translate(0, 0) scale(1)");
+      }
+
+      const width = svgElement.clientWidth || 800;
+      const height = svgElement.clientHeight || 720;
+      
+      clonedSvg.setAttribute("width", width.toString());
+      clonedSvg.setAttribute("height", height.toString());
+
+      const svgString = new XMLSerializer().serializeToString(clonedSvg);
+      
+      const processedSvgString = svgString
+        .replace(/class="[^"]*fill-emerald-500[^"]*"/g, 'fill="#10b981"')
+        .replace(/class="[^"]*fill-sky-500[^"]*"/g, 'fill="#0ea5e9"')
+        .replace(/class="[^"]*fill-rose-600[^"]*"/g, 'fill="#e11d48"')
+        .replace(/class="[^"]*fill-orange-500[^"]*"/g, 'fill="#f97316"')
+        .replace(/class="[^"]*fill-amber-500[^"]*"/g, 'fill="#f59e0b"')
+        .replace(/class="[^"]*fill-amber-300[^"]*"/g, 'fill="#fcd34d"')
+        .replace(/class="[^"]*fill-pink-500[^"]*"/g, 'fill="#ec4899"')
+        .replace(/class="[^"]*fill-purple-500[^"]*"/g, 'fill="#a855f7"')
+        .replace(/class="[^"]*fill-indigo-500[^"]*"/g, 'fill="#6366f1"')
+        .replace(/class="[^"]*fill-cyan-500[^"]*"/g, 'fill="#06b6d4"')
+        .replace(/class="[^"]*fill-teal-500[^"]*"/g, 'fill="#14b8a6"')
+        .replace(/class="[^"]*fill-violet-500[^"]*"/g, 'fill="#8b5cf6"')
+        .replace(/stroke="[^"]*#f97316[^"]*"/g, 'stroke="#f97316"')
+        .replace(/stroke="[^"]*#0284c7[^"]*"/g, 'stroke="#0284c7"');
+
+      const svgBlob = new Blob([processedSvgString], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(svgBlob);
+      
+      const canvas = document.createElement("canvas");
+      canvas.width = width * 2;
+      canvas.height = height * 2;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const pngUrl = canvas.toDataURL("image/png");
+        const link = document.createElement("a");
+        link.href = pngUrl;
+        link.download = `scitrend-graph-${q.replace(/\s+/g, "_") || "discovery"}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    } catch (err) {
+      console.error(err);
+      toast.error("Không thể xuất ảnh đồ thị. Vui lòng thử lại.");
+    }
+  };
+
   return (
     <div 
       ref={containerRef}
@@ -365,6 +519,12 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
           setMinYearFilter={setMinYearFilter}
           minCitationsFilter={minCitationsFilter}
           setMinCitationsFilter={setMinCitationsFilter}
+          colorMode={colorMode}
+          setColorMode={setColorMode}
+          sizeMode={sizeMode}
+          setSizeMode={setSizeMode}
+          layoutMode={layoutMode}
+          setLayoutMode={setLayoutMode}
           containerRef={controlsRef}
         />
       )}
@@ -389,6 +549,54 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
           onClick={() => setSelectedPaper(null)}
         >
           <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
+            
+            {/* Timeline View Background Grid */}
+            {layoutMode === "timeline" && (() => {
+              const paperYears = semanticNodes
+                .filter(n => (n.type === "paper" || n.metadata) && n.metadata?.publishedYear)
+                .map(n => n.metadata!.publishedYear);
+              const activeYears = Array.from(new Set(paperYears)).sort((a, b) => a - b);
+              const yearsList = activeYears.length > 0 ? activeYears : [2026];
+              const numYears = yearsList.length;
+              const width = containerRef.current?.clientWidth || 800;
+              const height = 720;
+              const availableWidth = width - 200;
+
+              return yearsList.map((yr, idx) => {
+                const x = numYears === 1
+                  ? width / 2
+                  : 100 + (idx / (numYears - 1)) * availableWidth;
+                return (
+                  <g key={`grid-${yr}`} className="opacity-35 pointer-events-none select-none">
+                    <line
+                      x1={x}
+                      y1={40}
+                      x2={x}
+                      y2={height - 40}
+                      stroke="#85929E"
+                      strokeWidth={1.2}
+                      strokeDasharray="4 4"
+                    />
+                    <text
+                      x={x}
+                      y={30}
+                      textAnchor="middle"
+                      className="text-[11px] font-black fill-on-surface"
+                    >
+                      {yr}
+                    </text>
+                    <text
+                      x={x}
+                      y={height - 20}
+                      textAnchor="middle"
+                      className="text-[11px] font-black fill-on-surface"
+                    >
+                      {yr}
+                    </text>
+                  </g>
+                );
+              });
+            })()}
             
             {/* Draw Links */}
             {filteredLinks.map((link, idx) => {
@@ -445,19 +653,52 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
                 circleColor = "fill-sky-500";
                 strokeColor = "stroke-sky-600/30";
               } else if (node.type === "paper" && node.metadata) {
-                const yr = node.metadata.publishedYear || 2020;
-                if (yr >= 2024) {
-                  circleColor = "fill-rose-600";
-                  strokeColor = "stroke-rose-700/30";
-                } else if (yr >= 2020) {
+                if (colorMode === "year") {
+                  const yr = node.metadata.publishedYear || 2020;
+                  if (yr >= 2024) {
+                    circleColor = "fill-rose-600";
+                    strokeColor = "stroke-rose-700/30";
+                  } else if (yr >= 2020) {
+                    circleColor = "fill-orange-500";
+                    strokeColor = "stroke-orange-600/30";
+                  } else if (yr >= 2015) {
+                    circleColor = "fill-amber-500";
+                    strokeColor = "stroke-amber-600/30";
+                  } else {
+                    circleColor = "fill-amber-300";
+                    strokeColor = "stroke-amber-400/30";
+                  }
+                } else if (colorMode === "topic") {
+                  // Find topic links
+                  const paperLink = semanticLinks.find(l => {
+                    const srcId = typeof l.source === "object" ? (l.source as any).id : l.source;
+                    const tgtId = typeof l.target === "object" ? (l.target as any).id : l.target;
+                    return (srcId === node.id && tgtId.startsWith("kw_")) || (tgtId === node.id && srcId.startsWith("kw_"));
+                  });
+                  if (paperLink) {
+                    const topicId = typeof paperLink.source === "object"
+                      ? (paperLink.source as any).id
+                      : (paperLink.source === node.id ? paperLink.target : paperLink.source);
+                    const topicNum = parseInt(topicId.replace("kw_", "")) || 0;
+                    const clusterColors = [
+                      { fill: "fill-pink-500", stroke: "stroke-pink-600/30" },
+                      { fill: "fill-purple-500", stroke: "stroke-purple-600/30" },
+                      { fill: "fill-indigo-500", stroke: "stroke-indigo-600/30" },
+                      { fill: "fill-cyan-500", stroke: "stroke-cyan-600/30" },
+                      { fill: "fill-teal-500", stroke: "stroke-teal-600/30" },
+                      { fill: "fill-violet-500", stroke: "stroke-violet-600/30" },
+                    ];
+                    const colorSet = clusterColors[topicNum % clusterColors.length];
+                    circleColor = colorSet.fill;
+                    strokeColor = colorSet.stroke;
+                  } else {
+                    circleColor = "fill-orange-500";
+                    strokeColor = "stroke-orange-600/30";
+                  }
+                } else {
+                  // Monochrome
                   circleColor = "fill-orange-500";
                   strokeColor = "stroke-orange-600/30";
-                } else if (yr >= 2015) {
-                  circleColor = "fill-amber-500";
-                  strokeColor = "stroke-amber-600/30";
-                } else {
-                  circleColor = "fill-amber-300";
-                  strokeColor = "stroke-amber-400/30";
                 }
               } else if (node.type === "paper") {
                 circleColor = "fill-orange-500";
@@ -491,9 +732,9 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
                 nodeOpacity = isNodeRelatedToHover ? 1.0 : 0.15;
               }
 
-              // Calculate dynamic node radius based on citation count (for papers)
+              // Calculate dynamic node radius based on sizeMode and citation count
               const nodeRadius = node.type === "paper"
-                ? (12 + Math.min(10, (node.metadata?.citationsCount || 0) / 10))
+                ? (sizeMode === "citations" ? (12 + Math.min(10, (node.metadata?.citationsCount || 0) / 10)) : 14)
                 : node.val;
 
               // Adjust label margin dynamically based on node radius to avoid text overlapping circle
@@ -522,10 +763,25 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
                       setSelectedPaper(null);
                     }
                   }}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    if (node.type === "paper" && node.metadata) {
+                      handleExpandNode(node);
+                    }
+                  }}
                   onMouseDown={(e) => handleNodeMouseDown(e, node)}
                   onMouseEnter={() => setHoveredNodeId(node.id)}
                   onMouseLeave={() => setHoveredNodeId(null)}
                 >
+                  {/* Expanded Paper Indicator Ring */}
+                  {node.type === "paper" && node.metadata && expandedPaperIds.has(node.metadata.id) && (
+                    <circle
+                      r={nodeRadius + 6}
+                      className="fill-none stroke-warning/60 stroke-[1.5px] stroke-dasharray-[3,3] animate-spin"
+                      style={{ animationDuration: "12s" }}
+                    />
+                  )}
+
                   {(node.type === "root" || isSelected) && (
                     <circle
                       r={nodeRadius + 8}
@@ -666,6 +922,7 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
             onClick={() => {
               setShowControls(prev => !prev);
               setShowLegend(false);
+              setShowExportOptions(false);
             }}
             className={`w-8 h-8 rounded-full border border-outline-variant/30 shadow-md flex items-center justify-center transition-all cursor-pointer active:scale-90 relative group ${
               showControls
@@ -679,6 +936,73 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
             <span className="absolute bottom-full left-0 mb-2 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-white bg-on-surface rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-lg">
               Bộ lọc & Thu phóng
             </span>
+          </button>
+
+          {/* Export Toggle Button */}
+          <button
+            ref={exportToggleBtnRef}
+            type="button"
+            onClick={() => {
+              setShowExportOptions(prev => !prev);
+              setShowLegend(false);
+              setShowControls(false);
+            }}
+            className={`w-8 h-8 rounded-full border border-outline-variant/30 shadow-md flex items-center justify-center transition-all cursor-pointer active:scale-90 relative group ${
+              showExportOptions
+                ? "bg-primary text-white border-primary hover:bg-primary"
+                : "bg-surface-container-high/90 hover:bg-surface-container-highest text-on-surface hover:text-primary"
+            }`}
+          >
+            <Download className="w-4 h-4" />
+            
+            {/* Tooltip */}
+            <span className="absolute bottom-full left-0 mb-2 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-white bg-on-surface rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-lg">
+              Xuất dữ liệu & Ảnh
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Export popup options card shown above the buttons when showExportOptions is true */}
+      {semanticNodes.length > 0 && showExportOptions && (
+        <div 
+          ref={exportRef}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="absolute bottom-14 left-4 bg-surface-container-high/95 backdrop-blur-md p-4 rounded-3xl border border-outline-variant/35 shadow-2xl text-[10px] text-on-surface-variant font-semibold pointer-events-auto flex flex-col gap-2 w-56 animate-in fade-in slide-in-from-bottom-3 duration-200 z-30"
+        >
+          <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-wider block mb-1">Tùy chọn xuất:</span>
+          
+          <button
+            type="button"
+            onClick={() => {
+              setShowExportOptions(false);
+              handleExportPNG();
+            }}
+            className="w-full text-left px-3 py-2 rounded-xl hover:bg-surface-container-highest text-on-surface hover:text-primary transition-all text-xs font-bold flex items-center gap-2 cursor-pointer"
+          >
+            📸 Tải ảnh bản đồ (PNG)
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => {
+              setShowExportOptions(false);
+              exportToBibTeX(semanticPapers);
+            }}
+            className="w-full text-left px-3 py-2 rounded-xl hover:bg-surface-container-highest text-on-surface hover:text-primary transition-all text-xs font-bold flex items-center gap-2 cursor-pointer"
+          >
+            📚 Xuất BibTeX (.bib)
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setShowExportOptions(false);
+              exportToRIS(semanticPapers);
+            }}
+            className="w-full text-left px-3 py-2 rounded-xl hover:bg-surface-container-highest text-on-surface hover:text-primary transition-all text-xs font-bold flex items-center gap-2 cursor-pointer"
+          >
+            📚 Xuất RIS (.ris)
           </button>
         </div>
       )}

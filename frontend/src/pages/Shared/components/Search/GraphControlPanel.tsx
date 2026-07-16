@@ -7,6 +7,12 @@ interface GraphControlPanelProps {
   setMinYearFilter: (y: number) => void;
   minCitationsFilter: number;
   setMinCitationsFilter: (c: number) => void;
+  colorMode: "year" | "topic" | "monochrome";
+  setColorMode: (mode: "year" | "topic" | "monochrome") => void;
+  sizeMode: "citations" | "uniform";
+  setSizeMode: (mode: "citations" | "uniform") => void;
+  layoutMode: "force" | "timeline";
+  setLayoutMode: (mode: "force" | "timeline") => void;
   containerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -17,6 +23,12 @@ export const GraphControlPanel: React.FC<GraphControlPanelProps> = ({
   setMinYearFilter,
   minCitationsFilter,
   setMinCitationsFilter,
+  colorMode,
+  setColorMode,
+  sizeMode,
+  setSizeMode,
+  layoutMode,
+  setLayoutMode,
   containerRef,
 }) => {
   return (
@@ -39,6 +51,37 @@ export const GraphControlPanel: React.FC<GraphControlPanelProps> = ({
             className="w-24 h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
           />
           <span className="text-[9px] font-black text-on-surface w-8 text-right">{Math.round(zoom * 100)}%</span>
+        </div>
+      </div>
+
+      <div className="h-px bg-outline-variant/20" />
+
+      {/* Layout Mode Selector */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-wider">Bố cục sơ đồ:</span>
+        <div className="grid grid-cols-2 gap-1 bg-surface-container-highest p-0.5 rounded-xl border border-outline-variant/20 text-center select-none text-[8.5px] font-bold">
+          <button
+            type="button"
+            onClick={() => setLayoutMode("force")}
+            className={`py-1 rounded-lg transition-all cursor-pointer ${
+              layoutMode === "force"
+                ? "bg-primary text-white"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            Mạng Lưới (Force)
+          </button>
+          <button
+            type="button"
+            onClick={() => setLayoutMode("timeline")}
+            className={`py-1 rounded-lg transition-all cursor-pointer ${
+              layoutMode === "timeline"
+                ? "bg-primary text-white"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            Dòng Thời Gian
+          </button>
         </div>
       </div>
 
@@ -77,6 +120,79 @@ export const GraphControlPanel: React.FC<GraphControlPanelProps> = ({
             className="w-24 h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
           />
           <span className="text-[9px] font-black text-on-surface w-8 text-right">{minCitationsFilter}+</span>
+        </div>
+      </div>
+
+      <div className="h-px bg-outline-variant/20" />
+
+      {/* Color Mode Selector */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-wider">Màu sắc Node:</span>
+        <div className="grid grid-cols-3 gap-1 bg-surface-container-highest p-0.5 rounded-xl border border-outline-variant/20 text-center select-none text-[8.5px] font-bold">
+          <button
+            type="button"
+            onClick={() => setColorMode("year")}
+            className={`py-1 rounded-lg transition-all cursor-pointer ${
+              colorMode === "year"
+                ? "bg-primary text-white"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            Theo Năm
+          </button>
+          <button
+            type="button"
+            onClick={() => setColorMode("topic")}
+            className={`py-1 rounded-lg transition-all cursor-pointer ${
+              colorMode === "topic"
+                ? "bg-primary text-white"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            Chủ Đề
+          </button>
+          <button
+            type="button"
+            onClick={() => setColorMode("monochrome")}
+            className={`py-1 rounded-lg transition-all cursor-pointer ${
+              colorMode === "monochrome"
+                ? "bg-primary text-white"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            Đơn Sắc
+          </button>
+        </div>
+      </div>
+
+      <div className="h-px bg-outline-variant/20" />
+
+      {/* Size Mode Selector */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[9px] font-black text-on-surface-variant uppercase tracking-wider">Kích thước Node:</span>
+        <div className="grid grid-cols-2 gap-1 bg-surface-container-highest p-0.5 rounded-xl border border-outline-variant/20 text-center select-none text-[8.5px] font-bold">
+          <button
+            type="button"
+            onClick={() => setSizeMode("citations")}
+            className={`py-1 rounded-lg transition-all cursor-pointer ${
+              sizeMode === "citations"
+                ? "bg-primary text-white"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            Theo Trích Dẫn
+          </button>
+          <button
+            type="button"
+            onClick={() => setSizeMode("uniform")}
+            className={`py-1 rounded-lg transition-all cursor-pointer ${
+              sizeMode === "uniform"
+                ? "bg-primary text-white"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            Đồng Đều
+          </button>
         </div>
       </div>
     </div>

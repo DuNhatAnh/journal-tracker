@@ -37,17 +37,7 @@ class RetrievalService implements RetrievalServiceInterface
         // Detect if query is in Vietnamese and translate it to English for cross-lingual vector search
         $searchQuery = $query;
         if ($this->isVietnamese($query)) {
-            try {
-                $prompt = "Translate the following Vietnamese academic search query into a clean, search-optimized English keyword or phrase. Return ONLY the translated English search phrase, without any explanations, introductory text, or quotation marks:\n\n" . $query;
-                $translationResponse = $this->llmService->generate($prompt);
-                $translatedText = trim($translationResponse->content);
-                $translatedText = trim($translatedText, "\"'\"“‘’”");
-                if ($translatedText !== '') {
-                    $searchQuery = $translatedText;
-                }
-            } catch (\Exception $e) {
-                // Fallback to original query on translation error
-            }
+            $searchQuery = $this->translateToEnglish($query);
         }
 
         // Generate embedding for the query
@@ -130,5 +120,42 @@ class RetrievalService implements RetrievalServiceInterface
         }
         
         return $dotProduct / (sqrt($normA) * sqrt($normB));
+    }
+
+    private function translateToEnglish(string $text): string
+    {
+        // 1. Try Google Translate Free API
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(3)->get('https://translate.googleapis.com/translate_a/single', [
+                'client' => 'gtx',
+                'sl' => 'vi',
+                'tl' => 'en',
+                'dt' => 't',
+                'q' => $text
+            ]);
+            if ($response->successful()) {
+                $data = $response->json();
+                if (isset($data[0][0][0])) {
+                    return trim($data[0][0][0]);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fallback
+        }
+
+        // 2. Fallback to LLM Service
+        try {
+            $prompt = "Translate the following Vietnamese academic search query into a clean, search-optimized English keyword or phrase. Return ONLY the translated English search phrase, without any explanations, introductory text, or quotation marks:\n\n" . $text;
+            $translationResponse = $this->llmService->generate($prompt);
+            $translatedText = trim($translationResponse->content);
+            $translatedText = trim($translatedText, "\"'\"“‘’”");
+            if ($translatedText !== '') {
+                return $translatedText;
+            }
+        } catch (\Throwable $e) {
+            // Fallback to original text
+        }
+
+        return $text;
     }
 }

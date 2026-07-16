@@ -10,8 +10,137 @@ import { SearchPaperDetailModal } from "./components/Search/SearchPaperDetailMod
 import { PaperDetailsSidebar } from "./components/Search/PaperDetailsSidebar";
 import { PriorDerivativeWorksTable } from "./components/Search/PriorDerivativeWorksTable";
 import { SemanticGraphView } from "./components/Search/SemanticGraphView";
-import { Bot, Sparkles, GitBranch, Loader2 } from "lucide-react";
+import { Bot, Sparkles, GitBranch, Loader2, Scale, X } from "lucide-react";
 import { motion } from "framer-motion";
+
+const MarkdownCompareRenderer = ({ content }: { content: string }) => {
+  const lines = content.split("\n");
+  const elements: React.ReactNode[] = [];
+  
+  let inTable = false;
+  let tableHeaders: string[] = [];
+  let tableRows: string[][] = [];
+
+  const parseTableRow = (line: string): string[] => {
+    return line
+      .split("|")
+      .map(cell => cell.trim())
+      .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+  };
+
+  const flushTable = (key: number) => {
+    if (tableRows.length === 0) return null;
+    
+    const renderedTable = (
+      <div key={`table-${key}`} className="overflow-x-auto my-6 border border-outline-variant/35 rounded-2xl bg-surface-container/30">
+        <table className="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr className="border-b border-outline-variant/35 bg-surface-container-high/50">
+              {tableHeaders.map((h, i) => (
+                <th key={i} className="p-3.5 font-black text-primary uppercase tracking-wide">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {tableRows.map((row, rowIndex) => (
+              <tr key={rowIndex} className="border-b border-outline-variant/20 last:border-none hover:bg-white/5 transition-all">
+                {row.map((cell, cellIndex) => {
+                  let isPro = cell.toLowerCase().includes("pros:") || cell.toLowerCase().includes("ưu điểm") || cell.toLowerCase().includes("vượt trội");
+                  let isCon = cell.toLowerCase().includes("cons:") || cell.toLowerCase().includes("hạn chế") || cell.toLowerCase().includes("yếu");
+                  
+                  return (
+                    <td key={cellIndex} className="p-3.5 leading-relaxed align-top text-on-surface font-medium">
+                      {isPro ? (
+                        <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/20 text-[10.5px] mr-1">
+                          {cell}
+                        </span>
+                      ) : isCon ? (
+                        <span className="inline-block px-2.5 py-0.5 rounded-full bg-error/15 text-error font-bold border border-error/20 text-[10.5px] mr-1">
+                          {cell}
+                        </span>
+                      ) : (
+                        cell
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+    tableHeaders = [];
+    tableRows = [];
+    inTable = false;
+    return renderedTable;
+  };
+
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx];
+    
+    if (line.trim().startsWith("|")) {
+      if (line.includes("---")) {
+        continue;
+      }
+      
+      const parsed = parseTableRow(line);
+      if (!inTable) {
+        inTable = true;
+        tableHeaders = parsed;
+      } else {
+        tableRows.push(parsed);
+      }
+    } else {
+      if (inTable) {
+        const table = flushTable(idx);
+        if (table) elements.push(table);
+      }
+      
+      const trimmed = line.trim();
+      if (trimmed.startsWith("###")) {
+        elements.push(
+          <h4 key={idx} className="text-sm font-black text-primary mt-6 mb-2 uppercase tracking-wider">
+            {trimmed.replace(/^###\s*/, "")}
+          </h4>
+        );
+      } else if (trimmed.startsWith("##")) {
+        elements.push(
+          <h3 key={idx} className="text-base font-black text-secondary mt-8 mb-3 uppercase tracking-widest border-b border-outline-variant/35 pb-2">
+            {trimmed.replace(/^##\s*/, "")}
+          </h3>
+        );
+      } else if (trimmed.startsWith("#")) {
+        elements.push(
+          <h2 key={idx} className="text-lg font-black text-primary mt-8 mb-4 uppercase tracking-widest">
+            {trimmed.replace(/^#\s*/, "")}
+          </h2>
+        );
+      } else if (trimmed.startsWith("-") || trimmed.startsWith("*")) {
+        elements.push(
+          <li key={idx} className="text-xs text-on-surface-variant leading-relaxed ml-4 my-1.5 font-medium list-disc">
+            {trimmed.replace(/^[-*]\s*/, "")}
+          </li>
+        );
+      } else if (trimmed) {
+        elements.push(
+          <p key={idx} className="text-xs text-on-surface-variant leading-relaxed my-2.5 font-medium text-justify">
+            {trimmed}
+          </p>
+        );
+      }
+    }
+  }
+
+  if (inTable) {
+    const table = flushTable(lines.length);
+    if (table) elements.push(table);
+  }
+
+  return <div className="space-y-1">{elements}</div>;
+};
 
 interface Author {
   id: number;
@@ -120,6 +249,17 @@ export default function Search() {
   const [minYearFilter, setMinYearFilter] = useState<number>(2000);
   const [minCitationsFilter, setMinCitationsFilter] = useState<number>(0);
 
+  // Custom graph visual modes
+  const [colorMode, setColorMode] = useState<"year" | "topic" | "monochrome">("year");
+  const [sizeMode, setSizeMode] = useState<"citations" | "uniform">("citations");
+  const [layoutMode, setLayoutMode] = useState<"force" | "timeline">("force");
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [comparisonPapers, setComparisonPapers] = useState<Paper[]>([]);
+  const [isComparing, setIsComparing] = useState(false);
+  const [comparisonMarkdown, setComparisonMarkdown] = useState<string | null>(null);
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+  const [expandedPaperIds, setExpandedPaperIds] = useState<Set<number>>(new Set());
+
   const filteredNodes = useMemo(() => {
     return semanticNodes.filter(node => {
       if (node.type === "paper" && node.metadata) {
@@ -220,6 +360,7 @@ export default function Search() {
         setSemanticLinks(response.data.links);
         setPan({ x: 0, y: 0 });
         setZoom(1);
+        setExpandedPaperIds(new Set());
         setActiveSubView("graph");
       }
     } catch (err: any) {
@@ -230,18 +371,22 @@ export default function Search() {
     }
   };
 
-  // Expand tree nodes on-demand
+  // Expand tree nodes on-demand (Multi-hop Graph Expansion)
   const handleExpandNode = async (node: GraphNode) => {
     if (node.type === "root") return;
     setSemanticLoading(true);
     try {
+      const params = node.type === "paper" && node.metadata
+        ? { paper_id: node.metadata.id }
+        : { query: node.label };
+
       const response = await api.post<{
         success: boolean;
         data: {
           nodes: any[];
           links: any[];
         };
-      }>("/explore", { query: node.label });
+      }>("/explore", params);
 
       if (response.success && response.data) {
         setSemanticNodes(prevNodes => {
@@ -266,8 +411,19 @@ export default function Search() {
         setSemanticLinks(prevLinks => {
           const merged = [...prevLinks];
           response.data.links.forEach((l: any) => {
-            const src = l.source === "root" ? node.id : l.source;
-            const linkExists = merged.some(ml => ml.source === src && ml.target === l.target);
+            let src = l.source;
+            if (src === "root") {
+              src = node.id;
+            } else if (node.type === "paper" && node.metadata && src === `paper_${node.metadata.id}`) {
+              src = node.id;
+            }
+            
+            const linkExists = merged.some(ml => {
+              const mlSrc = typeof ml.source === "object" ? (ml.source as any).id : ml.source;
+              const mlTgt = typeof ml.target === "object" ? (ml.target as any).id : ml.target;
+              const lTgt = typeof l.target === "object" ? (l.target as any).id : l.target;
+              return mlSrc === src && mlTgt === lTgt;
+            });
             if (!linkExists) {
               merged.push({ source: src, target: l.target });
             }
@@ -275,11 +431,69 @@ export default function Search() {
           return merged;
         });
 
+        // Add node to expanded list if it is a paper node
+        if (node.type === "paper" && node.metadata) {
+          setExpandedPaperIds(prev => {
+            const next = new Set(prev);
+            next.add(node.metadata!.id);
+            return next;
+          });
+        }
+
         toast.success(`Đã mở rộng thêm các nhánh từ "${node.label}"`);
       }
     } catch (err: any) {
       console.error(err);
-      toast.error("Không thể mở rộng chủ đề.");
+      toast.error("Không thể mở rộng chủ đề hoặc bài báo.");
+    } finally {
+      setSemanticLoading(false);
+    }
+  };
+
+  const handleExploreFromSeed = async (paperId: number) => {
+    setSemanticLoading(true);
+    try {
+      const response = await api.post<{
+        success: boolean;
+        data: {
+          nodes: any[];
+          links: any[];
+        };
+      }>("/explore", { paper_id: paperId });
+
+      if (response.success && response.data) {
+        const width = 800;
+        const height = 720;
+        const formattedNodes = response.data.nodes.map((node: any, idx: number) => {
+          const angle = (idx * 2 * Math.PI) / (response.data.nodes.length || 1);
+          const radius = node.type === "root" ? 0 : (node.type === "topic" ? 110 : 210);
+          return {
+            ...node,
+            x: width / 2 + Math.cos(angle) * radius,
+            y: height / 2 + Math.sin(angle) * radius,
+            vx: 0,
+            vy: 0
+          };
+        });
+
+        setSemanticNodes(formattedNodes);
+        setSemanticLinks(response.data.links);
+        setPan({ x: 0, y: 0 });
+        setZoom(1);
+        setExpandedPaperIds(new Set());
+        setActiveSubView("graph");
+        
+        // Find seed paper metadata to select it
+        const seedNode = response.data.nodes.find((n: any) => n.id === `paper_${paperId}`);
+        if (seedNode && seedNode.metadata) {
+          setSelectedPaper(mapNodeMetadataToPaper(seedNode.metadata));
+        }
+        
+        toast.success("Đã vẽ sơ đồ tương đồng lấy bài báo làm gốc!");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Không thể vẽ bản đồ từ bài báo này.");
     } finally {
       setSemanticLoading(false);
     }
@@ -517,6 +731,160 @@ export default function Search() {
     setSearchParams({ q: searchInput, mode: searchMode, view, year, author, journal, keyword, sort, page: "1" });
   };
 
+  const loadPdfJs = (): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      if ((window as any).pdfjsLib) {
+        resolve((window as any).pdfjsLib);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js";
+      script.onload = () => {
+        const pdfjsLib = (window as any).pdfjsLib;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
+        resolve(pdfjsLib);
+      };
+      script.onerror = () => reject(new Error("Không thể tải thư viện PDF.js từ CDN"));
+      document.head.appendChild(script);
+    });
+  };
+
+  const extractTextFromPdf = async (file: File): Promise<string> => {
+    const pdfjsLib = await loadPdfJs();
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    
+    let text = "";
+    const numPages = Math.min(pdf.numPages, 10);
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map((item: any) => item.str).join(" ");
+      text += pageText + "\n\n";
+    }
+    return text;
+  };
+
+  const extractTextFromTxt = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string || "");
+      reader.onerror = () => reject(new Error("Không thể đọc file TXT"));
+      reader.readAsText(file);
+    });
+  };
+
+  const handleDraftFileSelect = async (file: File) => {
+    setDraftLoading(true);
+    const toastId = toast.loading(`Đang đọc file ${file.name}...`);
+    try {
+      let text = "";
+      if (file.type === "text/plain") {
+        text = await extractTextFromTxt(file);
+      } else if (file.type === "application/pdf") {
+        text = await extractTextFromPdf(file);
+      }
+
+      if (!text.trim()) {
+        throw new Error("Không thể trích xuất văn bản từ tài liệu này.");
+      }
+
+      const truncatedText = text.slice(0, 20000);
+      toast.loading("Đang phân tích và đối chiếu tài liệu nháp...", { id: toastId });
+      
+      const response = await api.post<{
+        success: boolean;
+        data: {
+          nodes: any[];
+          links: any[];
+        };
+      }>("/explore", { query: truncatedText });
+
+      if (response.success && response.data) {
+        const width = 800;
+        const height = 720;
+        const formattedNodes = response.data.nodes.map((node: any, idx: number) => {
+          const angle = (idx * 2 * Math.PI) / (response.data.nodes.length || 1);
+          const radius = node.type === "root" ? 0 : (node.type === "topic" ? 110 : 210);
+          return {
+            ...node,
+            x: width / 2 + Math.cos(angle) * radius,
+            y: height / 2 + Math.sin(angle) * radius,
+            vx: 0,
+            vy: 0
+          };
+        });
+
+        setSemanticNodes(formattedNodes);
+        setSemanticLinks(response.data.links);
+        setPan({ x: 0, y: 0 });
+        setZoom(1);
+        setExpandedPaperIds(new Set());
+        
+        setSearchInput(`[Draft] ${file.name}`);
+        setSearchParams({ q: `[Draft] ${file.name}`, mode: "semantic", view: viewMode, page: "1" });
+        
+        toast.success("Đối chiếu tài liệu nháp thành công!", { id: toastId });
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Lỗi khi xử lý file nháp.", { id: toastId });
+    } finally {
+      setDraftLoading(false);
+    }
+  };
+
+  const handleToggleComparison = (paper: Paper) => {
+    const exists = comparisonPapers.some(p => p.id === paper.id);
+    if (exists) {
+      setComparisonPapers(prev => prev.filter(p => p.id !== paper.id));
+      toast.success(`Đã xóa "${paper.title.slice(0, 30)}..." khỏi danh sách so sánh.`);
+    } else {
+      if (comparisonPapers.length >= 3) {
+        toast.error("Bạn chỉ có thể so sánh tối đa 3 bài báo cùng lúc.");
+        return;
+      }
+      setComparisonPapers(prev => [...prev, paper]);
+      toast.success(`Đã thêm "${paper.title.slice(0, 30)}..." vào danh sách so sánh.`);
+    }
+  };
+
+  const handleTriggerComparison = async () => {
+    if (comparisonPapers.length < 2) {
+      toast.error("Cần ít nhất 2 bài báo để tiến hành so sánh.");
+      return;
+    }
+    setIsComparing(true);
+    setIsCompareModalOpen(true);
+    setComparisonMarkdown(null);
+    
+    const toastId = toast.loading("AI đang tiến hành phân tích chéo và so sánh các bài báo...");
+    try {
+      const response = await api.post<{
+        success: boolean;
+        data: {
+          markdownTable: string;
+        };
+        message?: string;
+      }>("/compare", {
+        paper_ids: comparisonPapers.map(p => p.id)
+      });
+
+      if (response.success && response.data) {
+        setComparisonMarkdown(response.data.markdownTable);
+        toast.success("Đối chiếu các bài báo thành công!", { id: toastId });
+      } else {
+        throw new Error(response.message || "Không thể so sánh các bài báo.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Lỗi khi gọi dịch vụ so sánh AI.", { id: toastId });
+      setIsCompareModalOpen(false);
+    } finally {
+      setIsComparing(false);
+    }
+  };
+
 
 
   return (
@@ -538,6 +906,8 @@ export default function Search() {
         onSearchModeChange={handleSearchModeChange}
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
+        onDraftFileSelect={handleDraftFileSelect}
+        draftLoading={draftLoading}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -634,6 +1004,7 @@ export default function Search() {
                   draggedNode={draggedNode}
                   setDraggedNode={setDraggedNode}
                   handleExpandNode={handleExpandNode}
+                  expandedPaperIds={expandedPaperIds}
                   q={q}
                   year={year}
                   author={author}
@@ -646,6 +1017,13 @@ export default function Search() {
                   setSimTrigger={setSimTrigger}
                   filteredNodes={filteredNodes}
                   filteredLinks={filteredLinks}
+                  colorMode={colorMode}
+                  setColorMode={setColorMode}
+                  sizeMode={sizeMode}
+                  setSizeMode={setSizeMode}
+                  semanticPapers={semanticPapers}
+                  layoutMode={layoutMode}
+                  setLayoutMode={setLayoutMode}
                 />
               ) : (
                 <PriorDerivativeWorksTable
@@ -749,6 +1127,9 @@ export default function Search() {
             bookmarkedIds={bookmarkedIds}
             bookmarkLoadingIds={bookmarkLoadingIds}
             onBookmark={handleBookmark}
+            onExploreFromSeed={handleExploreFromSeed}
+            isInComparison={(selectedPaper || defaultPaper) ? comparisonPapers.some(p => p.id === (selectedPaper || defaultPaper)!.id) : false}
+            onToggleComparison={(selectedPaper || defaultPaper) ? () => handleToggleComparison(selectedPaper || defaultPaper!) : undefined}
           />
         ) : (
           <SearchFilters
@@ -781,7 +1162,134 @@ export default function Search() {
           followingKeywordIds={followingKeywordIds}
           onToggleFollowKeyword={toggleFollowKeyword}
           q={q}
+          isInComparison={comparisonPapers.some(p => p.id === selectedPaper.id)}
+          onToggleComparison={() => handleToggleComparison(selectedPaper)}
         />
+      )}
+
+      {/* Floating Comparison Tray */}
+      {comparisonPapers.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 glass-panel px-6 py-4 rounded-3xl border border-outline-variant/35 bg-surface-container-low/85 backdrop-blur-md shadow-2xl flex flex-col md:flex-row items-center gap-4 max-w-[90vw] md:max-w-3xl animate-slide-up">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-warning/15 text-warning shrink-0">
+              <Scale className="w-4 h-4" />
+            </div>
+            <div className="text-left shrink-0">
+              <h5 className="text-[11px] font-black text-on-surface uppercase tracking-wider">Khay so sánh học thuật</h5>
+              <p className="text-[10px] font-bold text-on-surface-variant">Đã chọn {comparisonPapers.length}/3 bài báo</p>
+            </div>
+          </div>
+
+          {/* Selected Papers Tags */}
+          <div className="flex flex-wrap gap-2 max-h-[80px] overflow-y-auto justify-center">
+            {comparisonPapers.map(p => (
+              <span key={p.id} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container border border-outline-variant/35 text-[10px] font-bold text-on-surface-variant max-w-[150px]">
+                <span className="truncate">{p.title}</span>
+                <button
+                  onClick={() => handleToggleComparison(p)}
+                  className="hover:text-error transition-all cursor-pointer p-0.5 rounded-full hover:bg-white/10 shrink-0"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end">
+            <button
+              onClick={() => setComparisonPapers([])}
+              className="px-3.5 py-1.5 rounded-xl border border-outline-variant/35 text-[10px] font-black uppercase tracking-wider text-on-surface hover:bg-white/5 transition-all cursor-pointer"
+            >
+              Xóa hết
+            </button>
+            <button
+              disabled={comparisonPapers.length < 2 || isComparing}
+              onClick={handleTriggerComparison}
+              className="px-4 py-1.5 rounded-xl bg-primary text-white text-[10px] font-black uppercase tracking-wider hover:bg-primary/95 transition-all cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+            >
+              So sánh ngay {isComparing && <Loader2 className="w-3 h-3 animate-spin" />}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Comparison Results Modal */}
+      {isCompareModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-surface-container-low border border-outline-variant/35 rounded-3xl w-full max-w-4xl p-6 shadow-2xl flex flex-col max-h-[85vh] animate-scale-up">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-outline-variant/20 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-2xl bg-primary/10 text-primary">
+                  <Scale className="w-5 h-5 animate-pulse" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-base font-black text-on-surface uppercase tracking-wider">
+                    Bảng đối chiếu học thuật thông minh
+                  </h3>
+                  <p className="text-[10px] font-bold text-on-surface-variant">
+                    Phân tích so sánh chéo bằng trợ lý AI địa phương (Ollama)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCompareModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-white/10 text-on-surface-variant hover:text-on-surface transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="flex-1 overflow-y-auto py-6 pr-1">
+              {isComparing ? (
+                <div className="h-64 flex flex-col items-center justify-center space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  </div>
+                  <div className="text-center space-y-1.5">
+                    <h4 className="text-xs font-bold text-on-surface">Đang tiến hành phân tích đối chiếu chéo...</h4>
+                    <p className="text-[10px] text-on-surface-variant max-w-sm px-6 leading-relaxed font-semibold">
+                      AI đang so sánh mục tiêu, phương pháp, ưu nhược điểm và kết quả của các bài báo đã chọn. Quá trình này chạy cục bộ và có thể mất vài giây.
+                    </p>
+                  </div>
+                </div>
+              ) : comparisonMarkdown ? (
+                <div className="space-y-4">
+                  {/* Header listing selected papers */}
+                  <div className="flex flex-wrap gap-2.5 p-3 rounded-2xl bg-surface-container-high/40 border border-outline-variant/20">
+                    <span className="text-[9px] bg-secondary/15 text-secondary border border-secondary/25 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
+                      Các tài liệu được so sánh:
+                    </span>
+                    {comparisonPapers.map((p, idx) => (
+                      <div key={p.id} className="text-[10.5px] font-black text-on-surface flex items-center gap-1">
+                        <span className="text-primary">{idx + 1}.</span> {p.title} <span className="text-[9px] text-on-surface-variant font-bold">({p.published_year})</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* AI comparative results */}
+                  <div className="text-left font-medium">
+                    <MarkdownCompareRenderer content={comparisonMarkdown} />
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center text-xs text-on-surface-variant">Không có dữ liệu so sánh.</div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="pt-4 border-t border-outline-variant/20 flex justify-end shrink-0">
+              <button
+                onClick={() => setIsCompareModalOpen(false)}
+                className="px-5 py-2.5 bg-surface-container hover:bg-surface-container-high border border-outline-variant/35 text-on-surface text-xs font-black uppercase tracking-widest rounded-2xl shadow-sm transition-all cursor-pointer"
+              >
+                Đóng cửa sổ
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

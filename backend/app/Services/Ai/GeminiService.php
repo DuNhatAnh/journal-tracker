@@ -22,14 +22,10 @@ class GeminiService implements EmbeddingServiceInterface, LlmServiceInterface
     public function __construct(Client $client)
     {
         $this->client = $client;
-        $this->apiKey = Config::get('services.gemini.api_key', '');
-        $this->embeddingModel = Config::get('services.gemini.embedding_model', 'gemini-embedding-001');
-        $this->chatModel = Config::get('services.gemini.chat_model', 'gemini-2.5-flash');
-        $this->embeddingDimensions = (int) Config::get('services.gemini.embedding_dimensions', 768);
-
-        if (empty($this->apiKey)) {
-            throw new AiServiceException('Gemini API key is not configured.');
-        }
+        $this->apiKey = Config::get('services.gemini.api_key') ?? '';
+        $this->embeddingModel = Config::get('services.gemini.embedding_model') ?? 'gemini-embedding-001';
+        $this->chatModel = Config::get('services.gemini.chat_model') ?? 'gemini-2.5-flash';
+        $this->embeddingDimensions = (int) (Config::get('services.gemini.embedding_dimensions') ?? 768);
     }
 
     /**
@@ -37,6 +33,10 @@ class GeminiService implements EmbeddingServiceInterface, LlmServiceInterface
      */
     public function getEmbedding(string $text): array
     {
+        if (empty($this->apiKey)) {
+            throw new AiServiceException('Gemini API key is not configured.');
+        }
+
         try {
             $url = "https://generativelanguage.googleapis.com/v1beta/models/{$this->embeddingModel}:embedContent";
 
@@ -86,6 +86,10 @@ class GeminiService implements EmbeddingServiceInterface, LlmServiceInterface
      */
     public function getEmbeddings(array $texts): array
     {
+        if (empty($this->apiKey)) {
+            throw new AiServiceException('Gemini API key is not configured.');
+        }
+
         if (empty($texts)) {
             return [];
         }
@@ -160,6 +164,10 @@ class GeminiService implements EmbeddingServiceInterface, LlmServiceInterface
      */
     public function generate(string $prompt): LlmResponse
     {
+        if (empty($this->apiKey)) {
+            throw new AiServiceException('Gemini API key is not configured.');
+        }
+
         try {
             $url = "https://generativelanguage.googleapis.com/v1beta/models/{$this->chatModel}:generateContent";
 
