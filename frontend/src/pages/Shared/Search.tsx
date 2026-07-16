@@ -257,6 +257,7 @@ export default function Search() {
   const [isComparing, setIsComparing] = useState(false);
   const [comparisonMarkdown, setComparisonMarkdown] = useState<string | null>(null);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+  const [expandedPaperIds, setExpandedPaperIds] = useState<Set<number>>(new Set());
 
   const filteredNodes = useMemo(() => {
     return semanticNodes.filter(node => {
@@ -358,6 +359,7 @@ export default function Search() {
         setSemanticLinks(response.data.links);
         setPan({ x: 0, y: 0 });
         setZoom(1);
+        setExpandedPaperIds(new Set());
         setActiveSubView("graph");
       }
     } catch (err: any) {
@@ -368,18 +370,22 @@ export default function Search() {
     }
   };
 
-  // Expand tree nodes on-demand
+  // Expand tree nodes on-demand (Multi-hop Graph Expansion)
   const handleExpandNode = async (node: GraphNode) => {
     if (node.type === "root") return;
     setSemanticLoading(true);
     try {
+      const params = node.type === "paper" && node.metadata
+        ? { paper_id: node.metadata.id }
+        : { query: node.label };
+
       const response = await api.post<{
         success: boolean;
         data: {
           nodes: any[];
           links: any[];
         };
-      }>("/explore", { query: node.label });
+      }>("/explore", params);
 
       if (response.success && response.data) {
         setSemanticNodes(prevNodes => {
@@ -404,8 +410,19 @@ export default function Search() {
         setSemanticLinks(prevLinks => {
           const merged = [...prevLinks];
           response.data.links.forEach((l: any) => {
-            const src = l.source === "root" ? node.id : l.source;
-            const linkExists = merged.some(ml => ml.source === src && ml.target === l.target);
+            let src = l.source;
+            if (src === "root") {
+              src = node.id;
+            } else if (node.type === "paper" && node.metadata && src === `paper_${node.metadata.id}`) {
+              src = node.id;
+            }
+            
+            const linkExists = merged.some(ml => {
+              const mlSrc = typeof ml.source === "object" ? (ml.source as any).id : ml.source;
+              const mlTgt = typeof ml.target === "object" ? (ml.target as any).id : ml.target;
+              const lTgt = typeof l.target === "object" ? (l.target as any).id : l.target;
+              return mlSrc === src && mlTgt === lTgt;
+            });
             if (!linkExists) {
               merged.push({ source: src, target: l.target });
             }
@@ -413,11 +430,20 @@ export default function Search() {
           return merged;
         });
 
+        // Add node to expanded list if it is a paper node
+        if (node.type === "paper" && node.metadata) {
+          setExpandedPaperIds(prev => {
+            const next = new Set(prev);
+            next.add(node.metadata!.id);
+            return next;
+          });
+        }
+
         toast.success(`Đã mở rộng thêm các nhánh từ "${node.label}"`);
       }
     } catch (err: any) {
       console.error(err);
-      toast.error("Không thể mở rộng chủ đề.");
+      toast.error("Không thể mở rộng chủ đề hoặc bài báo.");
     } finally {
       setSemanticLoading(false);
     }
@@ -453,6 +479,7 @@ export default function Search() {
         setSemanticLinks(response.data.links);
         setPan({ x: 0, y: 0 });
         setZoom(1);
+        setExpandedPaperIds(new Set());
         setActiveSubView("graph");
         
         // Find seed paper metadata to select it
@@ -791,6 +818,7 @@ export default function Search() {
         setSemanticLinks(response.data.links);
         setPan({ x: 0, y: 0 });
         setZoom(1);
+        setExpandedPaperIds(new Set());
         
         setSearchInput(`[Draft] ${file.name}`);
         setSearchParams({ q: `[Draft] ${file.name}`, mode: "semantic", view: viewMode, page: "1" });
@@ -975,6 +1003,7 @@ export default function Search() {
                   draggedNode={draggedNode}
                   setDraggedNode={setDraggedNode}
                   handleExpandNode={handleExpandNode}
+                  expandedPaperIds={expandedPaperIds}
                   q={q}
                   year={year}
                   author={author}

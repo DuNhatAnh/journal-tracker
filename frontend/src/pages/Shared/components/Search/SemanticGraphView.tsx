@@ -76,6 +76,7 @@ interface SemanticGraphViewProps {
   draggedNode: string | null;
   setDraggedNode: (n: string | null) => void;
   handleExpandNode: (node: GraphNode) => void;
+  expandedPaperIds: Set<number>;
   q: string;
   year: string;
   author: string;
@@ -121,6 +122,7 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
   draggedNode,
   setDraggedNode,
   handleExpandNode,
+  expandedPaperIds,
   q,
   year,
   author,
@@ -761,10 +763,25 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
                       setSelectedPaper(null);
                     }
                   }}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    if (node.type === "paper" && node.metadata) {
+                      handleExpandNode(node);
+                    }
+                  }}
                   onMouseDown={(e) => handleNodeMouseDown(e, node)}
                   onMouseEnter={() => setHoveredNodeId(node.id)}
                   onMouseLeave={() => setHoveredNodeId(null)}
                 >
+                  {/* Expanded Paper Indicator Ring */}
+                  {node.type === "paper" && node.metadata && expandedPaperIds.has(node.metadata.id) && (
+                    <circle
+                      r={nodeRadius + 6}
+                      className="fill-none stroke-warning/60 stroke-[1.5px] stroke-dasharray-[3,3] animate-spin"
+                      style={{ animationDuration: "12s" }}
+                    />
+                  )}
+
                   {(node.type === "root" || isSelected) && (
                     <circle
                       r={nodeRadius + 8}
