@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Exceptions\AiServiceException;
 use App\Interfaces\RagServiceInterface;
+use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,6 +19,7 @@ class ExceptionMappingTest extends TestCase
     use RefreshDatabase;
 
     private $ragServiceMock;
+    private User $user;
 
     protected function setUp(): void
     {
@@ -26,11 +28,18 @@ class ExceptionMappingTest extends TestCase
         // Mock RagService so we can force it to throw exceptions
         $this->ragServiceMock = $this->createMock(RagServiceInterface::class);
         $this->app->instance(RagServiceInterface::class, $this->ragServiceMock);
+
+        $this->user = User::forceCreate([
+            'name' => 'Researcher Test',
+            'email' => 'researcher@test.com',
+            'password' => bcrypt('password'),
+            'role' => 'researcher'
+        ]);
     }
 
     public function test_validation_exception_mapping()
     {
-        $response = $this->postJson('/api/chat', []); // Missing question
+        $response = $this->actingAs($this->user)->postJson('/api/chat', []); // Missing question
 
         $response->assertStatus(422)
             ->assertJson([
@@ -49,7 +58,7 @@ class ExceptionMappingTest extends TestCase
             ->method('generateAnswer')
             ->willThrowException(new InvalidArgumentException('Custom bad request message'));
 
-        $response = $this->postJson('/api/chat', ['question' => 'test_question']);
+        $response = $this->actingAs($this->user)->postJson('/api/chat', ['question' => 'test_question']);
 
         $response->assertStatus(400)
             ->assertJson([
@@ -68,7 +77,7 @@ class ExceptionMappingTest extends TestCase
             ->method('generateAnswer')
             ->willThrowException(new ModelNotFoundException());
 
-        $response = $this->postJson('/api/chat', ['question' => 'test_question']);
+        $response = $this->actingAs($this->user)->postJson('/api/chat', ['question' => 'test_question']);
 
         $response->assertStatus(404)
             ->assertJson([
@@ -86,7 +95,7 @@ class ExceptionMappingTest extends TestCase
             ->method('generateAnswer')
             ->willThrowException(new AiServiceException('Gemini is down'));
 
-        $response = $this->postJson('/api/chat', ['question' => 'test_question']);
+        $response = $this->actingAs($this->user)->postJson('/api/chat', ['question' => 'test_question']);
 
         $response->assertStatus(503)
             ->assertJson([
@@ -107,7 +116,7 @@ class ExceptionMappingTest extends TestCase
             ->method('generateAnswer')
             ->willThrowException($exception);
 
-        $response = $this->postJson('/api/chat', ['question' => 'test_question']);
+        $response = $this->actingAs($this->user)->postJson('/api/chat', ['question' => 'test_question']);
 
         $response->assertStatus(500)
             ->assertJson([
@@ -128,7 +137,7 @@ class ExceptionMappingTest extends TestCase
             ->method('generateAnswer')
             ->willThrowException(new Exception('Some random error'));
 
-        $response = $this->postJson('/api/chat', ['question' => 'test_question']);
+        $response = $this->actingAs($this->user)->postJson('/api/chat', ['question' => 'test_question']);
 
         $response->assertStatus(500)
             ->assertJson([

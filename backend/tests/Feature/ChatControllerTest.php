@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\DTOs\Citation;
 use App\DTOs\RagResponse;
 use App\Interfaces\RagServiceInterface;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -13,6 +14,7 @@ class ChatControllerTest extends TestCase
     use RefreshDatabase;
 
     private $ragServiceMock;
+    private User $user;
 
     protected function setUp(): void
     {
@@ -20,6 +22,13 @@ class ChatControllerTest extends TestCase
 
         $this->ragServiceMock = $this->createMock(RagServiceInterface::class);
         $this->app->instance(RagServiceInterface::class, $this->ragServiceMock);
+
+        $this->user = User::forceCreate([
+            'name' => 'Researcher Test',
+            'email' => 'researcher@test.com',
+            'password' => bcrypt('password'),
+            'role' => 'researcher'
+        ]);
     }
 
     public function test_chat_returns_successful_response()
@@ -43,7 +52,7 @@ class ChatControllerTest extends TestCase
             ->with($question)
             ->willReturn($ragResponse);
 
-        $response = $this->postJson('/api/chat', [
+        $response = $this->actingAs($this->user)->postJson('/api/chat', [
             'question' => $question
         ]);
 
@@ -68,7 +77,7 @@ class ChatControllerTest extends TestCase
     {
         $this->ragServiceMock->expects($this->never())->method('generateAnswer');
 
-        $response = $this->postJson('/api/chat', []);
+        $response = $this->actingAs($this->user)->postJson('/api/chat', []);
 
         $response->assertStatus(422);
         $response->assertJsonStructure(['error' => ['details' => ['question']]]);
@@ -79,7 +88,7 @@ class ChatControllerTest extends TestCase
     {
         $this->ragServiceMock->expects($this->never())->method('generateAnswer');
 
-        $response = $this->postJson('/api/chat', [
+        $response = $this->actingAs($this->user)->postJson('/api/chat', [
             'question' => 'ab'
         ]);
 
@@ -90,7 +99,7 @@ class ChatControllerTest extends TestCase
 
     public function test_chat_question_cannot_exceed_max_chars()
     {
-        $response = $this->postJson('/api/chat', [
+        $response = $this->actingAs($this->user)->postJson('/api/chat', [
             'question' => str_repeat('a', 5001),
         ]);
 

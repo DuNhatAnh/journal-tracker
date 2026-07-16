@@ -24,11 +24,16 @@ class ResearchExplorerController extends Controller
         ]);
 
         $query = $request->input('query');
+        $searchQuery = $query;
+
+        if ($this->isVietnamese($query)) {
+            $searchQuery = $this->translateToEnglish($query);
+        }
 
         // 1. Search for related papers using vector embedding similarity search
         try {
             // Using a threshold of 0.38 to capture broad relationships
-            $retrievalResults = $this->retrievalService->search($query, 6, 0.38);
+            $retrievalResults = $this->retrievalService->search($searchQuery, 6, 0.38);
             $paperIds = array_map(fn($r) => $r->paperId, $retrievalResults);
         } catch (\Exception $e) {
             $paperIds = [];
@@ -36,7 +41,7 @@ class ResearchExplorerController extends Controller
 
         // Fallback to text search if no matches found via vector similarity
         if (empty($paperIds)) {
-            $papers = ResearchPaper::search($query)->with(['keywords', 'authors'])->limit(6)->get();
+            $papers = ResearchPaper::search($searchQuery)->with(['keywords', 'authors'])->limit(6)->get();
         } else {
             $papers = ResearchPaper::whereIn('id', $paperIds)->with(['keywords', 'authors'])->get();
         }
@@ -146,5 +151,32 @@ class ResearchExplorerController extends Controller
                 'links' => $links,
             ],
         ]);
+    }
+
+    private function isVietnamese(string $text): bool
+    {
+        return (bool) preg_match('/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ]/u', $text);
+    }
+
+    private function translateToEnglish(string $text): string
+    {
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(3)->get('https://translate.googleapis.com/translate_a/single', [
+                'client' => 'gtx',
+                'sl' => 'vi',
+                'tl' => 'en',
+                'dt' => 't',
+                'q' => $text
+            ]);
+            if ($response->successful()) {
+                $data = $response->json();
+                if (isset($data[0][0][0])) {
+                    return trim($data[0][0][0]);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fallback
+        }
+        return $text;
     }
 }

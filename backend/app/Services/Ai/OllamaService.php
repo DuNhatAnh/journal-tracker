@@ -21,9 +21,9 @@ class OllamaService implements EmbeddingServiceInterface, LlmServiceInterface
     public function __construct(Client $client)
     {
         $this->client = $client;
-        $this->baseUrl = Config::get('services.ollama.base_url', 'http://host.docker.internal:11434');
-        $this->embeddingModel = Config::get('services.ollama.embedding_model', 'nomic-embed-text');
-        $this->chatModel = Config::get('services.ollama.chat_model', 'qwen2.5:3b');
+        $this->baseUrl = Config::get('services.ollama.base_url') ?? 'http://host.docker.internal:11434';
+        $this->embeddingModel = Config::get('services.ollama.embedding_model') ?? 'nomic-embed-text';
+        $this->chatModel = Config::get('services.ollama.chat_model') ?? 'qwen2.5:3b';
     }
 
     /**

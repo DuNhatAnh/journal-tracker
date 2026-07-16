@@ -119,6 +119,10 @@ export default function Search() {
   const [minYearFilter, setMinYearFilter] = useState<number>(2000);
   const [minCitationsFilter, setMinCitationsFilter] = useState<number>(0);
 
+  // Custom graph visual modes
+  const [colorMode, setColorMode] = useState<"year" | "topic" | "monochrome">("year");
+  const [sizeMode, setSizeMode] = useState<"citations" | "uniform">("citations");
+
   const filteredNodes = useMemo(() => {
     return semanticNodes.filter(node => {
       if (node.type === "paper" && node.metadata) {
@@ -645,6 +649,11 @@ export default function Search() {
                   setSimTrigger={setSimTrigger}
                   filteredNodes={filteredNodes}
                   filteredLinks={filteredLinks}
+                  colorMode={colorMode}
+                  setColorMode={setColorMode}
+                  sizeMode={sizeMode}
+                  setSizeMode={setSizeMode}
+                  semanticPapers={semanticPapers}
                 />
               ) : (
                 <PriorDerivativeWorksTable

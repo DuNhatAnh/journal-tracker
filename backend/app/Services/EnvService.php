@@ -17,7 +17,7 @@ class EnvService
      */
     public function setMany(array $data): bool
     {
-        $path = base_path('.env');
+        $path = $this->getEnvPath();
 
         if (!file_exists($path)) {
             return false;
@@ -32,9 +32,9 @@ class EnvService
             if (preg_match("/^{$key}=/m", $envContent)) {
                 // Replace existing key
                 $envContent = preg_replace(
-                    "/^{$key}=.*/m",
-                    "{$key}={$value}",
-                    $envContent
+                     "/^{$key}=.*/m",
+                     "{$key}={$value}",
+                     $envContent
                 );
             } else {
                 // Append new key
@@ -53,7 +53,7 @@ class EnvService
      */
     public function deleteKey(string $key): bool
     {
-        $path = base_path('.env');
+        $path = $this->getEnvPath();
 
         if (!file_exists($path)) {
             return false;
@@ -72,7 +72,7 @@ class EnvService
      */
     public function hasKey(string $key): bool
     {
-        $path = base_path('.env');
+        $path = $this->getEnvPath();
 
         if (!file_exists($path)) {
             return false;
@@ -88,7 +88,7 @@ class EnvService
      */
     public function getKey(string $key): ?string
     {
-        $path = base_path('.env');
+        $path = $this->getEnvPath();
 
         if (!file_exists($path)) {
             return null;
@@ -113,5 +113,29 @@ class EnvService
         }
         
         return $value;
+    }
+
+    /**
+     * Get the active environment file path.
+     */
+    private function getEnvPath(): string
+    {
+        $isTesting = false;
+        foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) as $trace) {
+            if (isset($trace['class']) && (str_starts_with($trace['class'], 'Tests\\') || str_starts_with($trace['class'], 'PHPUnit\\'))) {
+                $isTesting = true;
+                break;
+            }
+        }
+
+        $path = $isTesting
+            ? base_path('.env.testing')
+            : base_path('.env');
+
+        if ($isTesting && !file_exists($path)) {
+            file_put_contents($path, '');
+        }
+
+        return $path;
     }
 }
