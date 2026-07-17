@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Mail, Lock, User, ChevronLeft, ArrowLeft } from "lucide-react";
+import { Mail, Lock, User, ChevronLeft, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Logo } from "@/src/components/shared/Logo";
 import { ThemeToggle } from "@/src/components/shared/ThemeToggle";
@@ -12,6 +12,8 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [role, setRole] = useState("lecturer");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -97,21 +99,29 @@ export default function Register() {
             )}
 
             <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest pl-1">Họ tên</label>
-                <div className="relative group">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline group-focus-within:text-primary transition-colors" />
-                  <input
-                    type="text"
-                    required
-                    autoComplete="off"
-                    placeholder="Nguyễn Văn A"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-surface-container-low/50 border-2 border-outline-variant/30 rounded-xl py-3 pl-10 pr-4 text-on-surface focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-sans"
-                  />
+             <div className="space-y-2">
+                  <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest pl-1">Mật khẩu</label>
+                  <div className="relative group">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline group-focus-within:text-primary transition-colors" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full bg-surface-container-low/50 border-2 border-outline-variant/30 rounded-xl py-3 pl-10 pr-10 text-on-surface focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-sans"
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
-              </div>
 
               <div className="space-y-2">
                 <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest pl-1">Email</label>
@@ -146,19 +156,27 @@ export default function Register() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
+               <div className="space-y-2">
                   <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest pl-1">Xác nhận mật khẩu</label>
                   <div className="relative group">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline group-focus-within:text-primary transition-colors" />
                     <input
-                      type="password"
+                      type={showConfirmPassword ? "text" : "password"}
                       required
                       autoComplete="new-password"
                       placeholder="••••••••"
                       value={passwordConfirmation}
                       onChange={(e) => setPasswordConfirmation(e.target.value)}
-                      className="w-full bg-surface-container-low/50 border-2 border-outline-variant/30 rounded-xl py-3 pl-10 pr-4 text-on-surface focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-sans"
+                      className="w-full bg-surface-container-low/50 border-2 border-outline-variant/30 rounded-xl py-3 pl-10 pr-10 text-on-surface focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-sans"
                     />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors cursor-pointer"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
               </div>
