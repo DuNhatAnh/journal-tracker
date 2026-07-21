@@ -283,7 +283,7 @@ export default function Landing() {
         </p>
 
         {/* BIG Dynamic Search Bar */}
-        <form onSubmit={handleSearch} className="w-full max-w-3xl relative group mb-8">
+        <form onSubmit={handleSearch} className="w-full max-w-3xl relative group mb-20">
           <div className="absolute -inset-1 bg-gradient-to-r from-primary via-secondary to-tertiary rounded-3xl blur opacity-30 group-hover:opacity-60 transition duration-500 bg-gradient-animate"></div>
           <div className="relative flex items-center bg-surface border-2 border-outline-variant/50 backdrop-blur-2xl rounded-3xl p-2 pl-6 shadow-2xl">
             <Search className="w-7 h-7 text-primary" />
@@ -295,46 +295,14 @@ export default function Landing() {
               className="flex-1 bg-transparent border-none text-on-surface px-5 py-5 outline-none placeholder:text-on-surface-variant/70 font-semibold text-lg sm:text-xl w-full" 
             />
             <button 
-            type="submit"
-            className="flex items-center gap-2 sm:gap-3 bg-gradient-to-r from-primary to-secondary hover:brightness-110 text-on-primary px-5 sm:px-10 py-4 sm:py-5 rounded-2xl font-bold uppercase tracking-widest text-sm transition-all active:scale-95 shadow-lg shrink-0 cursor-pointer"
-          >
-            <span className="hidden sm:inline">Khám Phá</span> <ArrowRight className="w-5 h-5" />
-          </button>
-          </div>
-      </form>
-
-        {/* Trust stats */}
-        <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 text-center mt-4 mb-8">
-          <div>
-            <p className="font-display text-2xl sm:text-3xl font-extrabold text-on-surface">50K+</p>
-            <p className="text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold">Bài báo khoa học</p>
-          </div>
-          <div className="w-px h-8 bg-outline-variant hidden sm:block" />
-          <div>
-            <p className="font-display text-2xl sm:text-3xl font-extrabold text-on-surface">200+</p>
-            <p className="text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold">Tạp chí uy tín</p>
-          </div>
-          <div className="w-px h-8 bg-outline-variant hidden sm:block" />
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-tertiary animate-pulse" />
-            <p className="font-display text-2xl sm:text-3xl font-extrabold text-on-surface">Real-time</p>
-          </div>
-        </div>
-
-        {/* Quick search suggestions */}
-        <div className="flex flex-wrap items-center justify-center gap-2.5 mb-4">
-          <span className="text-xs text-on-surface-variant/70 font-semibold mr-1">Thử ngay:</span>
-          {["Machine Learning", "NLP", "Blockchain", "Computer Vision"].map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => navigate(`/search?q=${encodeURIComponent(tag)}`)}
-              className="px-3.5 py-1.5 rounded-full bg-surface-container/80 border border-outline-variant text-xs font-semibold text-on-surface-variant hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer"
+              type="submit"
+              className="hidden sm:flex items-center gap-3 bg-gradient-to-r from-primary to-secondary hover:brightness-110 text-on-primary px-10 py-5 rounded-2xl font-bold uppercase tracking-widest text-sm transition-all active:scale-95 shadow-lg shrink-0 cursor-pointer"
             >
-              {tag}
+              Khám Phá <ArrowRight className="w-5 h-5" />
             </button>
-          ))}
-        </div>
+          </div>
+        </form>
+
 
       </section>
 
