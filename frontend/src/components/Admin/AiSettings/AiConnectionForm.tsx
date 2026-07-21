@@ -1,5 +1,5 @@
 import React, { memo } from "react";
-import { Cpu, Eye, EyeOff, CheckCircle2, Loader2 } from "lucide-react";
+import { Cpu, Eye, EyeOff, CheckCircle2, Loader2, HelpCircle } from "lucide-react";
 import { AiModelsWhitelist, AiSettings } from "../../../pages/Admin/AiSettings";
 
 interface Props {
@@ -83,7 +83,21 @@ export const AiConnectionForm = memo(function AiConnectionForm({
 
       <div className="grid grid-cols-2 gap-6">
         <div className="space-y-2">
-          <label className="text-sm font-bold text-on-surface">Chat Model</label>
+          <label className="text-sm font-bold text-on-surface flex items-center gap-1">
+            Chat Model
+            {driver === "gemini" && (
+              <div className="group relative flex items-center z-10 hover:z-50">
+                <HelpCircle className="w-4 h-4 text-on-surface-variant cursor-help hover:text-primary transition-colors" />
+                <div className="absolute bottom-full left-0 mb-2 hidden w-72 bg-surface-container-highest border border-outline-variant/30 text-on-surface text-xs rounded-xl p-3 shadow-xl group-hover:block z-50">
+                  <ul className="list-disc pl-4 space-y-1.5 font-normal">
+                    <li><strong className="text-primary">gemini-3.5-flash</strong>: Tốc độ siêu việt và chi phí tối ưu, được hỗ trợ bởi API key hiện hành của bạn. <b>(Khuyên dùng)</b></li>
+                    <li><strong className="text-primary">gemini-1.5-pro</strong>: Mạnh mẽ nhất, xử lý ngữ cảnh phức tạp tốt hơn nhưng tốc độ chậm hơn.</li>
+                    <li><strong className="text-primary">gemini-1.5-flash</strong>: Nhẹ và cực kỳ nhanh, phù hợp cho các tác vụ cần phản hồi tức thì.</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+          </label>
           <select
             value={chatModel}
             onChange={(e) => setChatModel(e.target.value)}
@@ -96,7 +110,20 @@ export const AiConnectionForm = memo(function AiConnectionForm({
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-bold text-on-surface">Embedding Model</label>
+          <label className="text-sm font-bold text-on-surface flex items-center gap-1">
+            Embedding Model
+            {driver === "gemini" && (
+              <div className="group relative flex items-center z-10 hover:z-50">
+                <HelpCircle className="w-4 h-4 text-on-surface-variant cursor-help hover:text-primary transition-colors" />
+                <div className="absolute bottom-full left-0 mb-2 hidden w-72 bg-surface-container-highest border border-outline-variant/30 text-on-surface text-xs rounded-xl p-3 shadow-xl group-hover:block z-50">
+                  <ul className="list-disc pl-4 space-y-1.5 font-normal">
+                    <li><strong className="text-primary">gemini-embedding-001</strong>: Phiên bản ổn định trên API v1beta, ít lỗi 404 nhất. <b>(Khuyên dùng)</b></li>
+                    <li><strong className="text-primary">text-embedding-004</strong>: Đời mới hơn nhưng thường xuyên bị lỗi 404 (Not Found) trên một số tài khoản miễn phí do Google chưa mở hoàn toàn.</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+          </label>
           <div className="flex gap-2">
             <select
               value={embeddingModel}

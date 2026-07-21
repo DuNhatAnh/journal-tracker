@@ -7,7 +7,7 @@ import { AiProviderSelector } from "../../components/Admin/AiSettings/AiProvider
 import { AiConnectionForm } from "../../components/Admin/AiSettings/AiConnectionForm";
 import { AiRagPanel } from "../../components/Admin/AiSettings/AiRagPanel";
 import { AiStatusPanel } from "../../components/Admin/AiSettings/AiStatusPanel";
-import { AiTipsPanel } from "../../components/Admin/AiSettings/AiTipsPanel";
+
 import { AiRecentActivities } from "../../components/Admin/AiSettings/AiRecentActivities";
 import { AiChunkViewerModal } from "../../components/Admin/AiSettings/AiChunkViewerModal";
 
@@ -309,8 +309,9 @@ export default function AiSettingsPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
+      {/* Top Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        <div className="lg:col-span-2 space-y-6 relative z-50">
           <AiProviderSelector driver={driver} onDriverChange={handleDriverChange} />
 
           <AiConnectionForm
@@ -330,17 +331,6 @@ export default function AiSettingsPage() {
             handleSave={handleSave}
             saving={saving}
           />
-
-          <AiRagPanel
-            indexingStats={indexingStats}
-            indexing={indexing}
-            handleStartIndexing={handleStartIndexing}
-            handleStopIndexing={handleStopIndexing}
-            autoRefresh={autoRefresh}
-            setAutoRefresh={setAutoRefresh}
-            loading={loading}
-            onOpenChunkViewer={() => setIsChunkViewerOpen(true)}
-          />
         </div>
 
         {/* Action Panel */}
@@ -356,14 +346,34 @@ export default function AiSettingsPage() {
             handleSave={handleSave}
             handleReset={handleReset}
           />
+        </div>
+      </div>
 
-          <AiTipsPanel driver={driver} />
+      {/* Bottom Section: Parallel Panels */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+        <div className="lg:col-span-2 flex flex-col">
+          <div className="flex-1 flex flex-col [&>*]:flex-1">
+            <AiRagPanel
+              indexingStats={indexingStats}
+              indexing={indexing}
+              handleStartIndexing={handleStartIndexing}
+              handleStopIndexing={handleStopIndexing}
+              autoRefresh={autoRefresh}
+              setAutoRefresh={setAutoRefresh}
+              loading={loading}
+              onOpenChunkViewer={() => setIsChunkViewerOpen(true)}
+            />
+          </div>
+        </div>
 
-          <AiRecentActivities
-            activities={indexingStats?.recent_activities}
-            activityPage={activityPage}
-            setActivityPage={setActivityPage}
-          />
+        <div className="flex flex-col">
+          <div className="flex-1 flex flex-col [&>*]:flex-1">
+            <AiRecentActivities
+              activities={indexingStats?.recent_activities}
+              activityPage={activityPage}
+              setActivityPage={setActivityPage}
+            />
+          </div>
         </div>
       </div>
       

@@ -28,7 +28,7 @@ export const AiRagPanel = memo(function AiRagPanel({
   if (!indexingStats) return null;
 
   return (
-    <div className="glass-panel p-6 rounded-2xl border border-outline-variant/30 space-y-6">
+    <div className="glass-panel p-6 rounded-2xl border border-outline-variant/30 flex flex-col h-full space-y-6">
       <div>
         <h2 className="text-lg font-bold text-on-surface flex items-center gap-2">
           <Database className="w-5 h-5 text-primary" /> Quản lý Dữ liệu RAG
@@ -72,7 +72,7 @@ export const AiRagPanel = memo(function AiRagPanel({
         </div>
       </div>
 
-      <div className="pt-4 border-t border-outline-variant/20 space-y-3">
+      <div className="pt-4 border-t border-outline-variant/20 space-y-3 mt-auto">
         <button
           onClick={handleStartIndexing}
           disabled={indexing || indexingStats.unchunked_papers === 0}

@@ -3,15 +3,15 @@ import { UserItem } from "../../types";
 import { ROLE_CONFIG } from "./constants";
 
 type UsersStatsProps = {
-  users: UserItem[];
+  stats: Record<string, number>;
   loading: boolean;
 };
 
-export default function UsersStats({ users, loading }: UsersStatsProps) {
+export default function UsersStats({ stats, loading }: UsersStatsProps) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {Object.entries(ROLE_CONFIG).map(([role, cfg]) => {
-        const count = users.filter(u => u.role === role).length;
+        const count = stats[role] || 0;
         return (
           <div key={role} className={`glass-panel rounded-2xl p-4 border ${cfg.border} bg-surface flex items-center gap-3`}>
             <div className={`p-2.5 rounded-xl ${cfg.bg}`}>

@@ -22,10 +22,14 @@ class GeminiService implements EmbeddingServiceInterface, LlmServiceInterface
     public function __construct(Client $client)
     {
         $this->client = $client;
-        $this->apiKey = Config::get('services.gemini.api_key') ?? '';
-        $this->embeddingModel = Config::get('services.gemini.embedding_model') ?? 'gemini-embedding-001';
-        $this->chatModel = Config::get('services.gemini.chat_model') ?? 'gemini-2.5-flash';
-        $this->embeddingDimensions = (int) (Config::get('services.gemini.embedding_dimensions') ?? 768);
+        $this->apiKey = (string) Config::get('services.gemini.api_key', '');
+        $this->embeddingModel = Config::get('services.gemini.embedding_model', 'gemini-embedding-001');
+        $this->chatModel = Config::get('services.gemini.chat_model', 'gemini-2.5-flash');
+        $this->embeddingDimensions = (int) Config::get('services.gemini.embedding_dimensions', 768);
+
+        if (empty($this->apiKey)) {
+            throw new AiServiceException('Gemini API key is not configured.');
+        }
     }
 
     /**

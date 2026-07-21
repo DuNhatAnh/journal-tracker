@@ -804,7 +804,10 @@ export const SemanticGraphView: React.FC<SemanticGraphViewProps> = ({
                         : "opacity-0"
                     }`}
                     style={{
-                      textShadow: "0 1px 2px #ffffff, -1.5px -1.5px 0 #ffffff, 1.5px -1.5px 0 #ffffff, -1.5px 1.5px 0 #ffffff, 1.5px 1.5px 0 #ffffff"
+                      stroke: "var(--surface, #0f172a)",
+                      strokeWidth: "3px",
+                      strokeLinejoin: "round",
+                      paintOrder: "stroke fill"
                     }}
                   >
                     {node.label.length > 22

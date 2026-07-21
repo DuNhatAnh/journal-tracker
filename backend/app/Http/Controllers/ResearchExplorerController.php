@@ -42,12 +42,19 @@ class ResearchExplorerController extends Controller
 
         // 1. Search for related papers using vector embedding similarity search
         try {
-            // Using a threshold of 0.38 to capture broad relationships
-            $retrievalResults = $this->retrievalService->search($searchQuery, 7, 0.38);
-            $paperIds = array_map(fn($r) => $r->paperId, $retrievalResults);
+            // Fetch more chunks (e.g., 30) with a threshold of 0.38 to ensure we get enough unique and relevant papers
+            $retrievalResults = $this->retrievalService->search($searchQuery, 30, 0.38);
+            
+            // Extract paper IDs and remove duplicates
+            $paperIds = array_unique(array_map(fn($r) => $r->paperId, $retrievalResults));
+            
+            // Remove the seed paper from the results if it exists
             if ($seedPaper) {
-                $paperIds = array_filter($paperIds, fn($id) => $id != $seedPaper->id);
+                $paperIds = array_filter($paperIds, fn($id) => $id !== $seedPaper->id);
             }
+            
+            // Take the top 6 unique papers
+            $paperIds = array_slice(array_values($paperIds), 0, 6);
         } catch (\Exception $e) {
             $paperIds = [];
         }

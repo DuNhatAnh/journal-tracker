@@ -8,9 +8,34 @@ use Illuminate\Http\Request;
 
 class AdminUserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(User::where('email', '!=', 'admin@journaltracker.app')->get());
+        $query = User::where('email', '!=', 'admin@journaltracker.app');
+
+        if ($request->has('role') && $request->role !== 'all') {
+            $query->where('role', $request->role);
+        }
+
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'ilike', '%' . $search . '%')
+                  ->orWhere('email', 'ilike', '%' . $search . '%');
+            });
+        }
+
+        $statsQuery = User::where('email', '!=', 'admin@journaltracker.app')
+            ->selectRaw('role, count(*) as total')
+            ->groupBy('role')
+            ->pluck('total', 'role');
+
+        $perPage = $request->input('per_page', 10);
+        $users = $query->latest()->paginate($perPage);
+
+        return response()->json([
+            'users' => $users,
+            'stats' => $statsQuery
+        ]);
     }
 
     public function store(Request $request)

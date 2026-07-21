@@ -9,10 +9,15 @@ import UserModal from "./components/Users/UserModal";
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<UserItem[]>([]);
+  const [stats, setStats] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalUsers, setTotalUsers] = useState(0);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -34,9 +39,12 @@ export default function AdminUsers() {
 
   useEffect(() => {
     if (currentUser?.role === "admin") {
-      loadUsers();
+      const delayDebounceFn = setTimeout(() => {
+        loadUsers();
+      }, 300); // 300ms debounce
+      return () => clearTimeout(delayDebounceFn);
     }
-  }, []);
+  }, [currentPage, searchQuery, roleFilter]);
 
   if (currentUser?.role !== "admin") {
     return <Navigate to="/dashboard" replace />;
@@ -46,8 +54,23 @@ export default function AdminUsers() {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get<UserItem[]>("/admin/users");
-      setUsers(response || []);
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        search: searchQuery,
+        role: roleFilter
+      });
+      const response = await api.get<any>(`/admin/users?${queryParams.toString()}`);
+      if (response && response.users) {
+        setUsers(response.users.data || []);
+        setTotalPages(response.users.last_page || 1);
+        setTotalUsers(response.users.total || 0);
+        setStats(response.stats || {});
+      } else {
+        // Fallback for unexpected response structure
+        setUsers(response || []);
+        setTotalPages(1);
+        setTotalUsers(response.length || 0);
+      }
     } catch (err: any) {
       setError(err.message || "Không thể tải danh sách người dùng.");
     } finally {
@@ -148,14 +171,16 @@ export default function AdminUsers() {
     }
   };
 
-  // Filter & Search
-  const filteredUsers = users.filter((u) => {
-    const matchesSearch =
-      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = roleFilter === "all" || u.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
+  // When search or filter changes, we want to reset to page 1
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1);
+  };
+
+  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setRoleFilter(e.target.value);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-20">
@@ -175,7 +200,7 @@ export default function AdminUsers() {
       </header>
 
       {/* Stats Summary Row */}
-      <UsersStats users={users} loading={loading} />
+      <UsersStats stats={stats} loading={loading} />
 
       {error && (
         <div className="p-4 rounded-xl bg-error-container/20 border border-error/40 text-error text-sm font-medium">
@@ -214,11 +239,14 @@ export default function AdminUsers() {
       {/* Users Table */}
       <UsersTable
         users={users}
-        filteredUsers={filteredUsers}
         loading={loading}
         searchQuery={searchQuery}
         roleFilter={roleFilter}
         currentUser={currentUser}
+        totalUsers={totalUsers}
+        totalPages={totalPages}
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
         setSearchQuery={setSearchQuery}
         setRoleFilter={setRoleFilter}
         handleOpenEditModal={handleOpenEditModal}

@@ -136,27 +136,28 @@ class AdminSettingsController extends Controller
             ];
         }
 
-        // Fetch recent successes
+        // Fetch recent successes properly grouped by paper
         $recentSuccesses = \Illuminate\Support\Facades\DB::table('paper_chunks')
             ->join('research_papers', 'paper_chunks.paper_id', '=', 'research_papers.id')
-            ->select('research_papers.title', 'paper_chunks.created_at')
-            ->orderByDesc('paper_chunks.created_at')
-            ->limit(20)
-            ->get()
-            ->unique('title')
-            ->take(3);
+            ->select('research_papers.title', \Illuminate\Support\Facades\DB::raw('MAX(paper_chunks.created_at) as created_at'))
+            ->groupBy('research_papers.title')
+            ->orderByDesc('created_at')
+            ->limit(3)
+            ->get();
 
         foreach ($recentSuccesses as $chunk) {
             $activities[] = [
-                'time' => $chunk->created_at,
+                'time' => $chunk->created_at ?? date('Y-m-d H:i:s'),
                 'message' => 'Đã cắt thành công: ' . mb_substr($chunk->title, 0, 60) . '...',
                 'type' => 'success'
             ];
         }
 
-        // Sort by time descending
+        // Sort by time descending (robust)
         usort($activities, function ($a, $b) {
-            return strtotime($b['time']) - strtotime($a['time']);
+            $timeA = is_numeric($a['time']) ? $a['time'] : strtotime((string)$a['time']);
+            $timeB = is_numeric($b['time']) ? $b['time'] : strtotime((string)$b['time']);
+            return $timeB <=> $timeA;
         });
 
         // Limit to 50 total recent activities

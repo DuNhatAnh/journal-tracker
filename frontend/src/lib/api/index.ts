@@ -2,7 +2,7 @@ const BASE_URL = "/api";
 
 export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem("token");
-  
+
   const headers = new Headers(options.headers || {});
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
@@ -30,6 +30,22 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
 
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
+
+    // Handle custom error format from backend
+    if (errData.error) {
+      let message = errData.error.message || `Lỗi hệ thống (${response.status})`;
+
+      if (errData.error.details && Object.keys(errData.error.details).length > 0) {
+        const errorMessages = Object.values(errData.error.details).flat();
+        if (errorMessages.length > 0) {
+          message = errorMessages[0] as string;
+        }
+      }
+
+      throw new Error(message);
+    }
+
+    // Fallback for standard format
     let message = errData.message || `Lỗi hệ thống (${response.status})`;
 
     if (errData.errors) {

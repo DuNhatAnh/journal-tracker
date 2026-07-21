@@ -914,7 +914,74 @@ export default function Search() {
         
         {/* Papers list & Header */}
         <div className="lg:col-span-9 space-y-8 order-1 lg:order-1">
-          {searchMode === "semantic" && viewMode === "tree" ? (
+          {searchMode === "semantic" && !q ? (
+            <div className="space-y-8 animate-fade-in">
+              {/* Onboarding Panel */}
+              <div className="glass-panel p-6 rounded-3xl border border-outline-variant/30 bg-surface-container-low/40 space-y-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary flex-shrink-0">
+                    <Bot className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="text-base font-bold text-on-surface">Tìm kiếm ngữ nghĩa</h3>
+                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                      Chế độ này đối chiếu toàn bộ ngữ cảnh, từ khóa học thuật và ý tưởng nghiên cứu trong câu hỏi của bạn với cơ sở dữ liệu bài báo khoa học. AI giúp bạn tìm thấy các kết quả liên quan mật thiết về mặt bản chất kể cả khi chúng sử dụng các từ đồng nghĩa khác biệt.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Suggestion Prompts */}
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black text-on-surface-variant uppercase tracking-wider">Chọn nhanh một câu hỏi mẫu:</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      "Ứng dụng Học máy vào phát hiện bất thường trong giao thông thông minh",
+                      "Tối ưu hóa mô hình ngôn ngữ lớn (LLM) để chạy trực tiếp trên thiết bị di động",
+                      "Phương pháp thiết kế giao diện UI/UX thích ứng cho các ứng dụng đa màn hình",
+                      "Tích hợp Federated Learning vào bảo mật hệ thống Internet of Things (IoT)"
+                    ].map((prompt, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setSearchInput(prompt);
+                          setSearchParams({ q: prompt, mode: "semantic", view: viewMode, year, author, journal, keyword, sort, page: "1" });
+                        }}
+                        className="text-left p-3.5 rounded-2xl border border-outline-variant/20 bg-surface-container/50 hover:bg-surface-container-high hover:border-primary/45 hover:text-primary transition-all text-xs font-semibold text-on-surface-variant cursor-pointer flex items-center justify-between group"
+                      >
+                        <span className="truncate pr-2">{prompt}</span>
+                        <span className="text-[10px] font-bold text-primary opacity-0 group-hover:opacity-100 transition-all shrink-0">Tìm ngay →</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Default Recent Feed */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between px-1">
+                  <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                    Khám phá các bài báo khoa học mới nhất
+                  </h4>
+                  <span className="text-[10px] bg-secondary/10 text-secondary border border-secondary/20 px-2.5 py-0.5 rounded-full font-bold">
+                    Cập nhật liên tục
+                  </span>
+                </div>
+                <SearchResultsList
+                  papers={data?.data || []}
+                  loading={isLoading}
+                  bookmarkedIds={bookmarkedIds}
+                  bookmarkLoadingIds={bookmarkLoadingIds}
+                  onBookmark={handleBookmark}
+                  onSelectPaper={setSelectedPaper}
+                  page={pageParam}
+                  lastPage={data?.last_page || 1}
+                  onPageChange={handlePageChange}
+                  q={q}
+                />
+              </div>
+            </div>
+          ) : searchMode === "semantic" && viewMode === "tree" ? (
             <div className="space-y-4 relative">
               {semanticLoading && (
                 <div className="absolute inset-0 bg-surface-container-low/40 backdrop-blur-md z-50 rounded-3xl flex flex-col items-center justify-center space-y-4 animate-fade-in min-h-[720px]">
@@ -1036,74 +1103,6 @@ export default function Search() {
               )}
             </div>
           ) : (
-            searchMode === "semantic" && !q ? (
-              <div className="space-y-8 animate-fade-in">
-                {/* Onboarding Panel */}
-                <div className="glass-panel p-6 rounded-3xl border border-outline-variant/30 bg-surface-container-low/40 space-y-6">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary flex-shrink-0">
-                      <Bot className="w-6 h-6 animate-pulse" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <h3 className="text-base font-bold text-on-surface">Tìm kiếm ngữ nghĩa tương đồng AI</h3>
-                      <p className="text-xs text-on-surface-variant leading-relaxed">
-                        Chế độ này đối chiếu toàn bộ ngữ cảnh, từ khóa học thuật và ý tưởng nghiên cứu trong câu hỏi của bạn với cơ sở dữ liệu bài báo khoa học. AI giúp bạn tìm thấy các kết quả liên quan mật thiết về mặt bản chất kể cả khi chúng sử dụng các từ đồng nghĩa khác biệt.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Suggestion Prompts */}
-                  <div className="space-y-3">
-                    <h4 className="text-[10px] font-black text-on-surface-variant uppercase tracking-wider">Chọn nhanh một câu hỏi mẫu:</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {[
-                        "Ứng dụng Học máy vào phát hiện bất thường trong giao thông thông minh",
-                        "Tối ưu hóa mô hình ngôn ngữ lớn (LLM) để chạy trực tiếp trên thiết bị di động",
-                        "Phương pháp thiết kế giao diện UI/UX thích ứng cho các ứng dụng đa màn hình",
-                        "Tích hợp Federated Learning vào bảo mật hệ thống Internet of Things (IoT)"
-                      ].map((prompt, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            setSearchInput(prompt);
-                            setSearchParams({ q: prompt, mode: "semantic", view: viewMode, year, author, journal, keyword, sort, page: "1" });
-                          }}
-                          className="text-left p-3.5 rounded-2xl border border-outline-variant/20 bg-surface-container/50 hover:bg-surface-container-high hover:border-primary/45 hover:text-primary transition-all text-xs font-semibold text-on-surface-variant cursor-pointer flex items-center justify-between group"
-                        >
-                          <span className="truncate pr-2">{prompt}</span>
-                          <span className="text-[10px] font-bold text-primary opacity-0 group-hover:opacity-100 transition-all shrink-0">Tìm ngay →</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Default Recent Feed */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between px-1">
-                    <h4 className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                      Khám phá các bài báo khoa học mới nhất
-                    </h4>
-                    <span className="text-[10px] bg-secondary/10 text-secondary border border-secondary/20 px-2.5 py-0.5 rounded-full font-bold">
-                      Cập nhật liên tục
-                    </span>
-                  </div>
-                  <SearchResultsList
-                    papers={data?.data || []}
-                    loading={isLoading}
-                    bookmarkedIds={bookmarkedIds}
-                    bookmarkLoadingIds={bookmarkLoadingIds}
-                    onBookmark={handleBookmark}
-                    onSelectPaper={setSelectedPaper}
-                    page={pageParam}
-                    lastPage={data?.last_page || 1}
-                    onPageChange={handlePageChange}
-                    q={q}
-                  />
-                </div>
-              </div>
-            ) : (
               <SearchResultsList
                 papers={searchMode === "semantic" ? semanticPapers : (data?.data || [])}
                 loading={searchMode === "semantic" ? semanticLoading : isLoading}
@@ -1116,12 +1115,11 @@ export default function Search() {
                 onPageChange={handlePageChange}
                 q={q}
               />
-            )
           )}
         </div>
 
         {/* Sidebar Filters or Paper Details Workspace */}
-        {searchMode === "semantic" && viewMode === "tree" ? (
+        {searchMode === "semantic" && viewMode === "tree" && q ? (
           <PaperDetailsSidebar
             paperToShow={selectedPaper || defaultPaper}
             bookmarkedIds={bookmarkedIds}

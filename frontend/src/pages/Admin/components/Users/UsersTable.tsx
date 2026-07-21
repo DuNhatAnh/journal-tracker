@@ -4,11 +4,14 @@ import { UserItem } from "../../types";
 
 type UsersTableProps = {
   users: UserItem[];
-  filteredUsers: UserItem[];
   loading: boolean;
   searchQuery: string;
   roleFilter: string;
   currentUser: any;
+  totalUsers: number;
+  totalPages: number;
+  currentPage: number;
+  setCurrentPage: (page: number | ((prev: number) => number)) => void;
   setSearchQuery: (query: string) => void;
   setRoleFilter: (role: string) => void;
   handleOpenEditModal: (user: UserItem) => void;
@@ -17,26 +20,22 @@ type UsersTableProps = {
 
 export default function UsersTable({
   users,
-  filteredUsers,
   loading,
   searchQuery,
   roleFilter,
   currentUser,
+  totalUsers,
+  totalPages,
+  currentPage,
+  setCurrentPage,
   setSearchQuery,
   setRoleFilter,
   handleOpenEditModal,
   handleDeleteUser,
 }: UsersTableProps) {
-  const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 10;
-
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, roleFilter]);
-
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -47,7 +46,7 @@ export default function UsersTable({
     );
   }
 
-  if (filteredUsers.length === 0) {
+  if (users.length === 0) {
     return (
       <div className="rounded-2xl border border-white/10 bg-surface p-12 text-center text-on-surface-variant">
         <p className="text-lg font-semibold text-on-surface">Không tìm thấy người dùng nào.</p>
@@ -61,7 +60,7 @@ export default function UsersTable({
       {/* Table header with total count */}
       <div className="px-6 py-3 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
         <span className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">
-          {filteredUsers.length} / {users.length} người dùng
+          {totalUsers} người dùng
         </span>
         {searchQuery || roleFilter !== "all" ? (
           <button
@@ -84,7 +83,7 @@ export default function UsersTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5 text-sm">
-            {currentUsers.map((user) => (
+            {users.map((user) => (
               <tr key={user.id} className="hover:bg-white/[0.01] transition-all">
                 <td className="px-6 py-4 font-bold text-on-surface">{user.name}</td>
                 <td className="px-6 py-4 text-on-surface-variant">{user.email}</td>
@@ -139,7 +138,7 @@ export default function UsersTable({
       {totalPages > 1 && (
         <div className="px-6 py-4 border-t border-white/5 bg-white/[0.02] flex items-center justify-between">
           <div className="text-sm text-on-surface-variant">
-            Hiển thị <span className="font-bold text-on-surface">{startIndex + 1}</span> - <span className="font-bold text-on-surface">{Math.min(startIndex + itemsPerPage, filteredUsers.length)}</span> trong <span className="font-bold text-on-surface">{filteredUsers.length}</span> người dùng
+            Hiển thị <span className="font-bold text-on-surface">{startIndex + 1}</span> - <span className="font-bold text-on-surface">{Math.min(startIndex + itemsPerPage, totalUsers)}</span> trong <span className="font-bold text-on-surface">{totalUsers}</span> người dùng
           </div>
           <div className="flex items-center gap-2">
             <button
