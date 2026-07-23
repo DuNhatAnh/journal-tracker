@@ -163,8 +163,8 @@ interface Paper {
 
 interface SearchResponse {
   data: Paper[];
-  total: number;
-  last_page: number;
+  next_cursor: string | null;
+  prev_cursor: string | null;
 }
 
 interface NodeMetadata {
@@ -638,34 +638,43 @@ export default function Search() {
     }
   };
 
-  const fetchGlobalSuggestions = async (query: string) => {
+  const fetchGlobalSuggestions = React.useCallback(async (query: string, signal?: AbortSignal) => {
     try {
-      const [kwRes, auRes, joRes] = await Promise.all([
-        api.get<{ data: any[] }>(`/keywords?q=${encodeURIComponent(query)}&per_page=3`).then(r => r.data || []),
-        api.get<any[]>(`/following/search?type=author&q=${encodeURIComponent(query)}`).then(r => r.slice(0, 3)),
-        api.get<any[]>(`/following/search?type=journal&q=${encodeURIComponent(query)}`).then(r => r.slice(0, 3))
+      const [kwRes, auRes, joRes, paperRes] = await Promise.all([
+        api.get<{ data: any[] }>(`/keywords?q=${encodeURIComponent(query)}&per_page=3`, { signal }).then(r => r.data || []),
+        api.get<any[]>(`/following/search?type=author&q=${encodeURIComponent(query)}`, { signal }).then(r => r.slice(0, 3)),
+        api.get<any[]>(`/following/search?type=journal&q=${encodeURIComponent(query)}`, { signal }).then(r => r.slice(0, 3)),
+        api.get<any[]>(`/papers/suggestions?q=${encodeURIComponent(query)}`, { signal }).then(r => r.slice(0, 5))
       ]);
       const results: any[] = [];
+      paperRes.forEach((p: any) => results.push({ ...p, name: p.title, _type: 'paper' }));
       kwRes.forEach((k: any) => results.push({ ...k, _type: 'keyword' }));
       auRes.forEach((a: any) => results.push({ ...a, _type: 'author' }));
       joRes.forEach((j: any) => results.push({ ...j, _type: 'journal' }));
       return results;
-    } catch {
+    } catch (err: any) {
+      if (err.name === 'AbortError' || err.name === 'CanceledError') throw err;
       return [];
     }
-  };
+  }, []);
 
-  const fetchAuthorSuggestions = async (query: string) => {
+  const fetchAuthorSuggestions = React.useCallback(async (query: string, signal?: AbortSignal) => {
     try {
-      return await api.get<any[]>(`/following/search?type=author&q=${encodeURIComponent(query)}`);
-    } catch { return []; }
-  };
+      return await api.get<any[]>(`/following/search?type=author&q=${encodeURIComponent(query)}`, { signal });
+    } catch (err: any) {
+      if (err.name === 'AbortError' || err.name === 'CanceledError') throw err;
+      return []; 
+    }
+  }, []);
 
-  const fetchJournalSuggestions = async (query: string) => {
+  const fetchJournalSuggestions = React.useCallback(async (query: string, signal?: AbortSignal) => {
     try {
-      return await api.get<any[]>(`/following/search?type=journal&q=${encodeURIComponent(query)}`);
-    } catch { return []; }
-  };
+      return await api.get<any[]>(`/following/search?type=journal&q=${encodeURIComponent(query)}`, { signal });
+    } catch (err: any) { 
+      if (err.name === 'AbortError' || err.name === 'CanceledError') throw err;
+      return []; 
+    }
+  }, []);
 
   const handleSelectSuggestion = (item: any) => {
     if (item._type === 'keyword') {
@@ -673,13 +682,15 @@ export default function Search() {
       if (!currentKws.includes(item.name)) currentKws.push(item.name);
       const newKeyword = currentKws.join(',');
       setKeyword(newKeyword);
-      setSearchParams({ q: searchInput, mode: searchMode, view: viewMode, year, author, journal, keyword: newKeyword, sort, page: "1" });
+      setSearchParams({ q: searchInput, mode: searchMode, view: viewMode, year, author, journal, keyword: newKeyword, sort });
     } else if (item._type === 'author') {
       setAuthor(item.name);
-      setSearchParams({ q: searchInput, mode: searchMode, view: viewMode, year, author: item.name, journal, keyword, sort, page: "1" });
+      setSearchParams({ q: searchInput, mode: searchMode, view: viewMode, year, author: item.name, journal, keyword, sort });
     } else if (item._type === 'journal') {
       setJournal(item.name);
-      setSearchParams({ q: searchInput, mode: searchMode, view: viewMode, year, author, journal: item.name, keyword, sort, page: "1" });
+      setSearchParams({ q: searchInput, mode: searchMode, view: viewMode, year, author, journal: item.name, keyword, sort });
+    } else if (item._type === 'paper') {
+      setSearchParams({ q: item.name, mode: searchMode, view: viewMode, year, author, journal, keyword, sort });
     }
     setSearchInput("");
   };
@@ -693,11 +704,11 @@ export default function Search() {
     }
     const newKeyword = currentKws.join(',');
     setKeyword(newKeyword);
-    setSearchParams({ q, mode: searchMode, view: viewMode, year, author, journal, keyword: newKeyword, sort, page: "1" });
+    setSearchParams({ q, mode: searchMode, view: viewMode, year, author, journal, keyword: newKeyword, sort });
   };
 
   const handleApplyFilter = () => {
-    setSearchParams({ q, mode: searchMode, view: viewMode, year, author, journal, keyword, sort, page: "1" });
+    setSearchParams({ q, mode: searchMode, view: viewMode, year, author, journal, keyword, sort });
   };
 
   const handleResetFilters = () => {
@@ -706,29 +717,29 @@ export default function Search() {
     setJournal("");
     setKeyword("");
     setSort("relevance");
-    setSearchParams({ q, mode: searchMode, view: viewMode, page: "1" });
+    setSearchParams({ q, mode: searchMode, view: viewMode });
   };
 
   const handleSortChange = (newSort: string) => {
     setSort(newSort);
-    setSearchParams({ q, mode: searchMode, view: viewMode, year, author, journal, keyword, sort: newSort, page: "1" });
+    setSearchParams({ q, mode: searchMode, view: viewMode, year, author, journal, keyword, sort: newSort });
   };
 
-  const handlePageChange = (newPage: number) => {
-    if (newPage < 1 || newPage > (data?.last_page || 1)) return;
-    setSearchParams({ q, mode: searchMode, view: viewMode, year, author, journal, keyword, sort, page: newPage.toString() });
+  const handleCursorChange = (newCursor: string | null) => {
+    if (!newCursor) return;
+    setSearchParams({ q, mode: searchMode, view: viewMode, year, author, journal, keyword, sort, cursor: newCursor });
   };
 
   const handleSearchSubmit = () => {
-    setSearchParams({ q: searchInput, mode: searchMode, view: viewMode, year, author, journal, keyword, sort, page: "1" });
+    setSearchParams({ q: searchInput, mode: searchMode, view: viewMode, year, author, journal, keyword, sort });
   };
 
   const handleSearchModeChange = (mode: "keyword" | "semantic") => {
-    setSearchParams({ q: searchInput, mode, view: viewMode, year, author, journal, keyword, sort, page: "1" });
+    setSearchParams({ q: searchInput, mode, view: viewMode, year, author, journal, keyword, sort });
   };
 
   const handleViewModeChange = (view: "list" | "tree") => {
-    setSearchParams({ q: searchInput, mode: searchMode, view, year, author, journal, keyword, sort, page: "1" });
+    setSearchParams({ q: searchInput, mode: searchMode, view, year, author, journal, keyword, sort });
   };
 
   const loadPdfJs = (): Promise<any> => {
@@ -898,7 +909,6 @@ export default function Search() {
         onKeywordToggle={handleKeywordToggle}
         sort={sort}
         onSortChange={handleSortChange}
-        totalResults={data?.total || 0}
         q={q}
         fetchGlobalSuggestions={fetchGlobalSuggestions}
         onSelectSuggestion={handleSelectSuggestion}
@@ -974,9 +984,9 @@ export default function Search() {
                   bookmarkLoadingIds={bookmarkLoadingIds}
                   onBookmark={handleBookmark}
                   onSelectPaper={setSelectedPaper}
-                  page={pageParam}
-                  lastPage={data?.last_page || 1}
-                  onPageChange={handlePageChange}
+                  nextCursor={data?.next_cursor}
+                  prevCursor={data?.prev_cursor}
+                  onCursorChange={handleCursorChange}
                   q={q}
                 />
               </div>
@@ -1110,9 +1120,9 @@ export default function Search() {
                 bookmarkLoadingIds={bookmarkLoadingIds}
                 onBookmark={handleBookmark}
                 onSelectPaper={setSelectedPaper}
-                page={pageParam}
-                lastPage={searchMode === "semantic" ? 1 : (data?.last_page || 1)}
-                onPageChange={handlePageChange}
+                nextCursor={searchMode === "semantic" ? null : data?.next_cursor}
+                prevCursor={searchMode === "semantic" ? null : data?.prev_cursor}
+                onCursorChange={handleCursorChange}
                 q={q}
               />
           )}

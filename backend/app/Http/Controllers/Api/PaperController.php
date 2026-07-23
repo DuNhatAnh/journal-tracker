@@ -20,11 +20,59 @@ class PaperController extends Controller
                 ->when($request->keyword, fn($q) => $q->byKeyword($request->keyword))
                 ->when($request->year,    fn($q) => $q->byYear((int) $request->year))
                 ->orderByDesc('published_year')
-                ->paginate(10)
+                ->cursorPaginate(10)
                 ->withQueryString();
         });
 
         return response()->json($papers);
+    }
+
+    /**
+     * GET /api/papers/suggestions?q=
+     */
+    public function suggestions(Request $request)
+    {
+        $q = $request->q;
+        if (!$q) return response()->json([]);
+
+        $cacheKey = 'papers.suggestions.' . md5($q);
+        $suggestions = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($q) {
+            $words = array_filter(explode(' ', preg_replace('/[^\w\s]/', '', $q)));
+            
+            // 1. Try Full Text Search (Prefix)
+            $results = collect();
+            if (!empty($words)) {
+                $qFts = implode(' & ', array_map(fn($w) => $w . ':*A', $words));
+                $results = ResearchPaper::whereRaw("searchable @@ to_tsquery('english', ?)", [$qFts])
+                    ->orderByRaw("ts_rank(searchable, to_tsquery('english', ?)) DESC", [$qFts])
+                    ->select('id', 'title')
+                    ->limit(5)
+                    ->get();
+            }
+
+            // 2. Typo Tolerance Fallback (Trigram word_similarity)
+            if ($results->count() < 5 && mb_strlen($q) >= 3) {
+                $typoResults = ResearchPaper::whereRaw("? <% title", [$q])
+                    ->orderByRaw("word_similarity(?, title) DESC", [$q])
+                    ->select('id', 'title')
+                    ->limit(5)
+                    ->get();
+                
+                $results = $results->merge($typoResults)->unique('id')->take(5)->values();
+            }
+
+            // 3. Last Fallback (Classic ILIKE) if still empty
+            if ($results->isEmpty()) {
+                $results = ResearchPaper::where('title', 'ilike', '%' . $q . '%')
+                    ->select('id', 'title')
+                    ->limit(5)
+                    ->get();
+            }
+
+            return $results;
+        });
+
+        return response()->json($suggestions);
     }
 
     /**
@@ -46,7 +94,11 @@ class PaperController extends Controller
             $query = ResearchPaper::with(['journal', 'authors', 'keywords']);
             
             if ($request->filled('q')) {
+                // Add relevance score based on PostgreSQL ts_rank
+                $query->selectRaw("research_papers.*, ts_rank(searchable, websearch_to_tsquery('english', ?)) AS relevance_score", [$request->q]);
                 $query->search($request->q);
+            } else {
+                $query->select('research_papers.*');
             }
 
             if ($request->year) {
@@ -69,10 +121,20 @@ class PaperController extends Controller
             if ($request->sort === 'citations') {
                 $query->orderByDesc('citations_count');
             } else {
-                $query->orderByDesc('published_year')->orderByDesc('citations_count');
+                // Default sort is Relevance
+                if ($request->filled('q')) {
+                    $query->orderByDesc('relevance_score')->orderByDesc('citations_count');
+                } else {
+                    $query->orderByDesc('published_year')->orderByDesc('citations_count');
+                }
             }
 
-            return $query->paginate(10)->withQueryString();
+            // NOTE: Cursor pagination requires ordering by a unique column (e.g., id) to ensure deterministic results.
+            // When ordering by non-unique columns like 'published_year' or 'citations_count',
+            // we must append orderBy('id') or orderByDesc('id') at the end.
+            $query->orderByDesc('id');
+
+            return $query->cursorPaginate(10)->withQueryString();
         });
 
         return response()->json($papers);

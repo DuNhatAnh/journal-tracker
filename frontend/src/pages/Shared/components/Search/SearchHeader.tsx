@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, User, Book, Bot, List, Network, UploadCloud, Loader2 } from "lucide-react";
+import { Search, User, Book, Bot, List, Network, UploadCloud, Loader2, Clock } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { AutocompleteInput } from "@/src/components/ui/AutocompleteInput";
 import toast from "react-hot-toast";
@@ -13,7 +13,7 @@ interface SearchHeaderProps {
   onKeywordToggle: (keywordName: string) => void;
   sort: string;
   onSortChange: (sortVal: string) => void;
-  totalResults: number;
+  totalResults?: number;
   q: string;
   fetchGlobalSuggestions: (query: string) => Promise<any[]>;
   onSelectSuggestion: (item: any) => void;
@@ -78,11 +78,13 @@ export function SearchHeader({
     <header className="bg-transparent">
       {/* Title Section */}
       <div className="w-full mb-5">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary mb-2">
-          {searchMode === "keyword" 
-            ? `Tìm thấy ${totalResults.toLocaleString()} bài báo khoa học` 
-            : "Kết quả đối chiếu ngữ nghĩa"}
-        </div>
+        <p className="text-sm font-medium text-on-surface-variant max-w-2xl mx-auto leading-relaxed px-4">
+          {searchMode === "semantic"
+            ? "Trợ lý AI đang phân tích ngữ nghĩa 1536 chiều để tìm kiếm các tài liệu có độ tương đồng cao nhất."
+            : totalResults !== undefined
+              ? `Tìm thấy ${totalResults.toLocaleString()} bài báo khoa học`
+              : "Khám phá các bài báo khoa học"}
+        </p>
         {q ? (
           <h2 className="font-display text-3xl font-bold break-words">
             Kết quả cho <span className="gradient-text">"{q}"</span>
@@ -205,6 +207,7 @@ export function SearchHeader({
         <AutocompleteInput
           value={searchInput}
           onChange={setSearchInput}
+          recentSearchesKey="scitrend_recent_searches"
           icon={<Search className="w-4 h-4" />}
           placeholder={
             searchMode === "semantic"
@@ -220,12 +223,34 @@ export function SearchHeader({
           onSelect={(item) => {
             onSelectSuggestion(item);
           }}
-          renderSuggestion={(item) => {
+          renderSuggestion={(item, isFocused) => {
+            const isRecent = searchInput.trim() === "";
+            const highlightText = (text: string, highlight: string) => {
+              if (isRecent || !highlight.trim()) return text;
+              const regex = new RegExp(`(${highlight})`, "gi");
+              const parts = text.split(regex);
+              return (
+                <span>
+                  {parts.map((part, i) =>
+                    regex.test(part) ? (
+                      <strong key={i} className={cn("font-extrabold", isFocused ? "text-primary" : "text-primary")}>
+                        {part}
+                      </strong>
+                    ) : (
+                      <span key={i}>{part}</span>
+                    )
+                  )}
+                </span>
+              );
+            };
+
+            const Icon = isRecent ? <Clock className="w-3.5 h-3.5 text-on-surface-variant" /> : null;
+
             if (item._type === "keyword") {
               return (
                 <>
                   <span className="font-medium text-on-surface flex items-center gap-2">
-                    <span className="text-secondary">#</span> {item.name}
+                    {Icon || <span className="text-secondary">#</span>} {highlightText(item.name, searchInput)}
                   </span>
                   <span className="text-xs text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full">
                     Chủ đề
@@ -237,7 +262,7 @@ export function SearchHeader({
               return (
                 <>
                   <span className="font-medium text-on-surface flex items-center gap-2">
-                    <User className="w-3.5 h-3.5 text-primary" /> {item.name}
+                    {Icon || <User className="w-3.5 h-3.5 text-primary" />} {highlightText(item.name, searchInput)}
                   </span>
                   <span className="text-xs text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full">
                     Tác giả
@@ -245,10 +270,22 @@ export function SearchHeader({
                 </>
               );
             }
+            if (item._type === "paper") {
+              return (
+                <>
+                  <span className="font-medium text-on-surface line-clamp-1 flex items-center gap-2">
+                    {Icon || <Book className="w-3.5 h-3.5 text-emerald-500 shrink-0" />} {highlightText(item.name, searchInput)}
+                  </span>
+                  <span className="text-xs text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full shrink-0">
+                    Bài báo
+                  </span>
+                </>
+              );
+            }
             return (
               <>
                 <span className="font-medium text-on-surface flex items-center gap-2">
-                  <Book className="w-3.5 h-3.5 text-tertiary" /> {item.name}
+                  {Icon || <Book className="w-3.5 h-3.5 text-tertiary" />} {highlightText(item.name, searchInput)}
                 </span>
                 <span className="text-xs text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full">
                   Tạp chí

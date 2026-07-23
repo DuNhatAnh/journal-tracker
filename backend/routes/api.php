@@ -95,6 +95,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Research Papers
     Route::prefix('papers')->group(function () {
         Route::get('/', [PaperController::class, 'index']);
+        Route::get('/suggestions', [PaperController::class, 'suggestions']);
         Route::get('/search', [PaperController::class, 'search']);
         Route::get('/{paper}', [PaperController::class, 'show']);
     });

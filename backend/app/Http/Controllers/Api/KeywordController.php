@@ -23,24 +23,33 @@ class KeywordController extends Controller
         }
 
         $lowerQ = mb_strtolower($q);
+        $cacheKey = "keywords.search." . md5($lowerQ) . ".per_page.{$perPage}";
 
-        // Standard case-insensitive search
-        $keywords = Keyword::withCount('papers')
-            ->whereRaw('LOWER(name) LIKE ?', ["%{$lowerQ}%"])
-            ->orderByDesc('papers_count')
-            ->paginate($perPage);
+        $keywords = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($lowerQ, $q, $perPage) {
+            // Standard case-insensitive search - Optimized for Auto-complete
+            $results = Keyword::select('id', 'name')
+                ->where('name', 'ilike', "%{$lowerQ}%")
+                ->limit($perPage)
+                ->get();
 
-        // Fallback to fuzzy match (typo tolerance) if no exact match found
-        if ($keywords->isEmpty() && mb_strlen($q) >= 3) {
-            $chars = mb_str_split(str_replace(' ', '', $lowerQ));
-            $fuzzyPattern = '%' . implode('%', $chars) . '%';
-            
-            $keywords = Keyword::withCount('papers')
-                ->whereRaw('LOWER(name) LIKE ?', [$fuzzyPattern])
-                ->orderByRaw("LENGTH(name) ASC") // Prioritize tighter matches
-                ->orderByDesc('papers_count')
-                ->paginate($perPage);
-        }
+            // Fallback to fuzzy match (typo tolerance) if no exact match found
+            if ($results->isEmpty() && mb_strlen($q) >= 3) {
+                $chars = mb_str_split(str_replace(' ', '', $lowerQ));
+                $fuzzyPattern = '%' . implode('%', $chars) . '%';
+                
+                $results = Keyword::select('id', 'name')
+                    ->whereRaw('LOWER(name) LIKE ?', [$fuzzyPattern])
+                    ->orderByRaw("LENGTH(name) ASC") // Prioritize tighter matches
+                    ->limit($perPage)
+                    ->get();
+            }
+
+            // Return as paginated format to keep backward compatibility with frontend expecting data array
+            return [
+                'data' => $results,
+                'total' => $results->count(),
+            ];
+        });
 
         return response()->json($keywords);
     }

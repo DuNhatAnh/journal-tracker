@@ -28,9 +28,9 @@ interface SearchResultsListProps {
   bookmarkLoadingIds: Set<number>;
   onBookmark: (id: number) => void;
   onSelectPaper: (paper: Paper) => void;
-  page: number;
-  lastPage: number;
-  onPageChange: (p: number) => void;
+  nextCursor?: string | null;
+  prevCursor?: string | null;
+  onCursorChange: (c: string | null) => void;
   q?: string;
 }
 
@@ -64,9 +64,9 @@ export function SearchResultsList({
   bookmarkLoadingIds,
   onBookmark,
   onSelectPaper,
-  page,
-  lastPage,
-  onPageChange,
+  nextCursor,
+  prevCursor,
+  onCursorChange,
   q,
 }: SearchResultsListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -77,7 +77,7 @@ export function SearchResultsList({
       scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     }, 120);
     return () => clearTimeout(timer);
-  }, [page]);
+  }, [nextCursor, prevCursor]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
@@ -274,23 +274,23 @@ export function SearchResultsList({
         )}
       </div>
 
-      {lastPage > 1 && (
-        <div className="flex justify-center items-center gap-2 pt-8">
+      {(prevCursor || nextCursor) && (
+        <div className="flex justify-center items-center gap-4 pt-8">
           <button
-            onClick={() => onPageChange(page - 1)}
-            disabled={page === 1}
-            className="p-2 rounded border border-white/10 hover:bg-white/5 disabled:opacity-50"
+            onClick={() => prevCursor && onCursorChange(prevCursor)}
+            disabled={!prevCursor}
+            className="flex items-center gap-1 px-4 py-2 rounded border border-white/10 hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
           >
             <ChevronLeft className="w-4 h-4" />
+            <span className="text-xs font-bold uppercase">Trang trước</span>
           </button>
-          <span className="text-xs font-bold text-on-surface-variant px-4">
-            Trang {page} / {lastPage}
-          </span>
+          
           <button
-            onClick={() => onPageChange(page + 1)}
-            disabled={page === lastPage}
-            className="p-2 rounded border border-white/10 hover:bg-white/5 disabled:opacity-50"
+            onClick={() => nextCursor && onCursorChange(nextCursor)}
+            disabled={!nextCursor}
+            className="flex items-center gap-1 px-4 py-2 rounded border border-white/10 hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
           >
+            <span className="text-xs font-bold uppercase">Trang sau</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>

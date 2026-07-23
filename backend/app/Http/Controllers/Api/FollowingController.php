@@ -144,9 +144,6 @@ class FollowingController extends Controller
         return response()->json(['message' => 'Đã hủy theo dõi tác giả.']);
     }
 
-    /**
-     * Search options to follow.
-     */
     public function search(Request $request)
     {
         $type = $request->query('type');
@@ -156,19 +153,29 @@ class FollowingController extends Controller
             return response()->json([]);
         }
 
-        if ($type === 'keyword') {
-            $results = Keyword::where('name', 'ilike', "%{$q}%")
-                ->limit(20)
-                ->get();
-        } elseif ($type === 'journal') {
-            $results = Journal::where('name', 'ilike', "%{$q}%")
-                ->limit(20)
-                ->get();
-        } elseif ($type === 'author') {
-            $results = Author::where('name', 'ilike', "%{$q}%")
-                ->limit(20)
-                ->get();
-        } else {
+        $cacheKey = "following.search.{$type}." . md5($q);
+
+        $results = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($type, $q) {
+            if ($type === 'keyword') {
+                return Keyword::select('id', 'name')
+                    ->where('name', 'ilike', "%{$q}%")
+                    ->limit(20)
+                    ->get();
+            } elseif ($type === 'journal') {
+                return Journal::select('id', 'name')
+                    ->where('name', 'ilike', "%{$q}%")
+                    ->limit(20)
+                    ->get();
+            } elseif ($type === 'author') {
+                return Author::select('id', 'name')
+                    ->where('name', 'ilike', "%{$q}%")
+                    ->limit(20)
+                    ->get();
+            }
+            return null;
+        });
+
+        if ($results === null) {
             return response()->json(['message' => 'Loại tìm kiếm không hợp lệ.'], 400);
         }
 

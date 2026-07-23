@@ -93,7 +93,7 @@ class ResearchPaper extends Model
                     $tokens = [];
                     foreach ($matches[0] as $index => $match) {
                         if (!empty($matches[1][$index])) {
-                            $tokens[] = $matches[1][$index]; // Quoted phrase
+                            $tokens[] = '"' . $matches[1][$index] . '"'; // Keep quotes for websearch_to_tsquery
                         } else {
                             $tokens[] = $matches[2][$index]; // Normal word
                         }
@@ -114,11 +114,11 @@ class ResearchPaper extends Model
                         $expectingNot = false;
                         
                         $condition = function ($q2) use ($token) {
-                            $q2->where('title', 'ilike', "%{$token}%")
-                               ->orWhere('abstract', 'ilike', "%{$token}%")
-                               ->orWhereHas('keywords', fn($k) => $k->where('name', 'ilike', "%{$token}%"))
-                               ->orWhereHas('authors', fn($a) => $a->where('name', 'ilike', "%{$token}%"))
-                               ->orWhereHas('journal', fn($j) => $j->where('name', 'ilike', "%{$token}%"));
+                            $cleanToken = trim($token, '"');
+                            $q2->whereRaw("searchable @@ websearch_to_tsquery('english', ?)", [$token])
+                               ->orWhereHas('keywords', fn($k) => $k->where('name', 'ilike', "%{$cleanToken}%"))
+                               ->orWhereHas('authors', fn($a) => $a->where('name', 'ilike', "%{$cleanToken}%"))
+                               ->orWhereHas('journal', fn($j) => $j->where('name', 'ilike', "%{$cleanToken}%"));
                         };
 
                         if ($isNot) {
